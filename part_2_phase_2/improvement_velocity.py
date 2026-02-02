@@ -260,7 +260,8 @@ def get_fighter_stats(fighter):
             'opponent_strength',
             'adjusted_performance',
             'adjusted_performance_category',
-            'event_name'
+            'event_name',
+            'win_flag_indicator'
         ]].copy()
         
         fighter_summary.columns = [
@@ -271,7 +272,8 @@ def get_fighter_stats(fighter):
             'Opp Str',
             'Adj Perf',
             'Category',
-            'Event'
+            'Event',
+            'win(1)/loss(0)'
         ]
         
         print(fighter_summary.to_string(index=False))
@@ -442,6 +444,10 @@ if __name__ == "__main__":
     print("3. Memo(information about the model and how to read it)")
     print("4. Exit")
     option = input("\nEnter your option: ")
+    #with error handling
+    if option not in ["1", "2", "3", "4"]:
+        print("Invalid option. Please try again.")
+
     while option != "4":
         if option == "1":
             fighter_name_input = input("\nEnter fighter name for analysis: ")
