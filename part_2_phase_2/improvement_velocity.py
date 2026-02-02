@@ -162,10 +162,13 @@ def calculate_adjusted_performance(row):
     opp_str = row['opponent_strength']
     won = row['win_flag_indicator']
     fight_time = row['fight_time_sec']
+    method_of_victory = row['method']
     
     if won == 1:
         # Wins: Boost based on opponent strength
         adjusted = base_perf * (0.5 + opp_str)
+    elif method_of_victory == 'DQ':
+        adjusted = base_perf
     else:
         # Losses: Apply penalty for short fight
         # normalize fight time
