@@ -35,7 +35,7 @@ fighter_df_filtered['career_stage'] = fighter_df_filtered['fight_number'].apply(
 # Calculate average win rate by career stage
 stage_performance = fighter_df_filtered.groupby('career_stage').agg({
     'win_flag_indicator': 'mean',
-    'age_at_fight': 'mean',  # ← ADD THIS
+    'age_at_fight': 'mean',  
     'fight_number': 'count'
 }).round(3)
 
@@ -46,9 +46,8 @@ print(f"WIN RATE BY CAREER STAGE")
 print(f"{'='*60}")
 print(stage_performance)
 
-# ============================================================
-# STEP 2: Find Individual Fighter Peak Windows
-# ============================================================
+#  Find Individual Fighter Peak Windows
+
 
 def find_peak_window(fighter_data):
     """Find the fight number where fighter had highest rolling win rate"""
@@ -85,9 +84,7 @@ print(f"Average peak occurs at fight: {peak_df['peak_fight_number'].mean():.1f}"
 print(f"Median peak occurs at fight: {peak_df['peak_fight_number'].median():.1f}")
 print(f"Most common peak fight: {peak_df['peak_fight_number'].mode().values[0]}")
 
-# ============================================================
-# STEP 3: Visualize Peak Distribution
-# ============================================================
+#visulaize
 
 plt.figure(figsize=(14, 6))
 
@@ -123,8 +120,8 @@ for i, bar in enumerate(bars):
              f'{height:.3f}', ha='center', va='bottom', fontsize=10)
 
 plt.tight_layout()
-plt.savefig('prime_window_analysis.png', dpi=300, bbox_inches='tight')
-print(f"\n✅ Saved visualization: prime_window_analysis.png")
+plt.savefig('analysis_images_part_2/prime_window_analysis.png', dpi=300, bbox_inches='tight')
+print(f"\n Saved visualization: prime_window_analysis.png")
 
 plt.show()
 

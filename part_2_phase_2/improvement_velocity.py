@@ -200,6 +200,48 @@ fighters_df['adjusted_performance_category'] = fighters_df['adjusted_performance
 
 print("All calculations complete")
 
+def compute_career_score(fighter_fights: pd.DataFrame) -> float:
+    """Your exact Career efficiency (Title-Adjusted) metric, but for a fighter's slice."""
+    win_rate = fighter_fights['win_flag_indicator'].mean()
+    avg_adj_perf = fighter_fights['adjusted_performance'].mean()
+
+    title_fights = fighter_fights[fighter_fights['title_fight'] == 1]
+    num_title_fights = len(title_fights)
+    num_title_wins = title_fights['win_flag_indicator'].sum()
+
+    title_bonus = 0.03 * num_title_fights + 0.10 * num_title_wins
+    title_bonus = min(title_bonus, 0.25)
+
+    max_adj_perf = fighters_df['adjusted_performance'].max()
+    norm_adj_perf = avg_adj_perf / max_adj_perf
+
+    career_quality_score = 0.6 * win_rate + 0.4 * norm_adj_perf
+
+    total_fights = len(fighter_fights)
+    longevity_factor = min(np.sqrt(total_fights / 25.0), 1.0)
+
+    career_quality_title_adjusted = (
+        0.7 * (career_quality_score + title_bonus) +
+        0.3 * longevity_factor
+    ) * 100
+
+    return min(career_quality_title_adjusted, 100.0)
+
+
+def get_top_careers_by_metric(top_n: int = 20, min_fights: int = 5) -> pd.DataFrame:
+    """Top N fighters by your career metric."""
+    scores = (
+        fighters_df.groupby(['id', 'name'])
+        .filter(lambda g: len(g) >= min_fights)
+        .groupby(['id', 'name'])
+        .apply(compute_career_score)
+        .rename('career_quality_title_adjusted')
+        .reset_index()
+        .sort_values('career_quality_title_adjusted', ascending=False)
+        .head(top_n)
+    )
+    return scores
+
 # Fighter stats lookup function
 def get_fighter_stats(fighter):
     fighter_name = fighter.strip()
@@ -351,8 +393,67 @@ def get_fighter_stats(fighter):
         sample_fighters = fighters_df['name'].value_counts().head(20).index.tolist()
         for i, name in enumerate(sample_fighters, 1):
             print(f"  {i}. {name}")
+def print_model_memo() -> None:
+    memo = """
+=============================
+MODEL MEMO (Quick Guide)
+=============================
 
+This tool outputs 3 key numbers per fight:
+
+1) Raw Performance (0–100)
+- “How well you performed” based on fight stats.
+- Higher = more effective/efficient in your style (striking vs grappling weighting).
+- It’s relative to this dataset (80 is “better than most fights here”, not “80% perfect”).
+
+2) Opponent Strength (continuous, ~0.50 to 0.75)
+- Continuous score, not a label.
+- 0.50 = average/unknown opponent (or not enough prior data).
+- It uses the opponent’s track record BEFORE the fight date and becomes more trusted as they have more fights.
+- It’s capped at 0.75 so opponent boosts don’t dominate the model.
+
+3) Adjusted Performance
+- Context score: Raw Performance scaled by opponent strength and result.
+
+How wins are treated:
+- Beating stronger opponents increases Adjusted Performance more.
+
+How losses are treated (yes, you get punished for getting finished early):
+- Losses get a lower base multiplier than wins.
+- Losses are also multiplied by a duration factor:
+  * short loss (quick finish) -> bigger penalty
+  * long loss (competitive late) -> smaller penalty
+
+Reading tips:
+- High Raw + low Opp Str -> looked great vs weaker/unknown competition.
+- Medium Raw + high Opp Str -> solid work vs strong competition.
+- Low Adjusted in a loss -> often a short/early loss.
+
+Note:
+This is NOT a “GOAT” or head-to-head ranking. It’s measuring consistency + dominance vs competition.
+=============================
+"""
+    print(memo)
 if __name__ == "__main__":
-    while True:
-        fighter_name_input = input("\nEnter fighter name for analysis: ")
-        get_fighter_stats(fighter_name_input)
+    print("Welcome to the UFC Fighter Analysis Tool to get best careers in UFC History!")
+    print("Options:")
+    print("1. Enter fighter name to analyze:")
+    print("2. List top N fighters by Career Quality:")
+    print("3. Memo(information about the model and how to read it)")
+    print("4. Exit")
+    option = input("\nEnter your option: ")
+    while option != "4":
+        if option == "1":
+            fighter_name_input = input("\nEnter fighter name for analysis: ")
+            get_fighter_stats(fighter_name_input)
+        elif option == "2":
+            top_n = int(input("Enter the number of top fighters to display: "))
+            top_careers = get_top_careers_by_metric(top_n)
+            print(f"\nTop {top_n} fighters by Career Quality:")
+            b = 0
+            for i, row in top_careers.iterrows():
+                b += 1
+                print(f"{b}. {row['name']} - Career Quality: {row['career_quality_title_adjusted']:.2f}")
+        elif option == "3":
+            print_model_memo()
+        option = input("\nEnter your option: ")
