@@ -5,6 +5,8 @@ def red_corner_fighters(ufc_dataset):
     cols_not_b = [c for c in ufc_dataset.columns if not c.startswith("b_")] # Exclude blue corner columns
     r_filtered_df = ufc_dataset[cols_not_b].copy() # Keep only red corner columns
     r_filtered_df["sig_str_absorbed"] = ufc_dataset["b_sig_str_landed"]
+    r_filtered_df["opponent_id"] = ufc_dataset["b_id"]
+    r_filtered_df["opponent_name"] = ufc_dataset["b_name"]
     r_filtered_df =r_filtered_df.rename(columns=lambda c: c[2:] if c.startswith("r_") else c) #renamecols
     return r_filtered_df
 
@@ -12,6 +14,8 @@ def blue_corner_fighters(ufc_dataset):
     cols_not_r = [c for c in ufc_dataset.columns if not c.startswith("r_")]
     b_filtered_df = ufc_dataset[cols_not_r].copy()
     b_filtered_df["sig_str_absorbed"] = ufc_dataset["r_sig_str_landed"]
+    b_filtered_df["opponent_id"] = ufc_dataset["r_id"]
+    b_filtered_df["opponent_name"] = ufc_dataset["r_name"]
     b_filtered_df = b_filtered_df.rename(columns=lambda c: c[2:] if c.startswith("b_") else c)
     return b_filtered_df
 
