@@ -11,10 +11,10 @@ This project uses statistical analysis and machine learning to investigate what 
 
 | Part | Focus | Status |
 |------|-------|--------|
-| **Part 1** | Statistical analysis of common MMA beliefs | ✅ Complete |
-| **Part 2** | Career trajectory and fighter evolution modeling | ✅ Complete |
-| **Part 3** | Predictive modeling and matchup analysis | 🔄 In Progress |
-| **Part 4** | Fighter archetype clustering and profiling | 🔄 In Progress |
+| **Part 1** | Statistical analysis of common MMA beliefs | Complete |
+| **Part 2** | Career trajectory and fighter evolution modeling | Complete |
+| **Part 3** | Predictive modeling and matchup analysis | Complete |
+| **Part 4** | Fighter archetype clustering and profiling | Complete |
 
 ---
 
@@ -88,15 +88,6 @@ This chart shows the correlation between height/reach and winning, broken down b
 - **Women's Bantamweight** bucks this trend with positive correlations for both height (~0.14) and reach (~0.12), suggesting body type effects are not uniform across women's divisions.
 
 > **Takeaway:** Size isn't universally good or bad — its impact is highly division-dependent. In lighter divisions, being compact can be an advantage. In heavier divisions, longer reach is a genuine edge.
-
----
-
-## Goals
-
-- [x] Test hypotheses about fight outcomes with data
-- [x] Identify patterns in fighter career development
-- [ ] Build interpretable models for fight prediction
-- [ ] Extract actionable insights from historical fight data
 
 ---
 
