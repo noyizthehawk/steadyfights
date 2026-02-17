@@ -91,11 +91,64 @@ This chart shows the correlation between height/reach and winning, broken down b
 
 ---
 
+##  Part 2 & 3 — Improvement Velocity & Fight Prediction Model
+
+This project contains two major computational pipelines:
+
+###  `improvement_velocity.py`
+
+This script analyzes **fighter career trajectories**:
+
+- Computes per-fight performance metrics adjusted for **fight time, opponent strength, and style-weighted contributions**.  
+- Calculates **rolling performance averages** and **improvement velocity** to identify:
+  - Rapid risers  
+  - Plateaus  
+  - Declining fighters  
+  - Late bloomers  
+- Outputs a **fight-level CSV** with adjusted performance and opponent strength for downstream use in predictive models.
+
+> Core insight: Fighters do not improve linearly. Tracking momentum provides richer context than static averages.
+
+---
+
+### Fight Predictor — Machine Learning Model
+
+Predicts UFC fight winners using **engineered fighter matchup features**:
+
+- **Input Features:**
+  - Elo ratings (before fight)  
+  - Rolling performance stats (3- and 5-fight windows)  
+  - Striking/takedown differentials  
+  - Opponent strength metrics  
+  - Style clusters (Striker / Grappler / Balanced)  
+  - Physical attributes (height, reach, age, weight)  
+  - Stance differences  
+
+- **Models Used:**
+  - `XGBClassifier` (XGBoost)  
+  - `RandomForestClassifier`  
+  - `LogisticRegression`  
+  - **Ensemble Voting Classifier** (soft voting)  
+  - Calibrated for probabilities using `CalibratedClassifierCV`
+
+- **Performance:**
+  -Test Accuracy: ~61.2%
+  -Training Accuracy: ~63.7%
+- **Interpretation:**  
+  Accuracy is modest but meaningful in MMA; fights have high variance and judging subjectivity. The model captures **real signal above chance**, while respecting inherent unpredictability.
+
+- **Interactive Use:**  
+  Users can query matchups via a command-line menu to see predicted win probabilities and confidence for each fighter.
+
+> Key takeaway: Combining style-aware metrics, opponent context, and rolling performance creates a **more realistic fighter evaluation**, beyond simple record or stat-based comparisons.
+
+---
+
 ## Tech Stack
 
-- **Python** — pandas, numpy, scikit-learn, matplotlib, seaborn
-- **Statistical Analysis** — hypothesis testing, correlation analysis, distribution modeling
-- **Machine Learning** — classification models, clustering (coming in Parts 3–4)
+- **Python** — pandas, numpy, scikit-learn, matplotlib, seaborn  
+- **Statistical Analysis** — hypothesis testing, correlation analysis, distribution modeling  
+- **Machine Learning** — classification models (XGBoost, Random Forest, Logistic Regression), ensemble learning, calibration, clustering  
 
 ---
 
