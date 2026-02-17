@@ -38,7 +38,7 @@ The right chart tells an equally striking story. Win rate declines monotonically
 
 #### Myth #1: Does Reach Advantage Predict Wins?
 
-![Myth 1 - Reach Advantage](myth1_reach_advantage.png)
+![Myth 1 - Reach Advantage](analysis_images_part_1/myth1_reach_advantage.png)
 
 **Verdict: Partially TRUE — but only at the extremes.**
 
