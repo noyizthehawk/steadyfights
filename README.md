@@ -138,7 +138,7 @@ Predicts UFC fight winners using **engineered fighter matchup features**:
   Accuracy is modest but meaningful in MMA; fights have high variance and judging subjectivity. The model captures **real signal above chance**, while respecting inherent unpredictability.
 
 - **Interactive Use:**  
-  Users can query matchups via a command-line menu to see predicted win probabilities and confidence for each fighter.
+  Users can query matchups via a command-line menu to see predicted win probabilities and confidence for each fighter.(Run Main.py)
 
 > Key takeaway: Combining style-aware metrics, opponent context, and rolling performance creates a **more realistic fighter evaluation**, beyond simple record or stat-based comparisons.
 
