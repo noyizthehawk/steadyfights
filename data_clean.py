@@ -27,7 +27,7 @@ def base_clean(path):
 
 
 def clean_ufc():
-    df = base_clean("UFC.csv")
+    df = base_clean("Uncleaned/UFC.csv")
 
     for c in ["r_dob", "b_dob"]:
         if c in df.columns:
@@ -37,7 +37,7 @@ def clean_ufc():
 
 
 def clean_event():
-    df = base_clean("event_details.csv")
+    df = base_clean("Uncleaned/event_details.csv")
 
     if 'date' in df.columns:
         df['date'] = pd.to_datetime(df['date'], errors="coerce")
@@ -45,7 +45,7 @@ def clean_event():
     return df
 
 def clean_fight():
-    df = base_clean("fight_details.csv")
+    df = base_clean("Uncleaned/fight_details.csv")
 
     # Convert all relevant numeric columns to float
     numeric_cols = [col for col in df.columns if any(x in col for x in [
@@ -60,7 +60,7 @@ def clean_fight():
 
 
 def clean_fighter():
-    df = base_clean("fighter_details.csv")
+    df = base_clean("Uncleaned/fighter_details.csv")
 
     # Numeric columns
     numeric_cols = [
@@ -83,10 +83,10 @@ def clean_fighter():
 
 if __name__ == "__main__":
     # clean each dataset and save
-    clean_ufc().to_csv("UFC_clean.csv", index=False)
-    clean_event().to_csv("event_clean.csv", index=False)
-    clean_fight().to_csv("fight_clean.csv", index=False)
-    clean_fighter().to_csv("fighter_clean.csv", index=False)
+    clean_ufc().to_csv("csv/UFC_clean.csv", index=False)
+    clean_event().to_csv("csv/event_clean.csv", index=False)
+    clean_fight().to_csv("csv/fight_clean.csv", index=False)
+    clean_fighter().to_csv("csv/fighter_clean.csv", index=False)
 
     print("All datasets cleaned and saved:")
     print("- UFC_clean.csv")

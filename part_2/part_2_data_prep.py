@@ -35,8 +35,7 @@ def blue_corner_fighters(ufc_dataset):
 def merge_red_blue(red_df, blue_df):
     merged_df = pd.concat([red_df, blue_df], ignore_index=True)
     return merged_df
-    
-    
+
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -45,26 +44,27 @@ if __name__ == "__main__":
     csv_output_path = os.path.join(script_dir, "../csv/fighter_level_data.csv")
     ufc_dataset = pd.read_csv(csv_input_path)
 
-    red_corner =red_corner_fighters(ufc_dataset)
+    red_corner = red_corner_fighters(ufc_dataset)
     blue_corner = blue_corner_fighters(ufc_dataset)
 
     # Merge red and blue corner fighters
     fighters_df = merge_red_blue(red_corner, blue_corner)
-    
+
     fighters_df["date"] = pd.to_datetime(fighters_df["date"])
     fighters_df["dob"] = pd.to_datetime(fighters_df["dob"])  # date of birth
 
     fighters_df = fighters_df.sort_values(by=["name", "date"])
     fighters_df["fight_number"] = fighters_df.groupby("name").cumcount() + 1
+
     # days since last fight
     fighters_df["days_since_last_fight"] = fighters_df.groupby("name")["date"].diff().dt.days
 
-    #age at fight
+    # age at fight
     fighters_df["age_at_fight"] = ((fighters_df["date"] - fighters_df["dob"]).dt.days / 365.25).round(2)
-    #winner column
+
+    # winner column
     fighters_df['win_flag_indicator'] = (fighters_df['winner'] == fighters_df['name']).astype(int)
-    
-    #rolling rates
+
     # Fight time in minutes
     fighters_df["fight_time_min"] = (fighters_df["finish_round"] - 1) * 300 + fighters_df["match_time_sec"]
     fighters_df["fight_time_min"] = fighters_df["fight_time_min"] / 60
@@ -76,7 +76,9 @@ if __name__ == "__main__":
     # Takedown accuracy
     fighters_df["td_acc_fight"] = (fighters_df["td_landed"] / fighters_df["td_atmpted"]).fillna(0)
 
-    # ========================== rolling rates ================================
+    # Create debut flag first
+    fighters_df["is_debut"] = (fighters_df["fight_number"] == 1).astype(int)
+
     # --- STRIKING ---
     fighters_df["rolling_slpm_3"] = (
         fighters_df.groupby("name")["sig_str_landed_per_min"]
@@ -108,19 +110,12 @@ if __name__ == "__main__":
         .round(2)
     )
 
-    # Fill NaNs with dataset mean (first fights)
-    fighters_df["rolling_slpm_3"] = fighters_df["rolling_slpm_3"].fillna(
-        fighters_df["sig_str_landed_per_min"].mean()
-    )
-    fighters_df["rolling_slpm_5"] = fighters_df["rolling_slpm_5"].fillna(
-        fighters_df["sig_str_landed_per_min"].mean()
-    )
-    fighters_df["rolling_sapm_3"] = fighters_df["rolling_sapm_3"].fillna(
-        fighters_df["sig_str_absorbed_per_min"].mean()
-    )
-    fighters_df["rolling_sapm_5"] = fighters_df["rolling_sapm_5"].fillna(
-        fighters_df["sig_str_absorbed_per_min"].mean()
-    )
+    # Fill NaNs ONLY for debut fights (fight_number == 1)
+    # Use 0 as placeholder - model will learn to ignore with is_debut flag
+    fighters_df["rolling_slpm_3"] = fighters_df["rolling_slpm_3"].fillna(0)
+    fighters_df["rolling_slpm_5"] = fighters_df["rolling_slpm_5"].fillna(0)
+    fighters_df["rolling_sapm_3"] = fighters_df["rolling_sapm_3"].fillna(0)
+    fighters_df["rolling_sapm_5"] = fighters_df["rolling_sapm_5"].fillna(0)
 
     # --- GRAPPLING ---
     fighters_df["rolling_td_acc_3"] = (
@@ -152,19 +147,11 @@ if __name__ == "__main__":
         .round(2)
     )
 
-    # Fill NaNs with dataset mean
-    fighters_df["rolling_td_acc_3"] = fighters_df["rolling_td_acc_3"].fillna(
-        fighters_df["td_acc_fight"].mean()
-    )
-    fighters_df["rolling_td_acc_5"] = fighters_df["rolling_td_acc_5"].fillna(
-        fighters_df["td_acc_fight"].mean()
-    )
-    fighters_df["rolling_td_def_3"] = fighters_df["rolling_td_def_3"].fillna(
-        fighters_df["td_defense"].mean()
-    )
-    fighters_df["rolling_td_def_5"] = fighters_df["rolling_td_def_5"].fillna(
-        fighters_df["td_defense"].mean()
-    )
+    # Fill NaNs for debut fights
+    fighters_df["rolling_td_acc_3"] = fighters_df["rolling_td_acc_3"].fillna(0)
+    fighters_df["rolling_td_acc_5"] = fighters_df["rolling_td_acc_5"].fillna(0)
+    fighters_df["rolling_td_def_3"] = fighters_df["rolling_td_def_3"].fillna(0)
+    fighters_df["rolling_td_def_5"] = fighters_df["rolling_td_def_5"].fillna(0)
 
     # --- WIN RATE ---
     fighters_df["rolling_win_rate_3"] = (
@@ -182,8 +169,9 @@ if __name__ == "__main__":
         .round(2)
     )
 
-    # Fill first-fight NaNs with neutral 0.5
+    # Fill first-fight NaNs with neutral 0.5 (no prior win history)
     fighters_df["rolling_win_rate_3"] = fighters_df["rolling_win_rate_3"].fillna(0.5)
     fighters_df["rolling_win_rate_5"] = fighters_df["rolling_win_rate_5"].fillna(0.5)
+
     # Write merged DataFrame to CSV
     fighters_df.to_csv(csv_output_path, index=False)

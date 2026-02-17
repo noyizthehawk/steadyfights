@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
+import os
 
-fighters_df = pd.read_csv("csv/fighter_level_data.csv")  # Load dataset
-
+script_dir = os.path.dirname(os.path.abspath(__file__))
+fighter_csv = os.path.join(script_dir, "../csv/fighter_level_data.csv")
+fighters_df = pd.read_csv(fighter_csv)
 
 fighters_df['date'] = pd.to_datetime(fighters_df['date'])
 fighters_df = fighters_df.sort_values(['id', 'date']).reset_index(drop=True)
@@ -224,7 +226,13 @@ fight_level_df.rename(columns={
 }, inplace=True)
 
 # Save CSV
-fight_level_df.to_csv("csv/fighter_opponent_strength_extra.csv", index=False)
+csv_dir = os.path.join(script_dir, "../csv")
+os.makedirs(csv_dir, exist_ok=True)
+
+fight_level_df.to_csv(
+    os.path.join(csv_dir, "fighter_opponent_strength_extra.csv"),
+    index=False
+)
 print("Fight-level CSV for all fighters saved!")
 print("All calculations complete\n")
 

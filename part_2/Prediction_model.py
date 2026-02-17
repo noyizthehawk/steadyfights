@@ -1,0 +1,362 @@
+import pandas as pd
+import numpy as np
+import os
+import xgboost as xgb
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.ensemble import VotingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+fighter_csv = os.path.join(script_dir, "../csv/fighter_level_data.csv")
+opp_strength_csv = os.path.join(script_dir, "../csv/fighter_opponent_strength_extra.csv")
+
+fighters_df = pd.read_csv(fighter_csv)
+opp_strength_df = pd.read_csv(opp_strength_csv)
+
+# Merge opponent strength
+fighters_df = fighters_df.merge(
+    opp_strength_df[['Fighter', 'fight_number', 'Adj Perf', 'Opp Str']],
+    left_on=['name', 'fight_number'],
+    right_on=['Fighter', 'fight_number'],
+    how='left'
+)
+fighters_df.drop(columns=['Fighter'], inplace=True)
+fighters_df.rename(columns={'Opp Str': 'opponent_strength'}, inplace=True)
+fighters_df.rename(columns={'Adj Perf': 'adjusted_performance'}, inplace=True)
+
+#  elo rating system
+fighters_df['date'] = pd.to_datetime(fighters_df['date'])
+fighters_df['dob'] = pd.to_datetime(fighters_df['dob'])
+fighters_df = fighters_df.sort_values('date').reset_index(drop=True)
+
+# Initialize Elo tracking
+elo_ratings = {}
+K_FACTOR = 32
+INITIAL_ELO = 1500
+
+
+def expected_score(elo_a, elo_b):
+    return 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
+
+
+def update_elo(elo_a, elo_b, actual_score_a, k=K_FACTOR):
+    expected_a = expected_score(elo_a, elo_b)
+    new_elo_a = elo_a + k * (actual_score_a - expected_a)
+    new_elo_b = elo_b + k * ((1 - actual_score_a) - (1 - expected_a))
+    return new_elo_a, new_elo_b
+
+
+fighters_df['elo_before_fight'] = 0.0
+fighters_df['opponent_elo_before_fight'] = 0.0
+
+processed_fights = set()
+for idx, row in fighters_df.iterrows():
+    fight_id = row['fight_id']
+    fighter_name = row['name']
+    if fight_id in processed_fights:
+        continue
+    fight_rows = fighters_df[fighters_df['fight_id'] == fight_id]
+
+    if len(fight_rows) != 2:
+        continue
+
+    fighter_a = fight_rows.iloc[0]
+    fighter_b = fight_rows.iloc[1]
+
+    name_a = fighter_a['name']
+    name_b = fighter_b['name']
+    elo_a = elo_ratings.get(name_a, INITIAL_ELO)
+    elo_b = elo_ratings.get(name_b, INITIAL_ELO)
+
+    fighters_df.loc[fight_rows.index[0], 'elo_before_fight'] = elo_a
+    fighters_df.loc[fight_rows.index[1], 'elo_before_fight'] = elo_b
+    fighters_df.loc[fight_rows.index[0], 'opponent_elo_before_fight'] = elo_b
+    fighters_df.loc[fight_rows.index[1], 'opponent_elo_before_fight'] = elo_a
+
+    winner = fighter_a['winner']
+    if winner == name_a:
+        actual_score_a = 1.0
+    elif winner == name_b:
+        actual_score_a = 0.0
+    else:
+        actual_score_a = 0.5
+
+    new_elo_a, new_elo_b = update_elo(elo_a, elo_b, actual_score_a)
+    elo_ratings[name_a] = new_elo_a
+    elo_ratings[name_b] = new_elo_b
+    processed_fights.add(fight_id)
+
+fighters_df['elo_diff'] = fighters_df['elo_before_fight'] - fighters_df['opponent_elo_before_fight']
+
+# Physical features
+fighters_df['age_at_fight'] = ((fighters_df['date'] - fighters_df['dob']).dt.days / 365.25).round(2)
+stance_dummies = pd.get_dummies(fighters_df['stance'], prefix='stance')
+fighters_df = pd.concat([fighters_df, stance_dummies], axis=1)
+fighters_df.drop(columns=['stance'], inplace=True)
+
+# Striking derivation
+fighters_df["striking_differential_3"] = fighters_df["rolling_slpm_3"] - fighters_df["rolling_sapm_3"]
+fighters_df["striking_differential_5"] = fighters_df["rolling_slpm_5"] - fighters_df["rolling_sapm_5"]
+
+fighters_df["str_acc_fight"] = (
+        fighters_df["sig_str_landed"] / fighters_df["sig_str_atmpted"]
+).fillna(0)
+
+fighters_df["rolling_str_acc_3"] = (
+    fighters_df.groupby("name")["str_acc_fight"]
+    .shift(1)
+    .rolling(3, min_periods=1)
+    .mean()
+    .round(2)
+)
+fighters_df["rolling_str_acc_5"] = (
+    fighters_df.groupby("name")["str_acc_fight"]
+    .shift(1)
+    .rolling(5, min_periods=1)
+    .mean()
+    .round(2)
+)
+fighters_df["rolling_str_acc_3"] = fighters_df["rolling_str_acc_3"].fillna(0)
+fighters_df["rolling_str_acc_5"] = fighters_df["rolling_str_acc_5"].fillna(0)
+
+# Rolling opponent features
+fighters_df['rolling_opp_elo_3'] = (
+    fighters_df.groupby('name')['opponent_elo_before_fight']
+    .shift(1)
+    .rolling(3, min_periods=1)
+    .mean()
+    .round(2)
+)
+fighters_df['rolling_opp_elo_5'] = (
+    fighters_df.groupby('name')['opponent_elo_before_fight']
+    .shift(1)
+    .rolling(5, min_periods=1)
+    .mean()
+    .round(2)
+)
+fighters_df['rolling_opp_elo_3'] = fighters_df['rolling_opp_elo_3'].fillna(INITIAL_ELO)
+fighters_df['rolling_opp_elo_5'] = fighters_df['rolling_opp_elo_5'].fillna(INITIAL_ELO)
+
+fighters_df['rolling_opponent_strength_3'] = (
+    fighters_df.groupby('name')['opponent_strength']
+    .shift(1)
+    .rolling(3, min_periods=1)
+    .mean()
+    .round(2)
+)
+fighters_df['rolling_opponent_strength_5'] = (
+    fighters_df.groupby('name')['opponent_strength']
+    .shift(1)
+    .rolling(5, min_periods=1)
+    .mean()
+    .round(2)
+)
+fighters_df['rolling_opponent_strength_3'] = fighters_df['rolling_opponent_strength_3'].fillna(0)
+fighters_df['rolling_opponent_strength_5'] = fighters_df['rolling_opponent_strength_5'].fillna(0)
+#clustering of fight styles
+print("\nCalculating fighter styles...")
+print("===============================")
+
+fighter_style_stats = fighters_df.groupby('name').tail(5).groupby('name').agg({
+    'rolling_slpm_5': 'mean',
+    'rolling_sapm_5': 'mean',
+    'rolling_td_acc_5': 'mean',
+    'rolling_td_def_5': 'mean',
+    'striking_differential_5': 'mean',
+}).reset_index()
+
+fighter_style_stats = fighter_style_stats.dropna()
+
+style_features = [
+    'rolling_slpm_5',
+    'rolling_sapm_5',
+    'rolling_td_acc_5',
+    'rolling_td_def_5',
+    'striking_differential_5'
+]
+
+scaler = StandardScaler()
+X_style = scaler.fit_transform(fighter_style_stats[style_features])
+
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+fighter_style_stats['style_cluster'] = kmeans.fit_predict(X_style)
+
+cluster_profiles = fighter_style_stats.groupby('style_cluster')[style_features].mean()
+
+style_names = {}
+
+# First pass: identify the cluster with highest TD accuracy as Grappler
+max_td_cluster = cluster_profiles['rolling_td_acc_5'].idxmax()
+
+for cluster_id in range(3):
+    profile = cluster_profiles.loc[cluster_id]
+
+    slpm = profile['rolling_slpm_5']
+    sapm = profile['rolling_sapm_5']
+    td_acc = profile['rolling_td_acc_5']
+    td_def = profile['rolling_td_def_5']
+    diff = profile['striking_differential_5']
+
+    # Assign names based on relative comparison
+    if cluster_id == max_td_cluster:
+        name = "Grappler"  # Highest TD accuracy cluster
+    elif slpm > 4.5:  # High striking output
+        name = "Striker"
+    else:
+        name = "Balanced"
+
+    style_names[cluster_id] = name
+
+
+fighter_style_stats['style_name'] = fighter_style_stats['style_cluster'].map(style_names)
+
+fighters_df = fighters_df.merge(
+    fighter_style_stats[['name', 'style_cluster', 'style_name']],
+    on='name',
+    how='left'
+)
+
+most_common_style = fighters_df['style_cluster'].mode()[0]
+fighters_df['style_cluster'] = fighters_df['style_cluster'].fillna(most_common_style)
+fighters_df['style_name'] = fighters_df['style_name'].fillna(style_names[most_common_style])
+
+# ================== END STYLE CLUSTERING ==================
+
+# Numeric features to difference
+numeric_features_to_diff = [
+    "elo_before_fight",
+    "rolling_slpm_3", "rolling_slpm_5",
+    "rolling_sapm_3", "rolling_sapm_5",
+    "striking_differential_3", "striking_differential_5",
+    "rolling_str_acc_3", "rolling_str_acc_5",
+    "rolling_td_acc_3", "rolling_td_acc_5",
+    "rolling_td_def_3", "rolling_td_def_5",
+    "rolling_win_rate_3", "rolling_win_rate_5",
+    "weight", "height", "reach", "age_at_fight",
+    "days_since_last_fight", "fight_number",
+    "rolling_opp_elo_3", "rolling_opp_elo_5",
+    "rolling_opponent_strength_3", "rolling_opponent_strength_5",
+    "opponent_strength",
+    "style_cluster"
+]
+
+# Create fight pairs
+merged = fighters_df.merge(
+    fighters_df, on='fight_id', suffixes=('_A', '_B')
+)
+merged = merged[merged['name_A'] != merged['name_B']]
+merged = merged[merged['id_A'] < merged['id_B']]
+
+# Differences for numeric features
+for feature in numeric_features_to_diff:
+    merged[f"diff_{feature}"] = merged[f"{feature}_A"] - merged[f"{feature}_B"]
+
+merged['diff_stance_Orthodox'] = merged['stance_Orthodox_A'].astype(int) - merged['stance_Orthodox_B'].astype(int)
+merged['diff_stance_Southpaw'] = merged['stance_Southpaw_A'].astype(int) - merged['stance_Southpaw_B'].astype(int)
+merged['diff_stance_Switch'] = merged['stance_Switch_A'].astype(int) - merged['stance_Switch_B'].astype(int)
+
+# Target
+merged["target"] = (merged["winner_A"] == merged["name_A"]).astype(int)
+diff_features = [col for col in merged.columns if col.startswith('diff_')]
+
+# Model training
+X = merged[diff_features].fillna(0)
+y = merged["target"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+xgb_model = xgb.XGBClassifier(
+    max_depth=3,
+    learning_rate=0.005,
+    n_estimators=300,
+    subsample=0.7,
+    colsample_bytree=0.7,
+    min_child_weight=6,
+    gamma=0.5,
+    reg_alpha=0.5,
+    reg_lambda=1.5,
+    objective='binary:logistic',
+    eval_metric='logloss',
+    random_state=42
+)
+
+rf_model = RandomForestClassifier(
+    n_estimators=300,
+    max_depth=6,
+    min_samples_leaf=20,
+    random_state=42
+)
+
+lr_model = LogisticRegression(
+    max_iter=5000,
+    C=0.3
+)
+
+ensemble = VotingClassifier(
+    estimators=[
+        ('xgb', xgb_model),
+        ('rf', rf_model),
+        ('lr', lr_model)
+    ],
+    voting='soft'
+)
+
+calibrated_ensemble = CalibratedClassifierCV(
+    ensemble,
+    method="sigmoid",
+    cv=5
+)
+
+calibrated_ensemble.fit(X_train, y_train)
+test_probs = calibrated_ensemble.predict_proba(X_test)
+test_preds = (test_probs[:, 1] > 0.5).astype(int)
+
+print(f"\nTest Accuracy: {accuracy_score(y_test, test_preds) * 100:.2f}%")
+train_probs = calibrated_ensemble.predict_proba(X_train)
+train_preds = (train_probs[:, 1] > 0.5).astype(int)
+print(f"Training Accuracy: {accuracy_score(y_train, train_preds) * 100:.2f}%")
+
+
+def predict_fight(fighter_a, fighter_b):
+    fa = fighters_df[fighters_df["name"] == fighter_a].sort_values("date").iloc[-1]
+    fb = fighters_df[fighters_df["name"] == fighter_b].sort_values("date").iloc[-1]
+
+    row = {}
+
+    for feature in numeric_features_to_diff:
+        row[f"diff_{feature}"] = fa[feature] - fb[feature]
+
+    row["diff_stance_Orthodox"] = int(fa.get("stance_Orthodox", 0)) - int(fb.get("stance_Orthodox", 0))
+    row["diff_stance_Southpaw"] = int(fa.get("stance_Southpaw", 0)) - int(fb.get("stance_Southpaw", 0))
+    row["diff_stance_Switch"] = int(fa.get("stance_Switch", 0)) - int(fb.get("stance_Switch", 0))
+
+    X_pred = pd.DataFrame([row])[diff_features].fillna(0)
+    probs = calibrated_ensemble.predict_proba(X_pred)[0]
+
+    print("\n==============================")
+    print(f"{fighter_a} ({fa['style_name']}) vs {fighter_b} ({fb['style_name']})")
+    print("==============================")
+    print(f"{fighter_a} Win Probability: {probs[1] * 100:.2f}%")
+    print(f"{fighter_b} Win Probability: {probs[0] * 100:.2f}%")
+
+    winner = fighter_a if probs[1] > probs[0] else fighter_b
+    confidence = max(probs) * 100
+    print(f"\nModel Pick: {winner} ({confidence:.1f}% confidence)")
+    print("==============================\n")
+
+
+while True:
+    print("FIGHT PREDICTOR")
+    f1 = input("Enter Fighter A (or 'exit'): ")
+    if f1.lower() == "exit":
+        break
+    f2 = input("Enter Fighter B: ")
+    if f1 not in fighters_df["name"].values or f2 not in fighters_df["name"].values:
+        print("One or both fighters not found.")
+        continue
+
+    predict_fight(f1, f2)
