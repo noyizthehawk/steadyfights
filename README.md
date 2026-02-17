@@ -11,10 +11,10 @@ This project uses statistical analysis and machine learning to investigate what 
 
 | Part | Focus | Status |
 |------|-------|--------|
-| **Part 1** | Statistical analysis of common MMA beliefs |
-| **Part 2** | Career trajectory and fighter evolution modeling |
-| **Part 3** | Predictive modeling and matchup analysis | 
-| **Part 4** | Fighter archetype clustering and profiling |
+| **Part 1** | Statistical analysis of common MMA beliefs | ✅ Complete |
+| **Part 2** | Career trajectory and fighter evolution modeling | ✅ Complete |
+| **Part 3** | Predictive modeling and matchup analysis | 🔄 In Progress |
+| **Part 4** | Fighter archetype clustering and profiling | 🔄 In Progress |
 
 ---
 
@@ -22,7 +22,7 @@ This project uses statistical analysis and machine learning to investigate what 
 
 ### 🔬 Part 2 — Fighter Prime Window Analysis
 
-![Prime Window Analysis](prime_window_analysis.png)
+![Prime Window Analysis](part_2/analysis_images_part_2/prime_window_analysis.png)
 
 **What the data shows:**
 
@@ -50,7 +50,7 @@ The relationship is **non-linear**: small reach differences barely matter, but e
 
 #### Myth #2: Does Youth Beat Experience?
 
-![Myth 2 - Youth vs Experience](myth2_youth_vs_experience.png)
+![Myth 2 - Youth vs Experience](analysis_images_part_1/myth2_youth_vs_experience.png)
 
 **Verdict: FALSE — older fighters hold a consistent edge.**
 
@@ -64,7 +64,7 @@ This seems counterintuitive, but it likely reflects that older fighters in the U
 
 #### Myth #3: Wrestlers Beat Strikers?
 
-![Myth 3 - Wrestlers vs Strikers](myth3_wrestlers_vs_strikers.png)
+![Myth 3 - Wrestlers vs Strikers](analysis_images_part_1/myth3_wrestlers_vs_strikers.png)
 
 **Verdict: TRUE — wrestling confers a significant style advantage.**
 
@@ -76,7 +76,7 @@ This aligns with the long-standing MMA principle that wrestling is the most effe
 
 #### Myth #4: Does Size Impact Vary by Division?
 
-![Myth 4 - Size by Division](myth4_size_by_division.png)
+![Myth 4 - Size by Division](analysis_images_part_1/myth4_size_by_division.png)
 
 **Verdict: YES — and the pattern is striking.**
 
