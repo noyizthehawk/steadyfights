@@ -4,9 +4,11 @@ import os
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 fighter_csv = os.path.join(script_dir, "../csv/fighter_level_data.csv")
+
 fighters_df = pd.read_csv(fighter_csv)
 
 fighters_df['date'] = pd.to_datetime(fighters_df['date'])
+print("Latest fight date in dataset:", fighters_df['date'].max())
 fighters_df = fighters_df.sort_values(['id', 'date']).reset_index(drop=True)
 
 # Compute fight time
@@ -19,16 +21,16 @@ weight_for_grapplers = [0.05, 0.05, 0.35, 0.35, 0.20]
 weight_for_balanced = [0.20, 0.20, 0.20, 0.20, 0.20]
 
 # Per-minute metrics
-fighters_df["sig_str_landed_per_min"] = fighters_df["sig_str_landed"] / fighters_df["fight_time_min"]  
-fighters_df["sig_str_absorbed_per_min"] = fighters_df["sig_str_absorbed"] / fighters_df["fight_time_min"]  
-fighters_df["td_landed_per_min"] = fighters_df["td_landed"] / fighters_df["fight_time_min"] 
+fighters_df["sig_str_landed_per_min"] = fighters_df["sig_str_landed"] / fighters_df["fight_time_min"]
+fighters_df["sig_str_absorbed_per_min"] = fighters_df["sig_str_absorbed"] / fighters_df["fight_time_min"]
+fighters_df["td_landed_per_min"] = fighters_df["td_landed"] / fighters_df["fight_time_min"]
 fighters_df["control_fraction"] = fighters_df["ctrl"] / fighters_df["fight_time_sec"]
 fighters_df["strike_diff_per_min"] = fighters_df["sig_str_landed_per_min"] - fighters_df["sig_str_absorbed_per_min"]
 fighters_df["td_acc_fight"] = (fighters_df["td_landed"] / fighters_df["td_atmpted"]).fillna(0)
 
 # Z-scores for all metrics
 fighters_df["strike_diff_z"] = (
-    (fighters_df["strike_diff_per_min"] - fighters_df["strike_diff_per_min"].mean()) 
+    (fighters_df["strike_diff_per_min"] - fighters_df["strike_diff_per_min"].mean())
     / fighters_df["strike_diff_per_min"].std()
 )
 fighters_df["strike_acc_z"] = (
@@ -46,8 +48,8 @@ fighters_df["control_fraction_z"] = (
 
 # Style classification
 def group_fight_style(row):
-    TD_ATTEMPTS_PM = 0.4      
-    STR_LANDED_PM = 3.5       
+    TD_ATTEMPTS_PM = 0.4
+    STR_LANDED_PM = 3.5
 
     td_attempts_pm = row['td_atmpted'] / row['fight_time_min']
     sig_landed_pm = row['sig_str_landed'] / row['fight_time_min']
@@ -133,26 +135,26 @@ for idx, row in fighters_df.iterrows():
 def calculate_opponent_strength_optimized(row):
     opponent_id = row['opponent_id']
     fight_date = row['date']
-    
+
     # Look up opponent's stats at this date
     key = (opponent_id, fight_date)
-    
+
     if key not in fighter_stats_lookup:
         return 0.5
-    
+
     opp_stats = fighter_stats_lookup[key]
     fight_count = opp_stats['fight_count']
-    
+
     if fight_count <= 2:
         return 0.5
-    
+
     opp_win_rate = opp_stats['win_rate']
     opp_perf = opp_stats['performance'] / 100
-    
+
     raw_strength = 0.5 * opp_win_rate + 0.5 * opp_perf
     confidence = min(fight_count / 8.0, 1.0)
     adjusted_strength = confidence * raw_strength + (1 - confidence) * 0.5
-    
+
     return min(adjusted_strength, 0.75)
 
 fighters_df['opponent_strength'] = fighters_df.apply(calculate_opponent_strength_optimized, axis=1)
@@ -165,7 +167,7 @@ def calculate_adjusted_performance(row):
     won = row['win_flag_indicator']
     fight_time = row['fight_time_sec']
     method_of_victory = row['method']
-    
+
     if won == 1:
         # Wins: Boost based on opponent strength
         adjusted = base_perf * (0.5 + opp_str)
@@ -176,7 +178,7 @@ def calculate_adjusted_performance(row):
         # normalize fight time
         duration_factor = min(fight_time / 900.0, 1.0)
         adjusted = base_perf * (0.4 + opp_str) * duration_factor
-    
+
     return adjusted
 
 fighters_df['adjusted_performance'] = fighters_df.apply(calculate_adjusted_performance, axis=1)
@@ -264,8 +266,8 @@ def compute_career_score(fighter_fights: pd.DataFrame) -> float:
     return min(career_quality_title_adjusted, 100.0)
 
 
-def get_top_careers_by_metric(top_n: int = 20, min_fights: int = 5) -> pd.DataFrame:
-    """Top N fighters by your career metric."""
+def get_top_careers_by_metric(top_n: int = 20, min_fights: int = 5):
+    """Top N fighters by career metric."""
     scores = (
         fighters_df.groupby(['id', 'name'])
         .filter(lambda g: len(g) >= min_fights)
@@ -287,33 +289,33 @@ def get_fighter_stats(fighter):
         print(f"\n{'='*80}")
         print(f"{fighter_name.upper()} - FIGHT-BY-FIGHT BREAKDOWN")
         print(f"{'='*80}\n")
-        
+
         fighter_summary = fighter_fights[[
-            'fight_number', 
+            'fight_number',
             'opponent_name',
             'win_flag_indicator',
-            'performance_0_100', 
+            'performance_0_100',
             'opponent_strength',
             'adjusted_performance',
             'adjusted_performance_category',
             'event_name',
             'win_flag_indicator'
         ]].copy()
-        
+
         fighter_summary.columns = [
-            'Fight #', 
-            'Opponent', 
+            'Fight #',
+            'Opponent',
             'Won',
-            'Raw Perf', 
+            'Raw Perf',
             'Opp Str',
             'Adj Perf',
             'Category',
             'Event',
             'win(1)/loss(0)'
         ]
-        
+
         print(fighter_summary.to_string(index=False))
-        
+
         early_fights = fighter_fights[fighter_fights['fight_number'] <= 5]
         mid_fights = fighter_fights[(fighter_fights['fight_number'] >= 6) & (fighter_fights['fight_number'] <= 10)]
         late_fights = fighter_fights[fighter_fights['fight_number'] >= 11]
@@ -321,7 +323,7 @@ def get_fighter_stats(fighter):
         print(f"\n{'='*80}")
         print(f"CAREER TRAJECTORY ANALYSIS")
         print(f"{'='*80}")
-        
+
         # Determine trajectory for mid-career
         improvement_adj = mid_fights['adjusted_performance'].mean() - early_fights['adjusted_performance'].mean() if len(mid_fights) > 0 else 0
         if improvement_adj > 5:
@@ -334,27 +336,27 @@ def get_fighter_stats(fighter):
             trajectory = "Late-career transition — competitive performances against top-tier opponents"
         if len(mid_fights) > 0:
             print(f"Mid-Career Trajectory: {trajectory}")
-        
+
         print(f"\nEarly Career (Fights 1-5):")
         print(f"  Raw Performance: {early_fights['performance_0_100'].mean():.2f}")
         print(f"  Adjusted Performance: {early_fights['adjusted_performance'].mean():.2f}")
         print(f"  Avg Opponent Strength: {early_fights['opponent_strength'].mean():.3f}")
         print(f"  Win Rate: {early_fights['win_flag_indicator'].mean():.1%}")
-        
+
         if len(mid_fights) > 0:
             print(f"\nMid Career (Fights 6-10):")
             print(f"  Raw Performance: {mid_fights['performance_0_100'].mean():.2f}")
             print(f"  Adjusted Performance: {mid_fights['adjusted_performance'].mean():.2f}")
             print(f"  Avg Opponent Strength: {mid_fights['opponent_strength'].mean():.3f}")
             print(f"  Win Rate: {mid_fights['win_flag_indicator'].mean():.1%}")
-        
+
         if len(late_fights) > 0:
             print(f"\nLate Career (Fights 11+):")
             print(f"  Raw Performance: {late_fights['performance_0_100'].mean():.2f}")
             print(f"  Adjusted Performance: {late_fights['adjusted_performance'].mean():.2f}")
             print(f"  Avg Opponent Strength: {late_fights['opponent_strength'].mean():.3f}")
             print(f"  Win Rate: {late_fights['win_flag_indicator'].mean():.1%}")
-        
+
         print(f"\n{'='*80}")
         print(f"OVERALL CAREER SUMMARY")
         print(f"{'='*80}")
@@ -364,9 +366,9 @@ def get_fighter_stats(fighter):
         print(f"Career Avg Performance (Adjusted): {fighter_fights['adjusted_performance'].mean():.2f}")
         print(f"Performance Volatility: {fighter_fights['performance_0_100'].std():.2f}")
 
-        # --- Title Fight Bonus 
+        # --- Title Fight Bonus
 
-        
+
         title_fights = fighter_fights[fighter_fights['title_fight'] == 1]
 
         num_title_fights = len(title_fights)
@@ -378,15 +380,15 @@ def get_fighter_stats(fighter):
 
         # Cap the bonus so belts don't dominate the score
         title_bonus = min(title_bonus, 0.25)
-        
-        win_rate = fighter_fights['win_flag_indicator'].mean()              
-        avg_adj_perf = fighter_fights['adjusted_performance'].mean()        
+
+        win_rate = fighter_fights['win_flag_indicator'].mean()
+        avg_adj_perf = fighter_fights['adjusted_performance'].mean()
 
         # Normalize adjusted performance to 0–1
         max_adj_perf = fighters_df['adjusted_performance'].max()
         norm_adj_perf = avg_adj_perf / max_adj_perf
 
-        # --- Career Quality Score 
+        # --- Career Quality Score
 
         # Base career quality (performance + results)
         career_quality_score = (
@@ -408,9 +410,9 @@ def get_fighter_stats(fighter):
 
         # Cap Career Quality at 100
         career_quality_title_adjusted = min(career_quality_title_adjusted, 100.0)
-        
+
         print(f"Career efficiency (Title-Adjusted): {career_quality_title_adjusted:.3f}")
-        
+
         # Add narrative interpretation
         if career_quality_title_adjusted >= 90:
             career_label = "All-time dominant UFC career"
@@ -473,6 +475,7 @@ This is NOT a “GOAT” or head-to-head ranking. It’s measuring consistency +
 """
     print(memo)
 if __name__ == "__main__":
+
     print("Welcome to the UFC Fighter Analysis Tool to get best careers in UFC History!")
     print("Options:")
     print("1. Enter fighter name to analyze:")
