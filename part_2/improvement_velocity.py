@@ -204,6 +204,7 @@ def adjusted_performance_label(value):
 fighters_df['adjusted_performance_category'] = fighters_df['adjusted_performance'].apply(
     adjusted_performance_label
 )
+
 fight_level_df = fighters_df[[
     'name',
     'fight_number',
@@ -239,7 +240,6 @@ print("Fight-level CSV for all fighters saved!")
 print("All calculations complete\n")
 
 def compute_career_score(fighter_fights: pd.DataFrame) -> float:
-    """Your exact Career efficiency (Title-Adjusted) metric, but for a fighter's slice."""
     win_rate = fighter_fights['win_flag_indicator'].mean()
     avg_adj_perf = fighter_fights['adjusted_performance'].mean()
 
@@ -267,19 +267,44 @@ def compute_career_score(fighter_fights: pd.DataFrame) -> float:
 
 
 def get_top_careers_by_metric(top_n: int = 20, min_fights: int = 5):
-    """Top N fighters by career metric."""
-    scores = (
-        fighters_df.groupby(['id', 'name'])
-        .filter(lambda g: len(g) >= min_fights)
-        .groupby(['id', 'name'])
-        .apply(compute_career_score)
-        .rename('career_quality_title_adjusted')
-        .reset_index()
+    max_adj_perf = fighters_df['adjusted_performance'].max()
+    results = []
+
+    for fighter_name, group in fighters_df.groupby('name'):
+        if len(group) < min_fights:
+            continue
+
+        fighter_fights = group.sort_values('fight_number')
+
+        win_rate = fighter_fights['win_flag_indicator'].mean()
+        avg_adj_perf = fighter_fights['adjusted_performance'].mean()
+
+        title_fights = fighter_fights[fighter_fights['title_fight'] == 1]
+        title_bonus = min(
+            0.03 * len(title_fights) + 0.10 * title_fights['win_flag_indicator'].sum(),
+            0.25
+        )
+
+        norm_adj_perf = avg_adj_perf / max_adj_perf
+        career_quality_score = 0.6 * win_rate + 0.4 * norm_adj_perf
+        longevity_factor = min(np.sqrt(len(fighter_fights) / 25.0), 1.0)
+
+        score = min(
+            (0.7 * (career_quality_score + title_bonus) + 0.3 * longevity_factor) * 100,
+            100.0
+        )
+
+        results.append({
+            'name': fighter_name,
+            'career_quality_title_adjusted': score
+        })
+
+    return (
+        pd.DataFrame(results)
         .sort_values('career_quality_title_adjusted', ascending=False)
         .head(top_n)
+        .reset_index(drop=True)
     )
-    return scores
-
 # Fighter stats lookup function
 def get_fighter_stats(fighter):
     fighter_name = fighter.strip()
@@ -473,6 +498,7 @@ Note:
 This is NOT a “GOAT” or head-to-head ranking. It’s measuring consistency + dominance vs competition.
 =============================
 """
+
     print(memo)
 if __name__ == "__main__":
 
