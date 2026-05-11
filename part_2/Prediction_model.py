@@ -156,17 +156,51 @@ fighters_df['rolling_opponent_strength_5'] = (
     .mean()
     .round(2)
 )
+# Rolling TD volume
+fighters_df['rolling_td_avg_5'] = (
+    fighters_df.groupby('name')['td_avg']
+    .shift(1)
+    .rolling(5, min_periods=1)
+    .mean()
+    .round(2)
+)
+fighters_df['rolling_td_avg_5'] = fighters_df['rolling_td_avg_5'].fillna(0)
+
+# Rolling submission attempts
+fighters_df['rolling_sub_avg_5'] = (
+    fighters_df.groupby('name')['sub_avg']
+    .shift(1)
+    .rolling(5, min_periods=1)
+    .mean()
+    .round(2)
+)
+fighters_df['rolling_sub_avg_5'] = fighters_df['rolling_sub_avg_5'].fillna(0)
+
+# Rolling striking defense
+fighters_df['rolling_str_def_5'] = (
+    fighters_df.groupby('name')['str_def']
+    .shift(1)
+    .rolling(5, min_periods=1)
+    .mean()
+    .round(2)
+)
+fighters_df['rolling_str_def_5'] = fighters_df['rolling_str_def_5'].fillna(0)
 fighters_df['rolling_opponent_strength_3'] = fighters_df['rolling_opponent_strength_3'].fillna(0)
 fighters_df['rolling_opponent_strength_5'] = fighters_df['rolling_opponent_strength_5'].fillna(0)
 #clustering of fight styles
+#clustering of fight styles
 print("\nCalculating fighter styles...")
 print("===============================")
+print([col for col in fighters_df.columns if 'td' in col.lower() or 'sub' in col.lower() or 'str_def' in col.lower()])
 
 fighter_style_stats = fighters_df.groupby('name').tail(5).groupby('name').agg({
     'rolling_slpm_5': 'mean',
     'rolling_sapm_5': 'mean',
     'rolling_td_acc_5': 'mean',
     'rolling_td_def_5': 'mean',
+    'rolling_td_avg_5': 'mean',       # takedown volume — key for Chimaev types
+    'rolling_sub_avg_5': 'mean',      # submission attempts
+    'rolling_str_def_5': 'mean',      # striking defense
     'striking_differential_5': 'mean',
 }).reset_index()
 
@@ -177,43 +211,65 @@ style_features = [
     'rolling_sapm_5',
     'rolling_td_acc_5',
     'rolling_td_def_5',
+    'rolling_td_avg_5',
+    'rolling_sub_avg_5',
+    'rolling_str_def_5',
     'striking_differential_5'
 ]
 
 scaler = StandardScaler()
 X_style = scaler.fit_transform(fighter_style_stats[style_features])
 
-kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+kmeans = KMeans(n_clusters=5, random_state=42, n_init=10)
 fighter_style_stats['style_cluster'] = kmeans.fit_predict(X_style)
 
 cluster_profiles = fighter_style_stats.groupby('style_cluster')[style_features].mean()
 
+# Rank clusters by key metrics to assign labels intelligently
+td_vol_rank = cluster_profiles['rolling_td_avg_5'].rank(ascending=False)
+td_acc_rank = cluster_profiles['rolling_td_acc_5'].rank(ascending=False)
+slpm_rank = cluster_profiles['rolling_slpm_5'].rank(ascending=False)
+sub_rank = cluster_profiles['rolling_sub_avg_5'].rank(ascending=False)
+str_def_rank = cluster_profiles['rolling_str_def_5'].rank(ascending=False)
+diff_rank = cluster_profiles['striking_differential_5'].rank(ascending=False)
+
+# Score each cluster for different archetypes
+grappler_score = td_vol_rank + td_acc_rank + sub_rank          # high TD volume + accuracy + subs
+complete_score = td_vol_rank + slpm_rank + diff_rank           # high everywhere (Chimaev, Usman)
+striker_score = slpm_rank + diff_rank                          # high striking output + differential
+counter_score = str_def_rank + diff_rank                       # good defense, controlled striking
+wrestler_score = td_vol_rank + td_acc_rank                     # TD volume focused, less striking
+
+assigned = set()
 style_names = {}
 
-# First pass: identify the cluster with highest TD accuracy as Grappler
-max_td_cluster = cluster_profiles['rolling_td_acc_5'].idxmax()
+archetypes = [
+    ("Complete Fighter", complete_score),
+    ("Grappler", grappler_score),
+    ("Striker", striker_score),
+    ("Counter Striker", counter_score),
+    ("Wrestler", wrestler_score),
+]
 
-for cluster_id in range(3):
-    profile = cluster_profiles.loc[cluster_id]
-
-    slpm = profile['rolling_slpm_5']
-    sapm = profile['rolling_sapm_5']
-    td_acc = profile['rolling_td_acc_5']
-    td_def = profile['rolling_td_def_5']
-    diff = profile['striking_differential_5']
-
-    # Assign names based on relative comparison
-    if cluster_id == max_td_cluster:
-        name = "Grappler"  # Highest TD accuracy cluster
-    elif slpm > 4.5:  # High striking output
-        name = "Striker"
-    else:
-        name = "Balanced"
-
-    style_names[cluster_id] = name
-
+for label, score in archetypes:
+    # Pick best unassigned cluster for this archetype
+    ranked = score.sort_values().index.tolist()
+    for cluster_id in ranked:
+        if cluster_id not in assigned:
+            style_names[cluster_id] = label
+            assigned.add(cluster_id)
+            break
 
 fighter_style_stats['style_name'] = fighter_style_stats['style_cluster'].map(style_names)
+
+print("\nCluster Profiles:")
+for cid, name in style_names.items():
+    profile = cluster_profiles.loc[cid]
+    print(f"  {name}: SLPM={profile['rolling_slpm_5']:.2f}, "
+          f"TD_avg={profile['rolling_td_avg_5']:.2f}, "
+          f"TD_acc={profile['rolling_td_acc_5']:.2f}, "
+          f"Subs={profile['rolling_sub_avg_5']:.2f}, "
+          f"StrDiff={profile['striking_differential_5']:.2f}")
 
 fighters_df = fighters_df.merge(
     fighter_style_stats[['name', 'style_cluster', 'style_name']],
