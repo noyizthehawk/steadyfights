@@ -1,15 +1,21 @@
-import subprocess
 import sys
 import os
+print("STARTING MAIN")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+def get_path(path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, path)
+    return os.path.join(os.path.abspath("."), path)
 
-IMPROVEMENT_SCRIPT = os.path.join(BASE_DIR, "part_2/improvement_velocity.py")
-PREDICTION_SCRIPT = os.path.join(BASE_DIR, "part_2/Prediction_model.py")
+from part_2 import improvement_velocity
+from part_2 import Prediction_model
 
+def run_improvement():
+    improvement_velocity.main()
 
-def run_script(path):
-    subprocess.run([sys.executable, path])
+def run_prediction():
+    Prediction_model.main()
+
 if __name__ == "__main__":
     while True:
         print("\n==============================")
@@ -22,10 +28,10 @@ if __name__ == "__main__":
         choice = input("\nSelect option: ").strip()
 
         if choice == "1":
-            run_script(IMPROVEMENT_SCRIPT)
+            run_improvement()
 
         elif choice == "2":
-            run_script(PREDICTION_SCRIPT)
+            run_prediction()
 
         elif choice == "0":
             print("Exiting.")

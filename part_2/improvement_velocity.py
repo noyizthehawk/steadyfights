@@ -1,9 +1,14 @@
 import pandas as pd
 import numpy as np
 import os
+import sys
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-fighter_csv = os.path.join(script_dir, "../csv/fighter_level_data.csv")
+def get_path(path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, path)
+    return os.path.join(os.path.abspath("."), path)
+
+fighter_csv = get_path("csv/fighter_level_data.csv")
 
 fighters_df = pd.read_csv(fighter_csv)
 
@@ -229,11 +234,11 @@ fight_level_df.rename(columns={
 }, inplace=True)
 
 # Save CSV
-csv_dir = os.path.join(script_dir, "../csv")
-os.makedirs(csv_dir, exist_ok=True)
+output_path = get_path("csv/fighter_opponent_strength_extra.csv")
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
 fight_level_df.to_csv(
-    os.path.join(csv_dir, "fighter_opponent_strength_extra.csv"),
+    output_path,
     index=False
 )
 print("Fight-level CSV for all fighters saved!")
@@ -458,16 +463,17 @@ This is NOT a “GOAT” or head-to-head ranking. It’s measuring consistency +
 """
 
     print(memo)
-if __name__ == "__main__":
 
+def main():
     print("Welcome to the UFC Fighter Analysis Tool to get best careers in UFC History!")
     print("Options:")
     print("1. Enter fighter name to analyze:")
     print("2. List top N fighters by Career Quality:")
     print("3. Memo(information about the model and how to read it)")
     print("4. Exit")
+
     option = input("\nEnter your option: ")
-    #with error handling
+
     if option not in ["1", "2", "3", "4"]:
         print("Invalid option. Please try again.")
 
@@ -485,4 +491,9 @@ if __name__ == "__main__":
                 print(f"{b}. {row['name']} - Career Quality: {row['career_quality_title_adjusted']:.2f}")
         elif option == "3":
             print_model_memo()
+
         option = input("\nEnter your option: ")
+
+
+if __name__ == "__main__":
+    main()
