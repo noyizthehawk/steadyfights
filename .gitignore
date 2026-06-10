@@ -1,0 +1,15 @@
+# SQLite database files (user data + password hashes — never commit)
+*.db
+web/backend/app.db
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Node / frontend
+web/frontend/node_modules/
+web/frontend/dist/
+
+# Env / secrets
+.env

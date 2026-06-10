@@ -61,7 +61,46 @@ def predict_fight(fighter_a, fighter_b):
     print("==============================\n")
 
 
-def main():
+def predict_fight_api(fighter_a, fighter_b):
+    """Same logic as predict_fight, but returns a JSON-serializable dict
+    instead of printing. This is what the web backend calls."""
+    fa = fighters_df[fighters_df["name"] == fighter_a].sort_values("date").iloc[-1]
+    fb = fighters_df[fighters_df["name"] == fighter_b].sort_values("date").iloc[-1]
+
+    row = {}
+    for feature in numeric_features_to_diff:
+        row[f"diff_{feature}"] = fa[feature] - fb[feature]
+    row["diff_stance_Orthodox"] = int(fa.get("stance_Orthodox", 0)) - int(fb.get("stance_Orthodox", 0))
+    row["diff_stance_Southpaw"] = int(fa.get("stance_Southpaw", 0)) - int(fb.get("stance_Southpaw", 0))
+    row["diff_stance_Switch"] = int(fa.get("stance_Switch", 0)) - int(fb.get("stance_Switch", 0))
+
+    X_pred = pd.DataFrame([row])[diff_features].fillna(0)
+    probs = calibrated_ensemble.predict_proba(X_pred)[0]
+
+    prob_a = float(probs[1])
+    prob_b = float(probs[0])
+    winner = fighter_a if prob_a > prob_b else fighter_b
+    return {
+        "fighter_a": fighter_a,
+        "fighter_b": fighter_b,
+        "style_a": str(fa.get("style_name", "")),
+        "style_b": str(fb.get("style_name", "")),
+        "prob_a": round(prob_a * 100, 2),
+        "prob_b": round(prob_b * 100, 2),
+        "pick": winner,
+        "confidence": round(max(prob_a, prob_b) * 100, 1),
+    }
+
+
+def list_fighters():
+    """Sorted unique fighter names the model knows about (for dropdowns)."""
+    return sorted(fighters_df["name"].dropna().unique().tolist())
+
+
+def train():
+    """Run the full pipeline: load data, build Elo/features, fit the calibrated
+    ensemble. Sets the module-level globals used by predict_fight*(). Call this
+    ONCE (the web backend calls it at startup; the CLI calls it before looping)."""
     global fighters_df, calibrated_ensemble, diff_features, numeric_features_to_diff
 
     fighters_df = pd.read_csv(fighter_csv)
@@ -415,6 +454,10 @@ def main():
     train_preds = (train_probs[:, 1] > 0.5).astype(int)
     print(f"Training Accuracy: {accuracy_score(y_train, train_preds) * 100:.2f}%")
 
+
+def main():
+    """CLI entry point: train once, then loop on terminal input (unchanged)."""
+    train()
     while True:
         print("FIGHT PREDICTOR")
         f1 = input("Enter Fighter A (or 'exit'): ")

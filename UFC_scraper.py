@@ -3,14 +3,50 @@ import bs4
 import pandas as pd
 from datetime import datetime
 import time
+import hashlib
+import re
+from urllib.parse import urlparse
+
+# One session shared across all requests so the anti-bot clearance cookie
+# (set after solving the proof-of-work challenge) persists for the whole run.
+_session = requests.Session()
+_session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+})
+
+
+def _solve_challenge(url, html):
+    """ufcstats serves a JS proof-of-work interstitial: find n such that
+    sha256(f"{nonce}:{n}") starts with `difficulty` hex zeros, POST it to /__c
+    to get the clearance cookie, then return True so the caller can retry."""
+    m_nonce = re.search(r'nonce="([0-9a-f]+)"', html)
+    m_target = re.search(r'target=new Array\((\d+)\+1\)', html)
+    if not (m_nonce and m_target):
+        return False
+
+    nonce = m_nonce.group(1)
+    difficulty = int(m_target.group(1))
+    target = '0' * difficulty
+
+    n = 0
+    while hashlib.sha256(f'{nonce}:{n}'.encode()).hexdigest()[:difficulty] != target:
+        n += 1
+
+    parsed = urlparse(url)
+    base = f'{parsed.scheme}://{parsed.netloc}'
+    _session.post(
+        base + '/__c',
+        data={'nonce': nonce, 'n': n},
+        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+    )
+    return True
 
 
 def cached_request(url):
-    """Simple request wrapper"""
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-    }
-    response = requests.get(url, headers=headers)
+    """GET wrapper that transparently solves the anti-bot challenge if served."""
+    response = _session.get(url)
+    if 'Checking your browser' in response.text and _solve_challenge(url, response.text):
+        response = _session.get(url)  # retry now that we hold the cookie
     time.sleep(1)
     return response.text
 

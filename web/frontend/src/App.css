@@ -1,0 +1,126 @@
+.page {
+  max-width: 640px;
+  margin: 3rem auto;
+  padding: 0 1rem;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #e7e7ea;
+}
+
+h1 {
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  color: #9a9aa2;
+  margin-top: 0;
+}
+
+.pickers {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  font-size: 0.85rem;
+  color: #9a9aa2;
+}
+
+.field select,
+.field input {
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #3a3a42;
+  background: #1b1b20;
+  color: #e7e7ea;
+  font-size: 0.95rem;
+}
+
+.vs {
+  padding-bottom: 0.5rem;
+  font-weight: 700;
+  color: #9a9aa2;
+}
+
+.predict-btn {
+  width: 100%;
+  padding: 0.7rem;
+  border: none;
+  border-radius: 8px;
+  background: #d33a2c;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.predict-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  color: #ff7a6b;
+  margin-top: 1rem;
+}
+
+.result {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border: 1px solid #3a3a42;
+  border-radius: 12px;
+  background: #16161a;
+}
+
+.matchup {
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.matchup small {
+  color: #9a9aa2;
+  font-weight: 400;
+}
+
+.prob-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.prob-name {
+  width: 150px;
+  font-size: 0.9rem;
+}
+
+.prob-track {
+  flex: 1;
+  height: 14px;
+  background: #2a2a31;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.prob-fill {
+  height: 100%;
+  background: #d33a2c;
+  transition: width 0.4s ease;
+}
+
+.prob-pct {
+  width: 56px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pick {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #3a3a42;
+}

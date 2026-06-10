@@ -1,0 +1,5 @@
+# Web-server-only dependencies. The ML stack (pandas, numpy, scikit-learn,
+# xgboost) comes from the project's top-level requirements.txt — install that
+# too if you haven't:  pip install -r ../../requirements.txt
+fastapi
+uvicorn[standard]
