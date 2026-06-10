@@ -1,25 +1,24 @@
 import { useEffect, useState } from "react";
 import { getFighters, predict } from "./api";
+import type { PredictResult } from "./api";
 import "./App.css";
 
 export default function App() {
   // --- STATE ---
-  // useState gives you a value + a setter. When you call the setter, React
-  // re-renders the component with the new value. That's the whole model.
-  const [fighters, setFighters] = useState([]); // all names for the dropdowns
-  const [fighterA, setFighterA] = useState(""); // currently selected A
-  const [fighterB, setFighterB] = useState(""); // currently selected B
-  const [result, setResult] = useState(null); // prediction response, or null
-  const [loading, setLoading] = useState(false); // is a request in flight?
-  const [error, setError] = useState(""); // any error message to show
+  // The <...> is the TYPE of what this state holds. useState infers most things,
+  // but for empty/null initial values we tell it explicitly.
+  const [fighters, setFighters] = useState<string[]>([]); // names for the dropdowns
+  const [fighterA, setFighterA] = useState<string>(""); // selected A
+  const [fighterB, setFighterB] = useState<string>(""); // selected B
+  const [result, setResult] = useState<PredictResult | null>(null); // prediction, or none yet
+  const [loading, setLoading] = useState<boolean>(false); // request in flight?
+  const [error, setError] = useState<string>(""); // error message to show
 
-  // --- EFFECT ---
-  // useEffect with an empty [] dependency array runs ONCE after first render.
-  // Perfect for loading the fighter list when the page opens.
+  // --- EFFECT --- runs once on mount: load the fighter list.
   useEffect(() => {
     getFighters()
       .then(setFighters)
-      .catch((e) => setError(e.message));
+      .catch((e: unknown) => setError(errorMessage(e)));
   }, []);
 
   // --- EVENT HANDLER ---
@@ -34,14 +33,14 @@ export default function App() {
     try {
       const data = await predict(fighterA, fighterB);
       setResult(data);
-    } catch (e) {
-      setError(e.message);
+    } catch (e: unknown) {
+      // A caught value is `unknown` in TS — narrow it before using .message.
+      setError(errorMessage(e));
     } finally {
       setLoading(false);
     }
   }
 
-  
   return (
     <div className="page">
       <h1>STEADYFIGHTS</h1>
@@ -74,11 +73,22 @@ export default function App() {
   );
 }
 
-// A type-to-search fighter picker. It's a normal text <input> wired to a
-// <datalist>: as you type, the browser filters `options` and shows matches.
-// The <input> and its <datalist> are linked by a shared id via `list`.
-function FighterSelect({ label, value, onChange, options }) {
-  // Each input needs its OWN datalist id, or both pickers would share one.
+// Pull a readable message out of an unknown caught error.
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : "Something went wrong";
+}
+
+// Props are described by a type. Now passing the wrong prop is a compile error.
+type FighterSelectProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+};
+
+// A type-to-search fighter picker: a text <input> wired to a <datalist>, linked
+// by a shared id via `list`.
+function FighterSelect({ label, value, onChange, options }: FighterSelectProps) {
   const listId = `fighters-${label.replace(/\s+/g, "-")}`;
   return (
     <label className="field">
@@ -99,8 +109,7 @@ function FighterSelect({ label, value, onChange, options }) {
   );
 }
 
-// The result display. Renders two probability bars and the model's pick.
-function ResultCard({ result }) {
+function ResultCard({ result }: { result: PredictResult }) {
   return (
     <div className="result">
       <div className="matchup">
@@ -119,7 +128,7 @@ function ResultCard({ result }) {
   );
 }
 
-function ProbBar({ name, pct }) {
+function ProbBar({ name, pct }: { name: string; pct: number }) {
   return (
     <div className="prob-row">
       <span className="prob-name">{name}</span>
