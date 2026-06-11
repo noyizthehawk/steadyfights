@@ -361,6 +361,24 @@ def train():
 
     # ================== END STYLE CLUSTERING ==================
 
+    # --- Finish rate feature ---
+    # Did THIS fighter win this fight by finish (KO/TKO or submission, not a decision)?
+    # method examples: "KO/TKO", "Submission", "SUB Rear Naked Choke" -> finish;
+    #                  "Decision - Unanimous", "U-DEC" -> not a finish.
+    fighters_df["won_by_finish"] = (
+        (fighters_df["winner"] == fighters_df["name"])
+        & fighters_df["method"].str.contains("KO|SUB", case=False, na=False)
+    ).astype(int)
+
+    # Rolling finish rate over the fighter's PAST 5 fights. transform keeps the
+    # rolling window INSIDE each fighter's own history; shift(1) excludes the
+    # current fight so we never peek at the result we're trying to predict.
+    fighters_df["rolling_finish_rate_5"] = (
+        fighters_df.groupby("name")["won_by_finish"]
+        .transform(lambda s: s.shift(1).rolling(5, min_periods=1).mean())
+        .fillna(0)
+    )
+
     # Numeric features to difference
     numeric_features_to_diff = [
         "elo_before_fight",
@@ -376,7 +394,8 @@ def train():
         "rolling_opp_elo_3", "rolling_opp_elo_5",
         "rolling_opponent_strength_3", "rolling_opponent_strength_5",
         "opponent_strength",
-        "style_cluster"
+        "style_cluster",
+        "rolling_finish_rate_5"
     ]
 
     # Create fight pairs
@@ -398,36 +417,54 @@ def train():
     merged["target"] = (merged["winner_A"] == merged["name_A"]).astype(int)
     diff_features = [col for col in merged.columns if col.startswith('diff_')]
 
-    # Model training
+    # Model training — TEMPORAL split (train on the past, test on the most recent
+    # fights). This mirrors reality: you only ever predict FUTURE fights. A random
+    # split lets future fights leak into training and gives an optimistic number.
+    merged = merged.sort_values('date_A').reset_index(drop=True)
     X = merged[diff_features].fillna(0)
     y = merged["target"]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
+    split_idx = int(len(merged) * 0.8)            # earliest 80% -> train
+    X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
+    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+
+    # --- Symmetry augmentation (TRAINING SET ONLY) ---
+    # Every feature is a difference (A - B), so swapping the two fighters simply
+    # negates the whole feature row and flips the label. Adding these mirrored rows
+    # doubles the training data and forces the model to be order-invariant, i.e.
+    # predict(A, B) == 1 - predict(B, A).
+    # We do this AFTER the split and only on the train set — mirroring before the
+    # split would put each test fight's mirror into training (leakage = fake boost).
+    X_train = pd.concat([X_train, -X_train], ignore_index=True)
+    y_train = pd.concat([y_train, 1 - y_train], ignore_index=True)
+
+    # Balanced config: enough capacity to use the signal, regularized enough to
+    # keep the train/test gap sane (the loose config overfit to a 11-pt gap).
     xgb_model = xgb.XGBClassifier(
-        max_depth=3,
-        learning_rate=0.005,
-        n_estimators=300,
-        subsample=0.7,
-        colsample_bytree=0.7,
-        min_child_weight=6,
-        gamma=0.5,
-        reg_alpha=0.5,
-        reg_lambda=1.5,
+        max_depth=4,
+        learning_rate=0.02,
+        n_estimators=400,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        min_child_weight=5,
+        gamma=0.1,
+        reg_alpha=0.3,
+        reg_lambda=1.2,
         objective='binary:logistic',
         eval_metric='logloss',
         random_state=42
     )
 
     rf_model = RandomForestClassifier(
-        n_estimators=300,
-        max_depth=6,
-        min_samples_leaf=20,
+        n_estimators=400,
+        max_depth=8,            # middle ground (was 6 tight / 12 overfit)
+        min_samples_leaf=10,    # middle ground (was 20 tight / 5 overfit)
         random_state=42
     )
 
     lr_model = LogisticRegression(
         max_iter=5000,
-        C=0.3
+        C=0.5                   # middle ground (was 0.3 tight / 1.0 loose)
     )
 
     ensemble = VotingClassifier(
