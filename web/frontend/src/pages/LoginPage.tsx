@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../api";
+import { errorMessage } from "../lib/errorMessage";
 
 export default function LoginPage() {
   // The backend identifies users by email
@@ -45,7 +46,4 @@ export default function LoginPage() {
   );
 }
 
-// Pull a readable message out of an unknown caught error.
-function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : "Something went wrong";
-}
+
