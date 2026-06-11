@@ -32,3 +32,13 @@ def create_access_token(data: dict) -> str:
     payload["exp"] = now + timedelta(minutes=expires_in_minutes)  # when it expires
     payload["iat"] = now                                          # issued-at time
     return jwt.encode(payload, secret_key, algorithm=algorithm)
+
+def decode_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, secret_key, algorithms=[algorithm])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))

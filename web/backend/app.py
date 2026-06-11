@@ -3,11 +3,13 @@ import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
-from .security import hash_password, verify_password, create_access_token
+from .security import hash_password, verify_password, create_access_token, decode_token
 from .database import get_db
 from .models import User
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from fastapi import Response
+from fastapi import Cookie
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -42,6 +44,7 @@ app.add_middleware(
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 
@@ -65,6 +68,9 @@ def get_fighters():
     """List every fighter the model knows — used to fill the dropdowns."""
     return {"fighters": model.list_fighters()}
 
+@app.get("/api/me")
+def get_me(user: User = Depends(decode_token)):
+    return {"id": user.id, "email": user.email}
 
 @app.post("/api/predict")
 def predict(req: PredictRequest):
@@ -98,7 +104,7 @@ def sign_up(user: SignUpRequest, db: DBDep):
 
 
 @app.post("/api/login")
-def login(user: SignUpRequest, db: DBDep):
+def login(user: SignUpRequest, db: DBDep, response: Response):
     # verify an existing user: find by email, then check the password.
     db_user = db.execute(
         select(User).where(User.email == user.email)
@@ -111,5 +117,17 @@ def login(user: SignUpRequest, db: DBDep):
 
     # Issue a signed JWT identifying this user; the client sends it on later requests.
     token = create_access_token({"sub": db_user.email})
-    return {"access_token": token, "token_type": "bearer"}
+    #save token
+    response.set_cookie("token", token, httponly=True, samesite="lax", secure=False)
+    return { "message": "Login successful" }
+
+def get_curr_user(db: DBDep, token: str = Cookie(None)):
+    try:
+        payload = decode_token(token)
+        email = payload["sub"]
+        return db.execute(
+            select(User).where(User.email == email)
+        ).scalar_one_or_none()
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
     

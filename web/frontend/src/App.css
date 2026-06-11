@@ -1,3 +1,20 @@
+.nav {
+  display: flex;
+  gap: 1.25rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #2a2a31;
+}
+
+.nav a {
+  color: #e7e7ea;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.nav a:hover {
+  color: #d33a2c;
+}
+
 .page {
   max-width: 640px;
   margin: 3rem auto;

@@ -14,8 +14,11 @@ export type PredictResult = {
   pick: string;
   confidence: number;
 };
-export type LoginResponse = { access_token: string; token_type: string }; //
-export type SignupResponse = { id: string; email: string };
+// Login no longer returns the token in the body — it's set as an httpOnly cookie.
+// The body is just a confirmation now.
+export type LoginResponse = { message: string };
+export type SignupResponse = { id: number; email: string };
+export type MeResponse = { email: string };
 
 
 
@@ -53,6 +56,7 @@ export async function login(email : string, password : string): Promise<LoginRes
     method: "POST", //sending to backend server
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: email, password: password }),
+    credentials: "include", // <-- accept & store the httpOnly cookie the server sets
   });
   if (!res.ok) {
     // FastAPI puts error text in `detail`.
@@ -62,7 +66,7 @@ export async function login(email : string, password : string): Promise<LoginRes
   return res.json() as Promise<LoginResponse>;
   
 }
- export async function signup(email : number, password : string): Promise<SignupResponse> {
+ export async function signup(email : string, password : string): Promise<SignupResponse> {
   //fetch from backend, wait for response
   const res = await fetch(`${BASE_URL}/api/sign_up`, {
     method: "POST", //sending to backend server
@@ -75,5 +79,18 @@ export async function login(email : string, password : string): Promise<LoginRes
     throw new Error(err.detail || "Signup failed");
   }
   return res.json() as Promise<SignupResponse>;
-  
+
+}
+
+// "Who am I?" The frontend asks the backend who the cookie belongs to.
+// get_current_user
+export async function me(): Promise<MeResponse> {
+  const res = await fetch(`${BASE_URL}/api/me`, {
+    credentials: "include", // send the cookie so the backend can identify us
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Not authenticated");
+  }
+  return res.json() as Promise<MeResponse>;
 }
