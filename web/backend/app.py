@@ -1,5 +1,6 @@
 
 import sys
+import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
@@ -14,7 +15,7 @@ from fastapi import Cookie
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -35,6 +36,29 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="UFC Fight Predictor API", lifespan=lifespan)
 DBDep = Annotated[Session, Depends(get_db)]
+
+
+def get_curr_user(db: DBDep, token: str = Cookie(None)):
+    """Auth dependency: identify the logged-in user from the `token` cookie.
+
+    Attach via `Depends(get_curr_user)` to any endpoint that requires login;
+    """
+    if token is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = decode_token(token)
+        email = payload["sub"]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+    user = db.execute(
+        select(User).where(User.email == email)
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
 
 
 # The React dev server runs on a different origin (port 5173). Browsers block
@@ -69,7 +93,7 @@ def get_fighters():
     return {"fighters": model.list_fighters()}
 
 @app.get("/api/me")
-def get_me(user: User = Depends(decode_token)):
+def get_me(user: User = Depends(get_curr_user)):
     return {"id": user.id, "email": user.email}
 
 @app.post("/api/predict")
@@ -121,13 +145,14 @@ def login(user: SignUpRequest, db: DBDep, response: Response):
     response.set_cookie("token", token, httponly=True, samesite="lax", secure=False)
     return { "message": "Login successful" }
 
-def get_curr_user(db: DBDep, token: str = Cookie(None)):
-    try:
-        payload = decode_token(token)
-        email = payload["sub"]
-        return db.execute(
-            select(User).where(User.email == email)
-        ).scalar_one_or_none()
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=str(e))
+def _run_refresh(no_scrape: bool) -> None:
+    """Background task to run a full data refresh + model retrain."""
+    cmd = [sys.executable, str(PROJECT_ROOT / "refresh_data.py")]
+    if no_scrape:
+        cmd.append("--no-scrape")
+    subprocess.run(cmd, cwd=PROJECT_ROOT, check=True)
+    model.train()
+
+
+
     
