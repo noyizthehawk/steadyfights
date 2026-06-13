@@ -1,9 +1,7 @@
 
 const BASE_URL = "http://localhost:8000";
 
-// The exact shape of what /api/predict returns. This is the TypeScript payoff:
-// every component that uses a prediction now KNOWS these fields (autocomplete +
-// compile-time errors), instead of guessing at runtime.
+// one of the benefits of typscript is that we can define the shape of responses
 export type PredictResult = {
   fighter_a: string;
   fighter_b: string;
@@ -13,9 +11,14 @@ export type PredictResult = {
   prob_b: number;
   pick: string;
   confidence: number;
+  factors: {
+    label: string;
+    favors: string;
+    detail: number;
+    _impact: number;
+  }[];
 };
-// Login no longer returns the token in the body — it's set as an httpOnly cookie.
-// The body is just a confirmation now.
+//
 export type LoginResponse = { message: string };
 export type SignupResponse = { id: number; email: string };
 export type MeResponse = { email: string };
@@ -31,10 +34,11 @@ export async function getFighters(): Promise<string[]> {
 }
 
 // Ask the model to predict a matchup. The return type tells callers exactly
+// when called in the front end. the backend returns the prediction
 export async function predict(
   fighterA: string,
   fighterB: string,
-): Promise<PredictResult> {
+): Promise<PredictResult> { // the odel is expecting the return type to be PredictResult, that is the promise
   const res = await fetch(`${BASE_URL}/api/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -56,7 +60,7 @@ export async function login(email : string, password : string): Promise<LoginRes
     method: "POST", //sending to backend server
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: email, password: password }),
-    credentials: "include", // <-- accept & store the httpOnly cookie the server sets
+    credentials: "include", //  accept and store the httpOnly cookie the server sets
   });
   if (!res.ok) {
     // FastAPI puts error text in `detail`.

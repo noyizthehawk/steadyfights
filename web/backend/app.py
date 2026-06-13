@@ -11,10 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from fastapi import Response
 from fastapi import Cookie
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
-
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -32,8 +30,6 @@ async def lifespan(app: FastAPI):
     yield
 
 #load env
-
-
 app = FastAPI(title="UFC Fight Predictor API", lifespan=lifespan)
 DBDep = Annotated[Session, Depends(get_db)]
 
@@ -72,7 +68,7 @@ app.add_middleware(
 )
 
 
-# Pydantic model 
+# Pydantic models
 
 class PredictRequest(BaseModel):
     fighter_a: str
@@ -98,7 +94,7 @@ def get_me(user: User = Depends(get_curr_user)):
 
 @app.post("/api/predict")
 def predict(req: PredictRequest):
-    """Predict a matchup. Returns win probabilities, styles, and the pick."""
+    """Predict a matchup. Returns win probabilities, styles, and the pick and fighhter advantages"""
     names = set(model.list_fighters())
     if req.fighter_a not in names or req.fighter_b not in names:
         raise HTTPException(status_code=404, detail="One or both fighters not found.")
@@ -152,7 +148,6 @@ def _run_refresh(no_scrape: bool) -> None:
         cmd.append("--no-scrape")
     subprocess.run(cmd, cwd=PROJECT_ROOT, check=True)
     model.train()
-
 
 
     

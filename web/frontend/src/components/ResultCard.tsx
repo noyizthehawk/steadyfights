@@ -15,6 +15,14 @@ export function ResultCard({ result }: { result: PredictResult }) {
           Model pick: <strong>{result.pick}</strong> ({result.confidence}%
           confidence)
         </div>
+  
+        <div className="factors">
+          {result.factors.map((f) => (
+            <div key={f.label}>
+              <strong>{f.label}</strong>: {f.favors} by {f.detail}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

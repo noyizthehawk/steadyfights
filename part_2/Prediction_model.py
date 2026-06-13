@@ -21,6 +21,14 @@ K_FACTOR = 32
 INITIAL_ELO = 1500
 VERBOSE = False
 
+FEATURE_LABELS = {
+    "diff_elo_before_fight": "Elo rating",
+    "diff_reach": "Reach",
+    "diff_rolling_finish_rate_5": "Finish rate (last 5)",
+    "diff_age_at_fight": "Age",
+    "diff_height": "Height",
+    }
+
 
 def expected_score(elo_a, elo_b):
     return 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
@@ -77,6 +85,26 @@ def predict_fight_api(fighter_a, fighter_b):
     X_pred = pd.DataFrame([row])[diff_features].fillna(0)
     probs = calibrated_ensemble.predict_proba(X_pred)[0]
 
+    factors = []
+    for feat, label in FEATURE_LABELS.items():
+        diff = row.get(feat, 0)
+        std  = feature_stds.get(feat, 0)
+        if not std:                      # skip if std is 0 this is bad data
+            continue
+        impact = abs(diff / std)         # how many std-devs apart -> for ranking
+        favors = fighter_a if diff > 0 else fighter_b   # diff is A - B, so + = A
+        factors.append({
+            "label":  label,
+            "favors": favors,
+            "detail": abs(round(float(diff), 1)),    # the raw gap, for display
+            "_impact": impact,           # temporary, only used to sort
+        })
+
+    factors.sort(key=lambda f: f["_impact"], reverse=True)   # biggest first
+    top_factors = factors[:3]
+    for f in top_factors:
+        del f["_impact"]
+
     prob_a = float(probs[1])
     prob_b = float(probs[0])
     winner = fighter_a if prob_a > prob_b else fighter_b
@@ -89,6 +117,7 @@ def predict_fight_api(fighter_a, fighter_b):
         "prob_b": round(prob_b * 100, 2),
         "pick": winner,
         "confidence": round(max(prob_a, prob_b) * 100, 1),
+        "factors": top_factors,
     }
 
 
@@ -98,13 +127,14 @@ def list_fighters():
 
 
 def train():
-    """Run the full pipeline: load data, build Elo/features, fit the calibrated
-    ensemble. Sets the module-level globals used by predict_fight*(). Call this
-    ONCE (the web backend calls it at startup; the CLI calls it before looping)."""
+    global feature_stds
     global fighters_df, calibrated_ensemble, diff_features, numeric_features_to_diff
 
+    
     fighters_df = pd.read_csv(fighter_csv)
     opp_strength_df = pd.read_csv(opp_strength_csv)
+
+    
 
     # Merge opponent strength
     fighters_df = fighters_df.merge(
@@ -422,6 +452,7 @@ def train():
     # split lets future fights leak into training and gives an optimistic number.
     merged = merged.sort_values('date_A').reset_index(drop=True)
     X = merged[diff_features].fillna(0)
+    feature_stds = X.std()
     y = merged["target"]
 
     split_idx = int(len(merged) * 0.8)            # earliest 80% -> train
