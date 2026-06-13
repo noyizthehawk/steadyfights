@@ -21,13 +21,24 @@ K_FACTOR = 32
 INITIAL_ELO = 1500
 VERBOSE = False
 
+# Tale-of-the-tape features: base column name -> (display label, unit format).
 FEATURE_LABELS = {
-    "diff_elo_before_fight": "Elo rating",
-    "diff_reach": "Reach",
-    "diff_rolling_finish_rate_5": "Finish rate (last 5)",
-    "diff_age_at_fight": "Age",
-    "diff_height": "Height",
-    }
+    "elo_before_fight":      ("Elo rating", "int"),
+    "reach":                 ("Reach", "cm"),
+    "height":                ("Height", "cm"),
+    "rolling_finish_rate_5": ("Finish rate (last 5)", "pct"),
+}
+
+
+def _fmt_stat(value, kind):
+    """Format a raw stat for display in the tale of the tape."""
+    if kind == "pct":
+        return f"{value * 100:.0f}%"
+    if kind == "cm":
+        return f"{value:.1f} cm"
+    if kind == "int":
+        return f"{value:.0f}"
+    return f"{value:.1f}"
 
 
 def expected_score(elo_a, elo_b):
@@ -39,6 +50,7 @@ def update_elo(elo_a, elo_b, actual_score_a, k=K_FACTOR):
     new_elo_a = elo_a + k * (actual_score_a - expected_a)
     new_elo_b = elo_b + k * ((1 - actual_score_a) - (1 - expected_a))
     return new_elo_a, new_elo_b
+
 
 
 def predict_fight(fighter_a, fighter_b):
@@ -85,22 +97,27 @@ def predict_fight_api(fighter_a, fighter_b):
     X_pred = pd.DataFrame([row])[diff_features].fillna(0)
     probs = calibrated_ensemble.predict_proba(X_pred)[0]
 
+    # Tale of the tape: show the features where the two fighters differ most
+    # (ranked by standardized difference), with each fighter's actual value so
+    # the user can compare directly instead of reading a single signed gap.
     factors = []
-    for feat, label in FEATURE_LABELS.items():
-        diff = row.get(feat, 0)
-        std  = feature_stds.get(feat, 0)
-        if not std:                      # skip if std is 0 this is bad data
+    for base, (label, kind) in FEATURE_LABELS.items():
+        diff_key = f"diff_{base}"
+        diff = row.get(diff_key, 0)
+        std  = feature_stds.get(diff_key, 0)
+        if not std:                      # skip if std is 0 (empty/constant feature)
             continue
-        impact = abs(diff / std)         # how many std-devs apart -> for ranking
-        favors = fighter_a if diff > 0 else fighter_b   # diff is A - B, so + = A
+        impact = abs(diff / std)         # std-devs apart -> ranks how notable the gap is
+        favors = fighter_a if diff > 0 else fighter_b   # bigger value = the edge
         factors.append({
-            "label":  label,
-            "favors": favors,
-            "detail": abs(round(float(diff), 1)),    # the raw gap, for display
+            "label":   label,
+            "value_a": _fmt_stat(float(fa[base]), kind),
+            "value_b": _fmt_stat(float(fb[base]), kind),
+            "favors":  favors,
             "_impact": impact,           # temporary, only used to sort
         })
 
-    factors.sort(key=lambda f: f["_impact"], reverse=True)   # biggest first
+    factors.sort(key=lambda f: f["_impact"], reverse=True)   # biggest gap first
     top_factors = factors[:3]
     for f in top_factors:
         del f["_impact"]
@@ -521,6 +538,26 @@ def train():
     train_probs = calibrated_ensemble.predict_proba(X_train)
     train_preds = (train_probs[:, 1] > 0.5).astype(int)
     print(f"Training Accuracy: {accuracy_score(y_train, train_preds) * 100:.2f}%")
+
+    # --- Confidence calibration check (is the model honest or timid?) ---
+    # For each test fight the model's CONFIDENCE in its pick is max(p, 1-p), and
+    # it's "correct" if the picked fighter actually won. Group fights by confidence
+    # and compare avg confidence vs the actual win rate in that group:
+    #   actual ~= confidence      -> well-calibrated (trust the numbers)
+    #   actual  > confidence      -> UNDER-confident (too timid; could be sharper)
+    #   actual  < confidence      -> OVER-confident (hyped; calibration is helping)
+    conf = np.maximum(test_probs[:, 1], test_probs[:, 0])   # 0.50 .. 1.00
+    correct = (test_preds == y_test.to_numpy())
+    print("\nConfidence calibration (test set):")
+    print(f"{'conf bin':>12} {'n':>5} {'avg conf':>10} {'actual win%':>12}")
+    edges = [0.5, 0.6, 0.7, 0.8, 0.9, 1.01]
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        mask = (conf >= lo) & (conf < hi)
+        n = int(mask.sum())
+        if n == 0:
+            continue
+        label = f"{lo*100:.0f}-{min(hi,1.0)*100:.0f}%"
+        print(f"{label:>12} {n:>5} {conf[mask].mean()*100:>9.1f}% {correct[mask].mean()*100:>11.1f}%")
 
 
 def main():

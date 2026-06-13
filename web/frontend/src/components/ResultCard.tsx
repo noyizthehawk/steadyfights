@@ -16,10 +16,18 @@ export function ResultCard({ result }: { result: PredictResult }) {
           confidence)
         </div>
   
-        <div className="factors">
+        <div className="tale-of-the-tape">
+          <h3>Tale of the Tape</h3>
           {result.factors.map((f) => (
-            <div key={f.label}>
-              <strong>{f.label}</strong>: {f.favors} by {f.detail}
+            <div className="tape-row" key={f.label}>
+              {/* Bold whichever fighter's value wins this stat. */}
+              <span className={f.favors === result.fighter_a ? "tape-val winner" : "tape-val"}>
+                {f.value_a}
+              </span>
+              <span className="tape-label">{f.label}</span>
+              <span className={f.favors === result.fighter_b ? "tape-val winner" : "tape-val"}>
+                {f.value_b}
+              </span>
             </div>
           ))}
         </div>

@@ -11,14 +11,16 @@ export type PredictResult = {
   prob_b: number;
   pick: string;
   confidence: number;
+  // Tale of the tape: each fighter's actual value on a key stat with who it favors.
   factors: {
     label: string;
+    value_a: string;
+    value_b: string;
     favors: string;
-    detail: number;
-    _impact: number;
   }[];
 };
-//
+
+
 export type LoginResponse = { message: string };
 export type SignupResponse = { id: number; email: string };
 export type MeResponse = { email: string };
@@ -60,7 +62,7 @@ export async function login(email : string, password : string): Promise<LoginRes
     method: "POST", //sending to backend server
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: email, password: password }),
-    credentials: "include", //  accept and store the httpOnly cookie the server sets
+    credentials: "include", //  accept and   store the httpOnly cookie the server sets
   });
   if (!res.ok) {
     // FastAPI puts error text in `detail`.

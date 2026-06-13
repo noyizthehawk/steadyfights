@@ -141,3 +141,47 @@ h1 {
   padding-top: 1rem;
   border-top: 1px solid #3a3a42;
 }
+
+.tale-of-the-tape {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #3a3a42;
+}
+
+.tale-of-the-tape h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a9aa2;
+}
+
+.tape-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+}
+
+.tape-val {
+  font-variant-numeric: tabular-nums;
+  color: #9a9aa2;
+}
+
+/* left value right-aligns toward the label, right value left-aligns toward it */
+.tape-row .tape-val:first-child {
+  text-align: right;
+}
+
+.tape-val.winner {
+  color: #d33a2c;
+  font-weight: 700;
+}
+
+.tape-label {
+  font-size: 0.85rem;
+  color: #c8c8d0;
+  text-align: center;
+  white-space: nowrap;
+}
