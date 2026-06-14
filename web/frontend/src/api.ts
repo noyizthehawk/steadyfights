@@ -11,7 +11,7 @@ export type PredictResult = {
   prob_b: number;
   pick: string;
   confidence: number;
-  // Tale of the tape: each fighter's actual value on a key stat with who it favors.
+  // Tale of the tape
   factors: {
     label: string;
     value_a: string;
@@ -19,13 +19,40 @@ export type PredictResult = {
     favors: string;
   }[];
 };
-
-
+export type Phase = {
+  fights: number;
+  win_rate: number;     
+  raw_perf: number;
+  adj_perf: number;
+  opp_strength: number; // 0–1
+};
+export type CareerSummary = {
+  fighter: string;
+  total_fights: number;
+  win_rate: number;       // percent
+  avg_raw_perf: number;
+  avg_adj_perf: number;
+  volatility: number;
+  career_score: number;   // 0–100
+  career_label: string;
+  trajectory: string | null;
+  phases: {
+    early: Phase | null;              // can be null
+    mid:   Phase | null;
+    late:  Phase | null;
+  };
+  
+};
 export type LoginResponse = { message: string };
 export type SignupResponse = { id: number; email: string };
 export type MeResponse = { email: string };
 
-
+export async function getCareerSummary(fighter: string): Promise<CareerSummary> {
+  const res = await  fetch(`${BASE_URL}/api/fighters/${encodeURIComponent(fighter)}/career`);
+  if (!res.ok) throw new Error("Could not load career summary");
+  const data: CareerSummary = await res.json();
+  return data;
+}
 
 // Fetch the list of fighter names for the dropdowns.
 export async function getFighters(): Promise<string[]> {

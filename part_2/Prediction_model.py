@@ -118,7 +118,7 @@ def predict_fight_api(fighter_a, fighter_b):
         })
 
     factors.sort(key=lambda f: f["_impact"], reverse=True)   # biggest gap first
-    top_factors = factors[:3]
+    top_factors = factors[:4]
     for f in top_factors:
         del f["_impact"]
 

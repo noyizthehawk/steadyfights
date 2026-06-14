@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 
 from part_2 import Prediction_model as model
+from part_2 import career
 
 
 @asynccontextmanager
@@ -37,7 +38,7 @@ DBDep = Annotated[Session, Depends(get_db)]
 def get_curr_user(db: DBDep, token: str = Cookie(None)):
     """Auth dependency: identify the logged-in user from the `token` cookie.
 
-    Attach via `Depends(get_curr_user)` to any endpoint that requires login;
+    Attach with `Depends(get_curr_user)` to any endpoint that requires login
     """
     if token is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -57,8 +58,6 @@ def get_curr_user(db: DBDep, token: str = Cookie(None)):
     return user
 
 
-# The React dev server runs on a different origin (port 5173). Browsers block
-# cross-origin requests unless the server opts in via CORS. This allows it.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -87,6 +86,14 @@ def health():
 def get_fighters():
     """List every fighter the model knows — used to fill the dropdowns."""
     return {"fighters": model.list_fighters()}
+
+@app.get("/api/fighters/{name}/career")
+def fighter_career(name: str):
+    """Career rundown for one fighter: phases, trajectory, and career score."""
+    data = career.career_summary_api(name)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Fighter not found")
+    return data
 
 @app.get("/api/me")
 def get_me(user: User = Depends(get_curr_user)):
