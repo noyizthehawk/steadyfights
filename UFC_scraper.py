@@ -238,7 +238,15 @@ def get_fights_data(cells):
     strikes = [p.get_text(strip=True) for p in cells[3].select("p")]
     td = [p.get_text(strip=True) for p in cells[4].select("p")]
     sub = [p.get_text(strip=True) for p in cells[5].select("p")]
-    weight_class = cells[6].get_text(strip=True)
+    # ufcstats marks title fights with a belt icon <img src=".../belt.png"> in the
+    # weight-class cell. get_text() drops images, so without this a title fight reads
+    # as just "Lightweight" and the downstream `'Title' in Weight_Class` check misses
+    # it. Detect the belt and re-add "Title" so Transformer flags it (no downstream changes).
+    wc_cell = cells[6]
+    weight_class = wc_cell.get_text(strip=True)
+    belt = wc_cell.select_one("img")
+    if belt is not None and "belt" in belt.get("src", "").lower():
+        weight_class = f"{weight_class} Title"
     method = " ".join([p.get_text(strip=True)
                        for p in cells[7].select("p") if p.get_text(strip=True)])
     round_num = cells[8].get_text(strip=True)

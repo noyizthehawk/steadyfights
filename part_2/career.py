@@ -39,9 +39,9 @@ def _load():
 
 
 def _is_real_title(division):
-    """A real belt  excludes interim, TUF, tournaments()"""
+    """A real belt  excludes, TUF, tournaments()"""
     d = str(division).lower()
-    excluded = ["interim", "ultimate fighter", "tournament", "road to",
+    excluded = ["ultimate fighter", "tournament", "road to",
                 "tuf nations", "ultimate ultimate", "ultimate japan"]
     return not any(x in d for x in excluded)
 
