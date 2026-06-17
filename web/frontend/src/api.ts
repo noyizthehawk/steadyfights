@@ -24,7 +24,7 @@ export type Phase = {
   win_rate: number;     
   raw_perf: number;
   adj_perf: number;
-  opp_strength: number; // 0–1
+  opp_strength: number; 
 };
 export type CareerSummary = {
   fighter: string;
@@ -43,6 +43,13 @@ export type CareerSummary = {
   };
   
 };
+export type NewsArticle = {
+  title: string;
+  url: string;
+  source: string | null;
+  published_at: string | null;
+  image: string | null;
+};
 export type LoginResponse = { message: string };
 export type SignupResponse = { id: number; email: string };
 export type MeResponse = { email: string };
@@ -54,6 +61,14 @@ export async function getCareerSummary(fighter: string): Promise<CareerSummary> 
   return data;
 }
 
+// Latest news for a query like a fighter. The backend call newsapiu
+export async function getNews(q: string): Promise<NewsArticle[]> {
+  const res = await fetch(`${BASE_URL}/api/news?q=${encodeURIComponent(q)}`); // make it url safe
+  if (!res.ok) throw new Error("Could not load news");
+  const data: { query: string; articles: NewsArticle[] } = await res.json();
+  return data.articles;
+}
+
 // Fetch the list of fighter names for the dropdowns.
 export async function getFighters(): Promise<string[]> {
   const res = await fetch(`${BASE_URL}/api/fighters`);
@@ -62,8 +77,7 @@ export async function getFighters(): Promise<string[]> {
   return data.fighters;
 }
 
-// Ask the model to predict a matchup. The return type tells callers exactly
-// when called in the front end. the backend returns the prediction
+
 export async function predict(
   fighterA: string,
   fighterB: string,
@@ -115,8 +129,7 @@ export async function login(email : string, password : string): Promise<LoginRes
 
 }
 
-// "Who am I?" The frontend asks the backend who the cookie belongs to.
-// get_current_user
+
 export async function me(): Promise<MeResponse> {
   const res = await fetch(`${BASE_URL}/api/me`, {
     credentials: "include", // send the cookie so the backend can identify us

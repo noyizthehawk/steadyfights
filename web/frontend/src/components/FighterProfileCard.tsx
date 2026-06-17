@@ -1,11 +1,13 @@
 import type { CareerSummary, Phase } from "../api";
 import { getCareerSummary } from "../api";
 import { useEffect, useState } from "react";
+import { NewsList } from "./NewsList";
 
 
 export function FighterProfileCard({ fighter }: { fighter: string }) {
     const [summary, setSummary] = useState<CareerSummary | null>(null);
     const [error, setError] = useState<string>("");
+    const [tab, setTab] = useState<"career" | "news">("career");
 
     //whenever fighter changes, fetch the summary
     useEffect(() => {
@@ -31,21 +33,42 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
                 </span>
             </div>
 
-            <p className="career-label">{summary.career_label}</p>
-            {summary.trajectory && <p className="trajectory">{summary.trajectory}</p>}
-
-            <div className="career-stats">
-                <Stat label="Fights" value={summary.total_fights} />
-                <Stat label="Win rate" value={`${summary.win_rate}%`} />
-                <Stat label="Avg adj. perf" value={summary.avg_adj_perf} />
-                <Stat label="Volatility" value={summary.volatility} />
+            <div className="tabs">
+                <button
+                    className={tab === "career" ? "tab active" : "tab"}
+                    onClick={() => setTab("career")}
+                >
+                    Career
+                </button>
+                <button
+                    className={tab === "news" ? "tab active" : "tab"}
+                    onClick={() => setTab("news")}
+                >
+                    News
+                </button>
             </div>
 
-            <div className="career-phases">
-                {summary.phases.early && <PhaseColumn title="Early (1–5)" phase={summary.phases.early} />}
-                {summary.phases.mid && <PhaseColumn title="Mid (6–10)" phase={summary.phases.mid} />}
-                {summary.phases.late && <PhaseColumn title="Late (11+)" phase={summary.phases.late} />}
-            </div>
+            {tab === "career" && (
+                <>
+                    <p className="career-label">{summary.career_label}</p>
+                    {summary.trajectory && <p className="trajectory">{summary.trajectory}</p>}
+
+                    <div className="career-stats">
+                        <Stat label="Fights" value={summary.total_fights} />
+                        <Stat label="Win rate" value={`${summary.win_rate}%`} />
+                        <Stat label="Avg adj. perf" value={summary.avg_adj_perf} />
+                        <Stat label="Volatility" value={summary.volatility} />
+                    </div>
+
+                    <div className="career-phases">
+                        {summary.phases.early && <PhaseColumn title="Early (1–5)" phase={summary.phases.early} />}
+                        {summary.phases.mid && <PhaseColumn title="Mid (6–10)" phase={summary.phases.mid} />}
+                        {summary.phases.late && <PhaseColumn title="Late (11+)" phase={summary.phases.late} />}
+                    </div>
+                </>
+            )}
+
+            {tab === "news" && <NewsList fighter={summary.fighter} />}
         </div>
     );
 }
