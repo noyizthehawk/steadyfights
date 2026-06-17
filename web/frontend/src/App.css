@@ -1,8 +1,15 @@
 .nav {
   display: flex;
-  gap: 1.25rem;
+  justify-content: space-between;
+  align-items: center;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid #2a2a31;
+}
+
+.nav-left,
+.nav-right {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
 }
 
 .nav a {
@@ -52,8 +59,7 @@ h1 {
 .field input {
   padding: 0.5rem;
   border-radius: 8px;
-  border: 1px solid #3a3a42;
-  background: #1b1b20;
+  background: #111;
   color: #e7e7ea;
   font-size: 0.95rem;
 }
@@ -89,9 +95,8 @@ h1 {
 .result {
   margin-top: 2rem;
   padding: 1.25rem;
-  border: 1px solid #3a3a42;
   border-radius: 12px;
-  background: #16161a;
+  background: #000;
 }
 
 .matchup {
@@ -139,13 +144,11 @@ h1 {
 .pick {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #3a3a42;
 }
 
 .tale-of-the-tape {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #3a3a42;
 }
 
 .tale-of-the-tape h3 {
@@ -190,9 +193,8 @@ h1 {
 .card {
   margin-top: 2rem;
   padding: 1.25rem;
-  border: 1px solid #3a3a42;
   border-radius: 12px;
-  background: #16161a;
+  background: #000;
 }
 
 /* ---- Fighter profile ---- */
@@ -238,8 +240,7 @@ h1 {
   gap: 0.5rem;
   margin: 1rem 0;
   padding: 1rem 0;
-  border-top: 1px solid #3a3a42;
-  border-bottom: 1px solid #3a3a42;
+  
 }
 
 .stat {
@@ -269,9 +270,8 @@ h1 {
 
 .phase {
   padding: 0.75rem;
-  border: 1px solid #3a3a42;
   border-radius: 8px;
-  background: #1d1d22;
+  background: #0d0d0d;
 }
 
 .phase h4 {
@@ -294,9 +294,8 @@ h1 {
   width: 100%;
   padding: 0.6rem 0.75rem;
   margin: 0.5rem 0;
-  border: 1px solid #3a3a42;
   border-radius: 8px;
-  background: #16161a;
+  background: #111;          /* faint fill so the box is visible on black */
   color: inherit;
   font-size: 1rem;
 }
@@ -312,7 +311,6 @@ h1 {
   display: flex;
   gap: 0.5rem;
   margin: 1rem 0;
-  border-bottom: 1px solid #3a3a42;
 }
 
 .tab {
@@ -343,7 +341,6 @@ h1 {
 
 .news-item {
   padding: 0.6rem 0;
-  border-bottom: 1px solid #2a2a31;
 }
 
 .news-link {

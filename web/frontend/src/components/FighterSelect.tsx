@@ -1,7 +1,4 @@
-// A type-to-search fighter picker: a text <input> wired to a <datalist>, linked
-// by a shared id via `list`.
 
-// Props are described by a type. Now passing the wrong prop is a compile error.
 type FighterSelectProps = {
     label: string;
     value: string;

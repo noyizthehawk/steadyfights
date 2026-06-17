@@ -10,10 +10,14 @@ export default function App() {
   return (
     <>
       <nav className="nav">
-        <Link to="/">Predictor</Link>
-        <Link to="/fighters">Career Analyzer</Link>
-        <Link to="/login">Log in</Link>
-        <Link to="/signup">Sign up</Link>
+        <div className="nav-left">
+          <Link to="/">Predictor</Link>
+          <Link to="/fighters">Career Analyzer</Link>
+        </div>
+        <div className="nav-right">
+          <Link to="/login">Log in</Link>
+          <Link to="/signup">Sign up</Link>
+        </div>
       </nav>
 
       <Routes>
