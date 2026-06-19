@@ -25,7 +25,7 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
 
 
     return (
-        <div className="FighterProfileCard card">
+        <div className="border border-zinc-700 rounded-lg p-4">
             <div className="profile-header">
                 <h2>{summary.fighter}</h2>
                 <span className="career-score" title="Career quality (0–100)">

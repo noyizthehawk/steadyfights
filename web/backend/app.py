@@ -19,6 +19,9 @@ from pydantic import BaseModel
 from apify_client import ApifyClient
 import os
 import json
+import requests
+import unicodedata
+from datetime import datetime, timedelta, timezone
 from newsapi import NewsApiClient
 
 
@@ -44,6 +47,15 @@ for item in apify_client.dataset(run.default_dataset_id).iterate_items():
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
+
+#FUTURE FIGHTS API
+UFC_API_KEY = os.getenv("UFC_API_KEY")
+client = ApifyClient(UFC_API_KEY)
+
+def _norm_name(s):
+    """Lowercase + strip accents so 'Jiří Procházka' matches 'Jiri Prochazka'."""
+    s = unicodedata.normalize("NFKD", str(s))
+    return "".join(c for c in s if not unicodedata.combining(c)).lower().strip()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -117,7 +129,19 @@ def fighter_career(name: str):
     if data is None:
         raise HTTPException(status_code=404, detail="Fighter not found")
     return data
-
+@app.get("/api/fights/upcoming")
+def get_future_fights():
+    run_input = {
+       "endpoint": "/events",
+       "params" : {
+           "search": "upcoming",
+           "limit": 10,
+       }
+    }
+    run = client.actor("lemur/ufc-api").call(run_input=run_input)
+    print(f"💾 Check your data here: https://console.apify.com/storage/datasets/{run.default_dataset_id}")
+    for item in client.dataset(run.default_dataset_id).iterate_items():
+        return item
 @app.get("/api/news")
 def get_news(q: str = "UFC"):
     if newsapi is None:
