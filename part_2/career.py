@@ -99,27 +99,28 @@ def career_summary_api(fighter):
 
     max_adj = df["Adj Perf"].max()
 
+    # Career-phase buckets — used for the `phases` breakdown in the response.
     early = fights[fights["fight_number"] <= 5]
     mid = fights[(fights["fight_number"] >= 6) & (fights["fight_number"] <= 10)]
     late = fights[fights["fight_number"] >= 11]
 
-    trajectory = None
-    if not late.empty:
-        improvement = late["Adj Perf"].mean() - mid["Adj Perf"].mean()
-    elif not mid.empty:
-        improvement = mid["Adj Perf"].mean() - early["Adj Perf"].mean()
+    # Trajectory is recent form that is last 5 fights against everything before them.
+    # Need at least 6 fights so there's a baseline to compare the last 5 against.
+    if len(fights) <= 5:
+        trajectory = "Developing career — not enough fights to assess trajectory"
     else:
-        improvement = None
+        recent = fights.tail(5)          # most recent 5 fights (rows are sorted by fight_number)
+        earlier = fights.iloc[:-5]       # everything before them
+        improvement = recent["Adj Perf"].mean() - earlier["Adj Perf"].mean()
 
-    if improvement is not None and pd.notna(improvement):
         if improvement > 5:
-            trajectory = "Rapid ascension — dominance increased against tougher competition"
+            trajectory = "On a tear right now, getting better the harder the fights get"
         elif improvement > 0:
-            trajectory = "Steady development — performance improved as competition strengthened"
+            trajectory = "Leveling up,  holding their own as the competition gets stiffer"
         elif improvement > -3:
-            trajectory = "Stabilization phase — faced elite opposition consistently"
+            trajectory = "Holding it down,  been grinding against top competition consistently"
         else:
-            trajectory = "Late-career transition — competitive performances against top-tier opponents"
+            trajectory = "Deep in the trenches,  still showing up against the best in the game"
 
     score = _compute_career_score(fights, max_adj)
     if score >= 90:
