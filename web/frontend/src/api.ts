@@ -57,7 +57,8 @@ export type Bout = {
   fighter_b: string;
   odds_a: string | null;   // can be null
   odds_b: string | null;
-  
+  img_a: string | null;
+  img_b: string | null;
 }
 export type UFCEvent = {
   /**

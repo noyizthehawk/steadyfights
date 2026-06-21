@@ -28,9 +28,11 @@ class UFCFight(Base):
     matchup = Column(String)
     fighter_a = Column(String)
     fighter_b = Column(String)
-    odds_a = Column(String, nullable=True)  
+    odds_a = Column(String, nullable=True)
     odds_b = Column(String, nullable=True)
-    winner = Column(String, nullable=True)  
+    img_a = Column(String, nullable=True)    # fighter headshot URLs from ufc.com
+    img_b = Column(String, nullable=True)
+    winner = Column(String, nullable=True)
     event = relationship("UFCEvent", back_populates="fights")
 
     __table_args__ = (UniqueConstraint("event_id", "matchup"),)

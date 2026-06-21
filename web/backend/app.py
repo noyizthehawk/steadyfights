@@ -139,13 +139,14 @@ def save_events(results: list, db: Session):
                 fighter_b=f["fighter_b"],
                 odds_a=f["odds_a"],
                 odds_b=f["odds_b"],
+                img_a=f["img_a"],
+                img_b=f["img_b"],
             ))
 
         db.add(event)
     db.commit()
     
 def _clean_odds(text):
-    """UFC shows missing odds as '' or a literal '-'. Treat those as None."""
     text = text.strip()
     return text if text not in ("", "-") else None
 
@@ -170,12 +171,20 @@ def scrape_event_details(event_url):
         odds_a = _clean_odds(odds[0]) if len(odds) >= 2 else None
         odds_b = _clean_odds(odds[1]) if len(odds) >= 2 else None
 
+        # fighter headshots — scoped to the red/blue corner so we skip the flag imgs
+        img_a_el = bout.select_one(".c-listing-fight__corner-image--red img")
+        img_b_el = bout.select_one(".c-listing-fight__corner-image--blue img")
+        img_a = img_a_el["src"] if img_a_el and img_a_el.has_attr("src") else None
+        img_b = img_b_el["src"] if img_b_el and img_b_el.has_attr("src") else None
+
         fights.append({
             "matchup": f"{fighter_a} vs {fighter_b}",
             "fighter_a": fighter_a,
             "fighter_b": fighter_b,
             "odds_a": odds_a,
             "odds_b": odds_b,
+            "img_a": img_a,
+            "img_b": img_b,
         })
 
     return poster, fights
@@ -252,6 +261,8 @@ def get_upcoming_events(db: DBDep):
                         "fighter_b": f.fighter_b,
                         "odds_a": f.odds_a,
                         "odds_b": f.odds_b,
+                        "img_a": f.img_a,
+                        "img_b": f.img_b,
                     }
                     for f in e.fights
                 ],

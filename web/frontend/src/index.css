@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -30,6 +32,9 @@
   @media (max-width: 1024px) {
     font-size: 16px;
   }
+}
+@theme {
+  --font-display: "Press Start 2P", sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -72,6 +77,7 @@ h2 {
   font-family: var(--heading);
   font-weight: 500;
   color: var(--text-h);
+  font-family: var(--font-display);
 }
 
 h1 {

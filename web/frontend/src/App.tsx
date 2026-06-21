@@ -6,6 +6,7 @@ import SignupPage from "./pages/SignupPage";
 import FighterProfilePage from "./pages/FighterProfilePage";
 import FightersPage from "./pages/FightersPage";
 import PredictionGamePage from "./pages/PredictionGamePage";
+import EventDetailPage from "./pages/EventDetailPage";
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/fighters" element={<FightersPage />} />
         <Route path="/fighters/:id/career" element={<FighterProfilePage />} />
         <Route path="/prediction-game" element={<PredictionGamePage />} />
+        <Route path="/events/:slug" element={<EventDetailPage />} />
       </Routes>
     </>
   );
