@@ -87,11 +87,10 @@ export type SignupResponse = { id: number; email: string };
 export type MeResponse = { email: string };
 
 
-export async function getUpcomingEvents(): Promise<Event[]> { 
-  // the odel is expecting the return type to be Fights
+export async function getUpcomingEvents(): Promise<UFCEvent[]> {
   const res = await fetch(`${BASE_URL}/api/events/upcoming`);
-  if (!res.ok) throw new Error("Could not load fights");
-  const data: { events: Event[] } = await res.json();
+  if (!res.ok) throw new Error("Could not load events");
+  const data: { events: UFCEvent[] } = await res.json();
   return data.events;
 }
 

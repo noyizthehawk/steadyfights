@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { getUpcomingEvents } from "../api";
 import { EventTile } from "../components/EventTile";
 import { UFCEvent } from "../api";
@@ -18,7 +17,7 @@ export default function PredictionGamePage() {
             <h1>Prediction Game</h1>
             {error && <p className="error">{error}</p>}
 
-            <div className="event-grid">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
             {events.map((event) => (
                 <EventTile key={event.event_link} event={event} />
             ))}
