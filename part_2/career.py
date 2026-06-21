@@ -10,13 +10,13 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 career_csv = os.path.join(script_dir, "../csv/fighter_opponent_strength_extra.csv")
 fighter_csv = os.path.join(script_dir, "../csv/fighter_level_data.csv")
 
-# Loaded once on first use and cached (the CSVs don't change while the server runs;
+# Loaded once on first use and cached afterwards (so that
 # a data refresh restarts the process, which re-reads them).
 _career_df = None
 
 
 def _load():
-    """Load and cache the per-fight career table, with title_fight/division joined in."""
+    """Load and cache """
     global _career_df
     if _career_df is not None:
         return _career_df
@@ -37,7 +37,7 @@ def _load():
     _career_df = career
     return career
 
-
+# CAn manipulate this to exclude tournament fights
 def _is_real_title(division):
     """A real belt  excludes, TUF, tournaments()"""
     d = str(division).lower()
@@ -46,9 +46,61 @@ def _is_real_title(division):
     return not any(x in d for x in excluded)
 
 
+# --- Population-calibrated labels -------------------------------------------
+# The raw metrics are tightly clustered (e.g. ~half of Opp Str values sit at
+# 0.50), so fixed thresholds would dump everyone in one bucket. Instead we
+# label each fighter by where they RANK in the population: thresholds are the
+# 25th/75th/90th percentiles of the per-fighter averages, computed once and
+# cached. This stays calibrated automatically after a data refresh.
+_thresholds = None
+
+
+def _get_thresholds():
+    global _thresholds
+    if _thresholds is not None:
+        return _thresholds
+    df = _load()
+    g = df.groupby("Fighter")
+    series = {
+        "adj": g["Adj Perf"].mean(),
+        "vol": g["Raw Perf"].std().dropna(), 
+        "opp": g["Opp Str"].mean(),
+    }
+    _thresholds = {
+        key: [s.quantile(0.25), s.quantile(0.75), s.quantile(0.90)]
+        for key, s in series.items()
+    }
+    return _thresholds
+
+
+def _bucket(value, edges, labels):
+    """Map value to a label. `labels` has len(edges)+1 entries, low band first."""
+    if value is None or pd.isna(value):
+        return "Not enough data"
+    for edge, label in zip(edges, labels):
+        if value < edge:
+            return label
+    return labels[-1]
+
+
+def _perf_label(avg_adj):
+    return _bucket(avg_adj, _get_thresholds()["adj"],
+                   ["Developing", "Competitive Performances", "Strong Performances", "Elite Performances"])
+
+
+def _volatility_label(vol):
+    # lower volatility = steadier, the lower the better
+    return _bucket(vol, _get_thresholds()["vol"],
+                   ["Very consistent", "Consistent Career", "Streaky", "Highly volatile"])
+
+
+def _opp_label(avg_opp):
+    return _bucket(avg_opp, _get_thresholds()["opp"],
+                   ["Lighter competition", "Average competition", "Tough competition", "Elite competition"])
+
+
 def _compute_career_score(fights, max_adj_perf):
-    """Career quality score (0-100). Ported from improvement_velocity.compute_career_score,
-    adapted to this CSV's column names ('win(1)/loss(0)', 'Adj Perf')."""
+    #carerer score
     win_rate = fights["win(1)/loss(0)"].mean()
     avg_adj_perf = fights["Adj Perf"].mean()
 
@@ -138,13 +190,21 @@ def career_summary_api(fighter):
     vol = fights["Raw Perf"].std()
     volatility = round(float(vol), 1) if pd.notna(vol) else 0.0
 
+    avg_adj = float(fights["Adj Perf"].mean())
+    avg_opp = float(fights["Opp Str"].mean())
+
     return {
         "fighter": fighter,
         "total_fights": int(len(fights)),
         "win_rate": round(float(fights["win(1)/loss(0)"].mean()) * 100, 1),
         "avg_raw_perf": round(float(fights["Raw Perf"].mean()), 1),
-        "avg_adj_perf": round(float(fights["Adj Perf"].mean()), 1),
+        "avg_adj_perf": round(avg_adj, 1),
+        "perf_label": _perf_label(avg_adj),
+        "avg_opp_strength": round(avg_opp, 3),
+        "opp_label": _opp_label(avg_opp),
         "volatility": volatility,
+        # label off the raw std (NaN-aware) so 1-fight fighters read "Not enough data"
+        "volatility_label": _volatility_label(vol),
         "career_score": round(float(score), 1),
         "career_label": label,
         "trajectory": trajectory,

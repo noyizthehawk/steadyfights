@@ -32,7 +32,11 @@ export type CareerSummary = {
   win_rate: number;       // percent
   avg_raw_perf: number;
   avg_adj_perf: number;
+  perf_label: string;
+  avg_opp_strength: number;
+  opp_label: string;
   volatility: number;
+  volatility_label: string;
   career_score: number;   // 0–100
   career_label: string;
   trajectory: string | null;

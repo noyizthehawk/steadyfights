@@ -56,8 +56,9 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
                     <div className="career-stats">
                         <Stat label="Fights" value={summary.total_fights} />
                         <Stat label="Win rate" value={`${summary.win_rate}%`} />
-                        <Stat label="Avg adj. perf" value={summary.avg_adj_perf} />
-                        <Stat label="Volatility" value={summary.volatility} />
+                        <Stat label="Avg adj. perf" value={summary.avg_adj_perf} hint={summary.perf_label} />
+                        <Stat label="Opp strength" value={summary.avg_opp_strength} hint={summary.opp_label} />
+                        <Stat label="Volatility" value={summary.volatility} hint={summary.volatility_label} />
                     </div>
 
                     <div className="career-phases">
@@ -73,17 +74,16 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
     );
 }
 
-// One labelled number in the summary row.
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
     return (
         <div className="stat">
             <span className="stat-value">{value}</span>
             <span className="stat-label">{label}</span>
+            {hint && <span className="stat-hint text-xs text-[#d33a2c]">{hint}</span>}
         </div>
     );
 }
 
-// One career phase (early/mid/late). Only rendered when the phase isn't null.
 function PhaseColumn({ title, phase }: { title: string; phase: Phase }) {
     return (
         <div className="phase">
