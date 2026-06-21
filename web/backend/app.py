@@ -420,6 +420,13 @@ def login(user: SignUpRequest, db: DBDep, response: Response):
     response.set_cookie("token", token, httponly=True, samesite="lax", secure=False)
     return { "message": "Login successful" }
 
+
+@app.post("/api/logout")
+def logout(response: Response):
+    # The token cookie is httpOnly, so JS can't clear it — the server must.
+    response.delete_cookie("token", samesite="lax")
+    return {"message": "Logged out"}
+
 def _run_refresh(no_scrape: bool) -> None:
     """Background task to run a full data refresh + model retrain."""
     cmd = [sys.executable, str(PROJECT_ROOT / "refresh_data.py")]

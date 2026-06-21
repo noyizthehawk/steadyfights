@@ -219,3 +219,8 @@ export async function getMyPicks(): Promise<Record<number, string>> {
   const data: { picks: Record<number, string> } = await res.json();
   return data.picks;
 }
+
+// clear the auth cookie server-side
+export async function logout(): Promise<void> {
+  await fetch(`${BASE_URL}/api/logout`, { method: "POST", credentials: "include" });
+}

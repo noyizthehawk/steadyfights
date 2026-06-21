@@ -1,4 +1,5 @@
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import "./App.css";
 import PredictorPage from "./pages/PredictorPage";
 import LoginPage from "./pages/LoginPage";
@@ -7,8 +8,29 @@ import FighterProfilePage from "./pages/FighterProfilePage";
 import FightersPage from "./pages/FightersPage";
 import PredictionGamePage from "./pages/PredictionGamePage";
 import EventDetailPage from "./pages/EventDetailPage";
+import { me, logout } from "./api";
 
 export default function App() {
+  // the logged-in user's email, or null when logged out
+  const [email, setEmail] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // re-check auth on every route change so the nav updates right after login
+  useEffect(() => {
+    me()
+      .then((u) => setEmail(u.email))
+      .catch(() => setEmail(null));
+  }, [location.pathname]);
+
+  async function handleLogout() {
+    await logout();
+    setEmail(null);
+    setMenuOpen(false);
+    navigate("/");
+  }
+
   return (
     <>
       <nav className="nav">
@@ -18,8 +40,31 @@ export default function App() {
           <Link to="/prediction-game">Prediction Game</Link>
         </div>
         <div className="nav-right">
-          <Link to="/login">Log in</Link>
-          <Link to="/signup">Sign up</Link>
+          {email ? (
+            <div className="relative">
+              <button
+                className="nav-email cursor-pointer"
+                onClick={() => setMenuOpen((o) => !o)}
+              >
+                {email} ▾
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 z-50 mt-2 w-40 rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">
+                  <button
+                    className="block w-full px-4 py-2 text-left text-sm text-white hover:bg-zinc-800"
+                    onClick={handleLogout}
+                  >
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <Link to="/login">Log in</Link>
+              <Link to="/signup">Sign up</Link>
+            </>
+          )}
         </div>
       </nav>
 

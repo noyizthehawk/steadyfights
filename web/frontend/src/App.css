@@ -21,6 +21,11 @@
 .nav a:hover {
   color: #d33a2c;
 }
+.nav-email {
+  color: #e7e7ea;
+  text-decoration: none;
+  font-weight: 600;
+}
 
 .page {
   max-width: 640px;
