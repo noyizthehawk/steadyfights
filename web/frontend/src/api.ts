@@ -64,6 +64,7 @@ export type Bout = {
                         "odds_a": f.odds_a,
                         "odds_b": f.odds_b,
                     } */
+  id: number;
   matchup: string;
   fighter_a: string;
   fighter_b: string;
@@ -192,4 +193,29 @@ export async function me(): Promise<MeResponse> {
     throw new Error(err.detail || "Not authenticated");
   }
   return res.json() as Promise<MeResponse>;
+}
+// Thrown when an action needs a logged-in user. The UI catches this to redirect to login.
+export class AuthError extends Error {}
+
+// Create or update the current user's pick for a fight. Needs the auth cookie.
+export async function makePick(fightId: number, picked: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/picks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ fight_id: fightId, picked }),
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not save pick");
+  }
+}
+
+// The current user's picks as { fight_id: picked }. Returns {} when logged out.
+export async function getMyPicks(): Promise<Record<number, string>> {
+  const res = await fetch(`${BASE_URL}/api/picks/me`, { credentials: "include" });
+  if (!res.ok) return {};
+  const data: { picks: Record<number, string> } = await res.json();
+  return data.picks;
 }

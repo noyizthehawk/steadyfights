@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Annotated
 from .security import hash_password, verify_password, create_access_token, decode_token
 from .database import get_db, SessionLocal, Base
-from .models import User, UFCEvent, UFCFight
+from .models import User, UFCEvent, UFCFight, Pick
 from sqlalchemy.orm import Session, relationship
 from sqlalchemy import select
 from fastapi import Response
@@ -61,10 +61,9 @@ DBDep = Annotated[Session, Depends(get_db)]
 
 
 def get_curr_user(db: DBDep, token: str = Cookie(None)):
-    """Auth dependency: identify the logged-in user from the `token` cookie.
-
-    Attach with `Depends(get_curr_user)` to any endpoint that requires login
+    """Auth dependency that looks up the logged-in user by token.
     """
+    # if there is no token, the user is not logged in
     if token is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
@@ -99,6 +98,10 @@ class PredictRequest(BaseModel):
 class SignUpRequest(BaseModel):
     email: str
     password: str
+
+class PickRequest(BaseModel):
+    fight_id: int
+    picked: str
 @app.get("/api/health")
 def health():
     """Quick check that the server is up."""
@@ -107,7 +110,7 @@ def health():
 
 @app.get("/api/fighters")
 def get_fighters():
-    """List every fighter the model knows — used to fill the dropdowns."""
+    """List every fighter the model knows about, used to fill the dropdowns."""
     return {"fighters": model.list_fighters()}
 
 @app.get("/api/fighters/{name}/career")
@@ -119,31 +122,41 @@ def fighter_career(name: str):
     return data
 def save_events(results: list, db: Session):
     for r in results:
-        # skip if already exists
-        existing = db.query(UFCEvent).filter_by(event_link=r["event_link"]).first()
-        if existing:
-            continue
+        # Find the existing event, or create a new one. We UPDATE existing events
+        # rather than skipping them, so a card that firms up (main event announced,
+        # title changes from "TBD vs TBD", odds posted) actually refreshes.
+        event = db.query(UFCEvent).filter_by(event_link=r["event_link"]).first()
+        if event is None:
+            event = UFCEvent(event_link=r["event_link"])
+            db.add(event)
 
-        event = UFCEvent(
-            title=r["title"],
-            event_link=r["event_link"],
-            date=r["date"],
-            venue=r["venue"],
-            poster=r["poster"],
-        )
+        event.title = r["title"]
+        event.date = r["date"]
+        event.venue = r["venue"]
+        event.poster = r["poster"]
 
+        # Upsert fights keyed on matchup. We never DELETE fight rows here so that
+        # any picks referencing them stay valid (stale/cancelled bouts can be
+        # cleaned up separately later).
+        existing_fights = {f.matchup: f for f in event.fights}
         for f in r["fights"]:
-            event.fights.append(UFCFight(
-                matchup=f["matchup"],
-                fighter_a=f["fighter_a"],
-                fighter_b=f["fighter_b"],
-                odds_a=f["odds_a"],
-                odds_b=f["odds_b"],
-                img_a=f["img_a"],
-                img_b=f["img_b"],
-            ))
-
-        db.add(event)
+            fight = existing_fights.get(f["matchup"])
+            if fight is None:
+                event.fights.append(UFCFight(
+                    matchup=f["matchup"],
+                    fighter_a=f["fighter_a"],
+                    fighter_b=f["fighter_b"],
+                    odds_a=f["odds_a"],
+                    odds_b=f["odds_b"],
+                    img_a=f["img_a"],
+                    img_b=f["img_b"],
+                ))
+            else:
+                # refresh the volatile fields on a bout we've already stored
+                fight.odds_a = f["odds_a"]
+                fight.odds_b = f["odds_b"]
+                fight.img_a = f["img_a"]
+                fight.img_b = f["img_b"]
     db.commit()
     
 def _clean_odds(text):
@@ -212,7 +225,6 @@ def scrape_events():
         venue = location.find("h5").text.strip() if location else None
 
         # The bouts (names + odds) come from the event's detail page, where
-        # they're already correctly paired — better than the listing markup.
         poster, fights = scrape_event_details(event_link) if event_link else (None, [])
         time.sleep(1)
         results.append({
@@ -256,6 +268,7 @@ def get_upcoming_events(db: DBDep):
                 "poster": e.poster,
                 "fights": [
                     {
+                        "id": f.id,
                         "matchup": f.matchup,
                         "fighter_a": f.fighter_a,
                         "fighter_b": f.fighter_b,
@@ -270,7 +283,57 @@ def get_upcoming_events(db: DBDep):
             for e in events
         ]
     }
-    
+
+
+@app.post("/api/picks")
+def make_pick(req: PickRequest, db: DBDep, user: User = Depends(get_curr_user)):
+    # Make a pick
+    fight = db.get(UFCFight, req.fight_id)
+    if fight is None:
+        raise HTTPException(status_code=404, detail="Fight not found")
+
+    # `picked` must be one of the two fighters in this bout
+    if req.picked not in (fight.fighter_a, fight.fighter_b):
+        raise HTTPException(status_code=400, detail="Picked fighter is not in this fight")
+
+    # Picks lock at the event's start time
+    if fight.event and fight.event.date and fight.event.date <= int(time.time()):
+        raise HTTPException(status_code=403, detail="Picks are locked for this event")
+
+    # Upsert: update the existing pick, or insert a new one
+    pick = db.execute(
+        select(Pick).where(Pick.user_id == user.id, Pick.fight_id == req.fight_id)
+    ).scalar_one_or_none()
+    if pick:
+        pick.picked = req.picked
+    else:
+        pick = Pick(user_id=user.id, fight_id=req.fight_id, picked=req.picked)
+        db.add(pick)
+    db.commit()
+    return {"fight_id": req.fight_id, "picked": req.picked}
+
+
+@app.get("/api/picks/me")
+def my_picks(db: DBDep, user: User = Depends(get_curr_user)):
+    """The logged-in user's picks, keyed by fight_id — used to pre-fill the buttons."""
+    picks = db.execute(select(Pick).where(Pick.user_id == user.id)).scalars().all()
+    return {"picks": {p.fight_id: p.picked for p in picks}}
+
+
+@app.get("/api/picks/me/stats")
+def my_stats(db: DBDep, user: User = Depends(get_curr_user)):
+    """Derived winrate over SETTLED fights only."""
+    rows = (
+        db.query(Pick.picked, UFCFight.winner)
+        .join(UFCFight, Pick.fight_id == UFCFight.id)
+        .filter(Pick.user_id == user.id, UFCFight.winner.isnot(None))
+        .all()
+    )
+    settled = len(rows)
+    correct = sum(1 for picked, winner in rows if picked == winner)
+    winrate = round(correct / settled * 100, 1) if settled else None
+    return {"settled": settled, "correct": correct, "winrate": winrate}
+
 
        
 @app.get("/api/news")

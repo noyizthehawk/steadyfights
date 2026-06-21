@@ -37,6 +37,24 @@ class UFCFight(Base):
 
     __table_args__ = (UniqueConstraint("event_id", "matchup"),)
 
+
+class Pick(Base):
+    """One user's prediction for one fight. Winrate is DERIVED from these +
+    UFCFight.winner — never stored. One pick per (user, fight); changing a pick
+    updates the row rather than inserting a new one."""
+    __tablename__ = "picks"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    fight_id = Column(Integer, ForeignKey("ufc_fights.id"), nullable=False)
+    picked = Column(String, nullable=False)   # the fighter name they chose
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    fight = relationship("UFCFight")
+
+    __table_args__ = (UniqueConstraint("user_id", "fight_id", name="uq_user_fight"),)
+
+
 class User(Base):
     # The actual table name in the database.
     __tablename__ = "users"
