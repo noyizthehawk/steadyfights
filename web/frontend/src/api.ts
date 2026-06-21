@@ -19,12 +19,20 @@ export type PredictResult = {
     favors: string;
   }[];
 };
+export type PhaseBout = {
+  fight_number: number;
+  opponent: string;
+  won: boolean;
+  event: string;
+  adj_perf: number;
+};
 export type Phase = {
   fights: number;
-  win_rate: number;     
+  win_rate: number;
   raw_perf: number;
   adj_perf: number;
-  opp_strength: number; 
+  opp_strength: number;
+  bouts: PhaseBout[];
 };
 export type CareerSummary = {
   fighter: string;

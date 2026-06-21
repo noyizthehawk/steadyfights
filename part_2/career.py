@@ -133,12 +133,24 @@ def _phase(sub):
     """Aggregate one career phase (early/mid/late), or None if it has no fights."""
     if sub.empty:
         return None
+    # Per-fight log for this phase — drives the drill-down when a user clicks the tile.
+    bouts = [
+        {
+            "fight_number": int(r["fight_number"]),
+            "opponent": r["opponent_name"],
+            "won": bool(int(r["win(1)/loss(0)"])),
+            "event": r["Event"],
+            "adj_perf": round(float(r["Adj Perf"]), 1),
+        }
+        for _, r in sub.sort_values("fight_number").iterrows()
+    ]
     return {
         "fights": int(len(sub)),
         "win_rate": round(float(sub["win(1)/loss(0)"].mean()) * 100, 1),
         "raw_perf": round(float(sub["Raw Perf"].mean()), 1),
         "adj_perf": round(float(sub["Adj Perf"].mean()), 1),
         "opp_strength": round(float(sub["Opp Str"].mean()), 3),
+        "bouts": bouts,
     }
 
 
@@ -203,7 +215,6 @@ def career_summary_api(fighter):
         "avg_opp_strength": round(avg_opp, 3),
         "opp_label": _opp_label(avg_opp),
         "volatility": volatility,
-        # label off the raw std (NaN-aware) so 1-fight fighters read "Not enough data"
         "volatility_label": _volatility_label(vol),
         "career_score": round(float(score), 1),
         "career_label": label,

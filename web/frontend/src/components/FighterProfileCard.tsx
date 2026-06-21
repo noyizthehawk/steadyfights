@@ -8,6 +8,8 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
     const [summary, setSummary] = useState<CareerSummary | null>(null);
     const [error, setError] = useState<string>("");
     const [tab, setTab] = useState<"career" | "news">("career");
+    // which phase's floating panel (PiP) is open, or null when none
+    const [activePhase, setActivePhase] = useState<{ title: string; phase: Phase } | null>(null);
 
     //whenever fighter changes, fetch the summary
     useEffect(() => {
@@ -62,14 +64,45 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
                     </div>
 
                     <div className="career-phases">
-                        {summary.phases.early && <PhaseColumn title="Early (1–5)" phase={summary.phases.early} />}
-                        {summary.phases.mid && <PhaseColumn title="Mid (6–10)" phase={summary.phases.mid} />}
-                        {summary.phases.late && <PhaseColumn title="Late (11+)" phase={summary.phases.late} />}
+                        {summary.phases.early && <PhaseColumn title="Early (1–5)" phase={summary.phases.early} onOpen={setActivePhase} />}
+                        {summary.phases.mid && <PhaseColumn title="Mid (6–10)" phase={summary.phases.mid} onOpen={setActivePhase} />}
+                        {summary.phases.late && <PhaseColumn title="Late (11+)" phase={summary.phases.late} onOpen={setActivePhase} />}
                     </div>
                 </>
             )}
 
             {tab === "news" && <NewsList fighter={summary.fighter} />}
+
+            {/* pictire in pictire type look */}
+            {activePhase && (
+                <div className="fixed top-26 right-4 z-50 w-72 rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-2xl">
+                    <div className="mb-2 flex items-center justify-between">
+                        <h4 className="font-semibold text-white">{activePhase.title}</h4>
+                        <button
+                            className="text-zinc-400 hover:text-white"
+                            onClick={() => setActivePhase(null)}
+                            aria-label="Close"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    <ul className="max-h-[70vh] space-y-1 overflow-y-auto pr-1">
+                        {activePhase.phase.bouts.map((b) => (
+                            <li key={b.fight_number} className="flex items-center gap-2 text-xs">
+                                <span className={`w-6 shrink-0 rounded-md py-0.5 text-center font-bold text-white ${b.won ? "bg-green-500" : "bg-red-500"}`}>
+                                    {b.won ? "W" : "L"}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">
+                                    <a href={`/fighters/${encodeURIComponent(b.opponent)}/career`} className="text-white hover:text-zinc-400 hover:underline">
+                                        {b.opponent}
+                                    </a>{" "}
+                                    <span className="text-zinc-500">({b.event})</span>
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
         </div>
     );
 }
@@ -84,14 +117,26 @@ function Stat({ label, value, hint }: { label: string; value: string | number; h
     );
 }
 
-function PhaseColumn({ title, phase }: { title: string; phase: Phase }) {
+function PhaseColumn({
+    title,
+    phase,
+    onOpen,
+}: {
+    title: string;
+    phase: Phase;
+    onOpen: (p: { title: string; phase: Phase }) => void;
+}) {
     return (
-        <div className="phase">
+        <button
+            className="phase w-full cursor-pointer text-left transition-transform duration-200 hover:scale-105"
+            onClick={() => onOpen({ title, phase })}
+            title="Click to see the fights in this phase"
+        >
             <h4>{title}</h4>
             <div className="phase-row">{phase.fights} fights</div>
             <div className="phase-row">{phase.win_rate}% wins</div>
             <div className="phase-row">Adj perf {phase.adj_perf}</div>
             <div className="phase-row">Opp str {phase.opp_strength}</div>
-        </div>
+        </button>
     );
 }
