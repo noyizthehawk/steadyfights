@@ -43,6 +43,38 @@ export type CareerSummary = {
   };
   
 };
+
+export type Bout = {
+  /** {
+                        "matchup": f.matchup,
+                        "fighter_a": f.fighter_a,
+                        "fighter_b": f.fighter_b,
+                        "odds_a": f.odds_a,
+                        "odds_b": f.odds_b,
+                    } */
+  matchup: string;
+  fighter_a: string;
+  fighter_b: string;
+  odds_a: string | null;   // can be null
+  odds_b: string | null;
+  
+}
+export type UFCEvent = {
+  /**
+                "title": e.title,
+                "event_link": e.event_link,
+                "date": e.date,
+                "venue": e.venue,
+                "poster": e.poster,
+                "fights": [ */
+  title: string;
+  event_link: string;
+  date: number;
+  venue: string | null;
+  poster: string | null;
+  fights: Bout[];
+  
+}
 export type NewsArticle = {
   title: string;
   url: string;
@@ -53,6 +85,15 @@ export type NewsArticle = {
 export type LoginResponse = { message: string };
 export type SignupResponse = { id: number; email: string };
 export type MeResponse = { email: string };
+
+
+export async function getUpcomingEvents(): Promise<Event[]> { 
+  // the odel is expecting the return type to be Fights
+  const res = await fetch(`${BASE_URL}/api/events/upcoming`);
+  if (!res.ok) throw new Error("Could not load fights");
+  const data: { events: Event[] } = await res.json();
+  return data.events;
+}
 
 export async function getCareerSummary(fighter: string): Promise<CareerSummary> {
   const res = await  fetch(`${BASE_URL}/api/fighters/${encodeURIComponent(fighter)}/career`);

@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import FighterProfilePage from "./pages/FighterProfilePage";
 import FightersPage from "./pages/FightersPage";
+import PredictionGamePage from "./pages/PredictionGamePage";
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <div className="nav-left">
           <Link to="/">Predictor</Link>
           <Link to="/fighters">Career Analyzer</Link>
+          <Link to="/prediction-game">Prediction Game</Link>
         </div>
         <div className="nav-right">
           <Link to="/login">Log in</Link>
@@ -26,6 +28,7 @@ export default function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/fighters" element={<FightersPage />} />
         <Route path="/fighters/:id/career" element={<FighterProfilePage />} />
+        <Route path="/prediction-game" element={<PredictionGamePage />} />
       </Routes>
     </>
   );
