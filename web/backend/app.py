@@ -5,9 +5,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 from .security import hash_password, verify_password, create_access_token, decode_token
-from .database import get_db
-from .models import User
-from sqlalchemy.orm import Session
+from .database import get_db, SessionLocal, Base
+from .models import User, Fight, UFCEvent, UFCFight
+from sqlalchemy.orm import Session, relationship
 from sqlalchemy import select
 from fastapi import Response
 from fastapi import Cookie
@@ -23,27 +23,17 @@ import requests
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from newsapi import NewsApiClient
-
-
+from bs4 import BeautifulSoup
 from part_2 import Prediction_model as model
 from part_2 import career
+import time
+from sqlalchemy import Column, String, Integer, JSON, ForeignKey
 
-'''
-apify_client = ApifyClient(os.environ["UFC_API_KEY"])
-run_input = {
-    "mode": "api_query",
-    "query_type": "latest_news",
-    "fighter_name": "Justin Gaethje",
-    "news_limit": 10,
-    "num_events": 1,
-    "admin_daily_sync": False,
-    "admin_decision_sync": False,
-    "target_org": "UFC"
-}
-run = apify_client.actor("visita/fighting-intelligence-engine").call(run_input=run_input)
-for item in apify_client.dataset(run.default_dataset_id).iterate_items():
-    print(json.dumps(item, indent=2))
-'''
+
+
+
+BASE = "https://www.ufc.com"
+headers = {"User-Agent": "Mozilla/5.0"}
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
@@ -101,9 +91,7 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-
 # Pydantic models
-
 class PredictRequest(BaseModel):
     fighter_a: str
     fighter_b: str
@@ -129,19 +117,112 @@ def fighter_career(name: str):
     if data is None:
         raise HTTPException(status_code=404, detail="Fighter not found")
     return data
-@app.get("/api/fights/upcoming")
-def get_future_fights():
-    run_input = {
-       "endpoint": "/events",
-       "params" : {
-           "search": "upcoming",
-           "limit": 10,
-       }
-    }
-    run = client.actor("lemur/ufc-api").call(run_input=run_input)
-    print(f"💾 Check your data here: https://console.apify.com/storage/datasets/{run.default_dataset_id}")
-    for item in client.dataset(run.default_dataset_id).iterate_items():
-        return item
+def save_events(results: list, db: Session):
+    for r in results:
+        # skip if already exists
+        existing = db.query(UFCEvent).filter_by(event_link=r["event_link"]).first()
+        if existing:
+            continue
+
+        event = UFCEvent(
+            title=r["title"],
+            event_link=r["event_link"],
+            date=r["date"],
+            venue=r["venue"],
+            poster=r["poster"],
+            odds=r["odds"],
+        )
+
+        for f in r["fights"]:
+            event.fights.append(UFCFight(
+                matchup=f["matchup"],
+                red_corner_img=f["red_corner_img"],
+                blue_corner_img=f["blue_corner_img"],
+            ))
+
+        db.add(event)
+    db.commit()
+    
+def scrape_event_details(event_url):
+    #visit individual event
+    res = requests.get(BASE + event_url, headers=headers, timeout=10)
+    soup = BeautifulSoup(res.text, "html.parser")
+
+    #poster
+    og_image = soup.find("meta", property="og:image")
+    poster = og_image["content"] if og_image else None
+
+    # Odds — look for betting odds section
+    odds = []
+    odds_items = soup.find_all("div", class_="c-listing-fight__odds")
+    for item in odds_items:
+        fighter = item.find("div", class_="c-listing-fight__corner-name")
+        price = item.find("div", class_="c-listing-fight__odds-amount")
+        if fighter and price:
+            odds.append({
+                "fighter": fighter.text.strip(),
+                "odds": price.text.strip()
+            })
+
+    return poster, odds
+def scrape_events():
+    html_data = requests.get(BASE + "/events", headers=headers, timeout=10).text
+    soup = BeautifulSoup(html_data, "html.parser")
+
+    results = []
+    for event in soup.find_all("div", class_="l-listing__item"):
+        article = event.find("article", class_="c-card-event--result")
+        if not article:
+            continue
+        #healdine and other improtant stuff
+        headline = article.find("h3", class_="c-card-event--result__headline")
+        title = headline.find("a").text.strip() if headline else None
+        event_link = headline.find("a")["href"] if headline else None
+
+        #date
+        date_div = article.find("div", class_="c-card-event--result__date")
+        timestamp = date_div.get("data-main-card-timestamp") if date_div else None
+        if timestamp and int(timestamp) < time.time():
+            continue
+         # Venue
+        location = article.find("div", class_="c-card-event--result__location")
+        venue = location.find("h5").text.strip() if location else None
+
+        #fights on the card
+        fights = []
+        for card in article.find_all("div", class_="fight-card-tickets"):
+            label = card.get("data-fight-label")
+            red_img = card.find("div", class_="field--name-red-corner")
+            blue_img = card.find("div", class_="field--name-blue-corner")
+            fights.append({
+                "matchup": label,
+                "red_corner_img": red_img.find("img")["src"] if red_img and red_img.find("img") else None,
+                "blue_corner_img": blue_img.find("img")["src"] if blue_img and blue_img.find("img") else None,
+            })
+        
+        poster, odds = scrape_event_details(event_link) if event_link else (None, [])
+        time.sleep(1)
+        results.append({
+            "title": title,
+            "date": timestamp,
+            "venue": venue,
+            "poster": poster,
+            "fights": fights,
+            "odds": odds
+        })
+    return results
+def scrape_and_save(db: Session):
+    results = scrape_events()   
+    save_events(results, db)
+    return results
+@app.post("/api/scrape-events")
+def scrape_events_endpoint():
+    # test scraping only 
+    results = scrape_events()
+    return {"count": len(results), "results": results}
+    
+
+       
 @app.get("/api/news")
 def get_news(q: str = "UFC"):
     if newsapi is None:

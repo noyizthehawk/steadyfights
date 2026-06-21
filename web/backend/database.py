@@ -9,9 +9,13 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Put the SQLite file right next to this code, as an ABSOLUTE path, so it lands
-# in the same place no matter which folder you run the server from.
-DB_PATH = Path(__file__).resolve().parent / "app.db"
+# Keep the SQLite file in a `data/` folder at the PROJECT ROOT — deliberately
+# OUTSIDE web/backend, which uvicorn's --reload watches. If the DB lived inside a
+# watched folder, every write would look like a code change and restart the server
+# in an endless loop. parents[2] = the project root (.../web/backend/database.py).
+DB_DIR = Path(__file__).resolve().parents[2] / "data"
+DB_DIR.mkdir(exist_ok=True)
+DB_PATH = DB_DIR / "app.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # The ENGINE is the low-level gateway to the database. It knows the URL and
