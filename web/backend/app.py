@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Annotated
 from .security import hash_password, verify_password, create_access_token, decode_token
 from .database import get_db, SessionLocal, Base
-from .models import User, Fight, UFCEvent, UFCFight
+from .models import User, UFCEvent, UFCFight
 from sqlalchemy.orm import Session, relationship
 from sqlalchemy import select
 from fastapi import Response
@@ -130,41 +130,55 @@ def save_events(results: list, db: Session):
             date=r["date"],
             venue=r["venue"],
             poster=r["poster"],
-            odds=r["odds"],
         )
 
         for f in r["fights"]:
             event.fights.append(UFCFight(
                 matchup=f["matchup"],
-                red_corner_img=f["red_corner_img"],
-                blue_corner_img=f["blue_corner_img"],
+                fighter_a=f["fighter_a"],
+                fighter_b=f["fighter_b"],
+                odds_a=f["odds_a"],
+                odds_b=f["odds_b"],
             ))
 
         db.add(event)
     db.commit()
     
+def _clean_odds(text):
+    """UFC shows missing odds as '' or a literal '-'. Treat those as None."""
+    text = text.strip()
+    return text if text not in ("", "-") else None
+
+
 def scrape_event_details(event_url):
     #visit individual event
     res = requests.get(BASE + event_url, headers=headers, timeout=10)
     soup = BeautifulSoup(res.text, "html.parser")
 
-    #poster
-    og_image = soup.find("meta", property="og:image")
-    poster = og_image["content"] if og_image else None
+    #poster — .c-hero__image is a wrapper div; the real event art is the <img> inside it
+    poster_img = soup.select_one(".c-hero__image img")
+    poster = poster_img["src"] if poster_img and poster_img.has_attr("src") else None
 
-    # Odds — look for betting odds section
-    odds = []
-    odds_items = soup.find_all("div", class_="c-listing-fight__odds")
-    for item in odds_items:
-        fighter = item.find("div", class_="c-listing-fight__corner-name")
-        price = item.find("div", class_="c-listing-fight__odds-amount")
-        if fighter and price:
-            odds.append({
-                "fighter": fighter.text.strip(),
-                "odds": price.text.strip()
-            })
+    fights = []
+    for bout in soup.select(".c-listing-fight"):
+        names = [n.get_text(" ", strip=True) for n in bout.select(".c-listing-fight__corner-name")]
+        odds = [o.get_text(strip=True) for o in bout.select(".c-listing-fight__odds-amount")]
+        if len(names) < 2:
+            continue  # skip incomplete blocks 
 
-    return poster, odds
+        fighter_a, fighter_b = names[0], names[1]
+        odds_a = _clean_odds(odds[0]) if len(odds) >= 2 else None
+        odds_b = _clean_odds(odds[1]) if len(odds) >= 2 else None
+
+        fights.append({
+            "matchup": f"{fighter_a} vs {fighter_b}",
+            "fighter_a": fighter_a,
+            "fighter_b": fighter_b,
+            "odds_a": odds_a,
+            "odds_b": odds_b,
+        })
+
+    return poster, fights
 def scrape_events():
     html_data = requests.get(BASE + "/events", headers=headers, timeout=10).text
     soup = BeautifulSoup(html_data, "html.parser")
@@ -188,27 +202,17 @@ def scrape_events():
         location = article.find("div", class_="c-card-event--result__location")
         venue = location.find("h5").text.strip() if location else None
 
-        #fights on the card
-        fights = []
-        for card in article.find_all("div", class_="fight-card-tickets"):
-            label = card.get("data-fight-label")
-            red_img = card.find("div", class_="field--name-red-corner")
-            blue_img = card.find("div", class_="field--name-blue-corner")
-            fights.append({
-                "matchup": label,
-                "red_corner_img": red_img.find("img")["src"] if red_img and red_img.find("img") else None,
-                "blue_corner_img": blue_img.find("img")["src"] if blue_img and blue_img.find("img") else None,
-            })
-        
-        poster, odds = scrape_event_details(event_link) if event_link else (None, [])
+        # The bouts (names + odds) come from the event's detail page, where
+        # they're already correctly paired — better than the listing markup.
+        poster, fights = scrape_event_details(event_link) if event_link else (None, [])
         time.sleep(1)
         results.append({
             "title": title,
+            "event_link": event_link,
             "date": timestamp,
             "venue": venue,
             "poster": poster,
             "fights": fights,
-            "odds": odds
         })
     return results
 def scrape_and_save(db: Session):
@@ -216,10 +220,45 @@ def scrape_and_save(db: Session):
     save_events(results, db)
     return results
 @app.post("/api/scrape-events")
-def scrape_events_endpoint():
-    # test scraping only 
-    results = scrape_events()
-    return {"count": len(results), "results": results}
+def scrape_events_endpoint(db: DBDep):
+   # cron later
+    results = scrape_and_save(db)
+    return {"count": len(results), "saved": True}
+
+
+@app.get("/api/events/upcoming")
+def get_upcoming_events(db: DBDep):
+    #front end call this
+    now = int(time.time())
+    #filter by date
+    events = (
+        db.query(UFCEvent)
+        .filter(UFCEvent.date > now)
+        .order_by(UFCEvent.date)
+        .all()
+    )
+    return {
+        "events": [
+            {
+                "title": e.title,
+                "event_link": e.event_link,
+                "date": e.date,
+                "venue": e.venue,
+                "poster": e.poster,
+                "fights": [
+                    {
+                        "matchup": f.matchup,
+                        "fighter_a": f.fighter_a,
+                        "fighter_b": f.fighter_b,
+                        "odds_a": f.odds_a,
+                        "odds_b": f.odds_b,
+                    }
+                    for f in e.fights
+                ],
+            }
+            for e in events
+        ]
+    }
     
 
        
