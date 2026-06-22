@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { getLeaderboard, type LeaderboardRow } from "../api";
+import { useParams, useNavigate } from "react-router-dom";
+import { getLeaderboard, inviteFriend, AuthError, type LeaderboardRow } from "../api";
 
 // ties into the "Casual Checker" theme — label a user from their winrate
 function casualLabel(winrate: number | null) {
@@ -12,9 +12,11 @@ function casualLabel(winrate: number | null) {
 export default function UserCardPage() {
   // optional :start index from the URL (e.g. /users/3 when clicked from the leaderboard)
   const { start } = useParams<{ start?: string }>();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [error, setError] = useState<string>("");
   const [i, setI] = useState(Number(start) || 0); // index of the card currently shown
+  const [inviteMsg, setInviteMsg] = useState(""); // feedback for the Add Friend button
 
   useEffect(() => {
     getLeaderboard()
@@ -29,13 +31,24 @@ export default function UserCardPage() {
   if (error) return <p className="error">{error}</p>;
   if (rows.length === 0) return <p className="page text-zinc-500">No ranked users yet.</p>;
 
-  // wrap-around: % keeps the index inside [0, length)
-  const prev = () => setI((i - 1 + rows.length) % rows.length);
-  const next = () => setI((i + 1) % rows.length);
+  // wrap-around: % keeps the index inside [0, length). Clear any invite message on move.
+  const prev = () => { setInviteMsg(""); setI((i - 1 + rows.length) % rows.length); };
+  const next = () => { setInviteMsg(""); setI((i + 1) % rows.length); };
 
   const user = rows[i];
   const rank = i + 1;
   const label = casualLabel(user.winrate);
+
+  async function handleAddFriend() {
+    setInviteMsg("");
+    try {
+      await inviteFriend({ user_id: user.id });
+      setInviteMsg("Invite sent ✓");
+    } catch (e) {
+      if (e instanceof AuthError) navigate("/login");
+      else setInviteMsg(e instanceof Error ? e.message : "Could not invite");
+    }
+  }
 
   return (
     <div className="page flex flex-col items-center">
@@ -73,6 +86,14 @@ export default function UserCardPage() {
               <div className="text-xs text-zinc-400">picks</div>
             </div>
           </div>
+
+          <button
+            onClick={handleAddFriend}
+            className="mt-5 w-full rounded bg-[#d33a2c] py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Add Friend
+          </button>
+          {inviteMsg && <p className="mt-2 text-xs text-zinc-400">{inviteMsg}</p>}
         </div>
 
         <button

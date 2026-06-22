@@ -39,9 +39,7 @@ class UFCFight(Base):
 
 
 class Pick(Base):
-    """One user's prediction for one fight. Winrate is DERIVED from these +
-    UFCFight.winner — never stored. One pick per (user, fight); changing a pick
-    updates the row rather than inserting a new one."""
+    """One user's prediction for one fight. """
     __tablename__ = "picks"
 
     id = Column(Integer, primary_key=True)
@@ -53,6 +51,22 @@ class Pick(Base):
     fight = relationship("UFCFight")
 
     __table_args__ = (UniqueConstraint("user_id", "fight_id", name="uq_user_fight"),)
+
+
+class Friendship(Base):
+    """A friend relationship between two users. One row covers the whole
+    lifecycle: 'pending' when invited, 'accepted' once accepted. Declining just
+    deletes the row. Stored once but treated as bidirectional once accepted."""
+    __tablename__ = "friendships"
+
+    id = Column(Integer, primary_key=True)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # who sent the invite
+    addressee_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # who received it
+    status = Column(String, default="pending")   # "pending" | "accepted"
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # can't invite the same person twice
+    __table_args__ = (UniqueConstraint("requester_id", "addressee_id", name="uq_friendship"),)
 
 
 class User(Base):

@@ -10,6 +10,7 @@ import PredictionGamePage from "./pages/PredictionGamePage";
 import EventDetailPage from "./pages/EventDetailPage";
 import LeaderBoardPage from "./pages/LeaderBoardPage";
 import UserCardPage from "./pages/UserCardPage";
+import FriendsPage from "./pages/FriendsPage";
 import { me, logout } from "./api";
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
           <Link to="/fighters">Fighter Cards</Link>
           <Link to="/prediction-game">Casual Checker</Link>
           <Link to="/leaderboard">Leaderboard</Link>
+          <Link to="/friends">Friends</Link>
         </div>
         <div className="nav-right">
           {email ? (
@@ -82,6 +84,7 @@ export default function App() {
         <Route path="/leaderboard" element={<LeaderBoardPage />} />
         <Route path="/users" element={<UserCardPage />} />
         <Route path="/users/:start" element={<UserCardPage />} />
+        <Route path="/friends" element={<FriendsPage />} />
       </Routes>
     </>
   );

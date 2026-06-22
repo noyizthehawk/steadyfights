@@ -2,14 +2,6 @@
 const BASE_URL = "http://localhost:8000";
 
 // one of the benefits of typscript is that we can define the shape of responses
-export type LeaderBoardRow= {
-  name: string;
-  total_picks: number;
-  settled: number;
-  correct: number;
-  winrate: number | null;   // null until fights get settle
-};
-  
 export type PredictResult = {
   fighter_a: string;
   fighter_b: string;
@@ -138,12 +130,6 @@ export async function getFighters(): Promise<string[]> {
   const data: { fighters: string[] } = await res.json();
   return data.fighters;
 }
-export async function leaderboard(): Promise<LeaderBoardRow[]> {
-  const res = await fetch(`${BASE_URL}/api/leaderboard`);
-  if (!res.ok) throw new Error("Could not load leaderboard");
-  const data: { rows: LeaderBoardRow[] } = await res.json();
-  return data.rows;
-} 
 
 export async function predict(
   fighterA: string,
@@ -240,6 +226,7 @@ export async function logout(): Promise<void> {
 
 // One row of the worldwide leaderboard. winrate is null until fights settle.
 export type LeaderboardRow = {
+  id: number;          // user id — used to send a friend invite from a card
   name: string;
   total_picks: number;
   settled: number;
@@ -252,4 +239,59 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   if (!res.ok) throw new Error("Could not load leaderboard");
   const data: { leaderboard: LeaderboardRow[] } = await res.json();
   return data.leaderboard;
+}
+
+// ---- Friends ----
+export type Friend = { id: number; email: string };
+export type PendingInvite = { invite_id: number; from: string };
+
+// invite by email (Friends page) or by user_id (from a card)
+export async function inviteFriend(body: { email?: string; user_id?: number }): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/friends/invite`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not send invite");
+  }
+}
+
+export async function acceptInvite(id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/friends/${id}/accept`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not accept invite");
+  }
+}
+
+export async function declineInvite(id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/friends/${id}/decline`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not decline invite");
+  }
+}
+
+export async function getFriends(): Promise<Friend[]> {
+  const res = await fetch(`${BASE_URL}/api/friends`, { credentials: "include" });
+  if (!res.ok) return [];
+  const data: { friends: Friend[] } = await res.json();
+  return data.friends;
+}
+
+export async function getPending(): Promise<PendingInvite[]> {
+  const res = await fetch(`${BASE_URL}/api/friends/pending`, { credentials: "include" });
+  if (!res.ok) return [];
+  const data: { pending: PendingInvite[] } = await res.json();
+  return data.pending;
 }
