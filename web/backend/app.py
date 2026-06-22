@@ -8,7 +8,7 @@ from .security import hash_password, verify_password, create_access_token, decod
 from .database import get_db, SessionLocal, Base
 from .models import User, UFCEvent, UFCFight, Pick
 from sqlalchemy.orm import Session, relationship
-from sqlalchemy import select
+from sqlalchemy import select, func, case
 from fastapi import Response
 from fastapi import Cookie
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -335,6 +335,45 @@ def my_stats(db: DBDep, user: User = Depends(get_curr_user)):
     return {"settled": settled, "correct": correct, "winrate": winrate}
 
 
+@app.get("/api/leaderboard")
+def leaderboard(db: DBDep, limit: int = 50):
+    """Worldwide leaderboard.ranked by winrate over settled fights."""
+    rows = (
+        db.query(
+            User.email,                                          # user email
+            func.count(Pick.id).label("total_picks"),            # all picks
+            func.count(UFCFight.winner).label("settled"),        # non-null winners = settled
+            # when picked == winner it's a correct pick, else 0
+            func.sum(case((Pick.picked == UFCFight.winner, 1), else_=0)).label("correct"),
+        )
+        .join(Pick, Pick.user_id == User.id)
+        .join(UFCFight, Pick.fight_id == UFCFight.id)            # inner join fights on picks
+        .group_by(User.id)
+        .having(func.count(UFCFight.winner) >= 3)                # only users with >= 3 settled picks
+        .all()
+    )
+
+    board = []
+    for email, total, settled, correct in rows:
+        correct = correct or 0
+        winrate = round(correct / settled * 100, 1) if settled else None
+        board.append({
+            # local only
+            "name": email.split("@")[0],
+            "total_picks": total,
+            "settled": settled,
+            "correct": correct,
+            "winrate": winrate,
+        })
+
+    #sort it
+    board.sort(
+        key=lambda r: (r["winrate"] is not None, r["winrate"] or 0, r["total_picks"]),
+        reverse=True,
+    )
+    return {"leaderboard": board[:limit]}
+
+
        
 @app.get("/api/news")
 def get_news(q: str = "UFC"):
@@ -434,6 +473,3 @@ def _run_refresh(no_scrape: bool) -> None:
         cmd.append("--no-scrape")
     subprocess.run(cmd, cwd=PROJECT_ROOT, check=True)
     model.train()
-
-
-    

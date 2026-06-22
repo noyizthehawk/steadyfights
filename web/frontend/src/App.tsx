@@ -8,6 +8,8 @@ import FighterProfilePage from "./pages/FighterProfilePage";
 import FightersPage from "./pages/FightersPage";
 import PredictionGamePage from "./pages/PredictionGamePage";
 import EventDetailPage from "./pages/EventDetailPage";
+import LeaderBoardPage from "./pages/LeaderBoardPage";
+import UserCardPage from "./pages/UserCardPage";
 import { me, logout } from "./api";
 
 export default function App() {
@@ -36,8 +38,9 @@ export default function App() {
       <nav className="nav">
         <div className="nav-left">
           <Link to="/">Predictor</Link>
-          <Link to="/fighters">Career Analyzer</Link>
-          <Link to="/prediction-game">Prediction Game</Link>
+          <Link to="/fighters">Fighter Cards</Link>
+          <Link to="/prediction-game">Casual Checker</Link>
+          <Link to="/leaderboard">Leaderboard</Link>
         </div>
         <div className="nav-right">
           {email ? (
@@ -76,6 +79,9 @@ export default function App() {
         <Route path="/fighters/:id/career" element={<FighterProfilePage />} />
         <Route path="/prediction-game" element={<PredictionGamePage />} />
         <Route path="/events/:slug" element={<EventDetailPage />} />
+        <Route path="/leaderboard" element={<LeaderBoardPage />} />
+        <Route path="/users" element={<UserCardPage />} />
+        <Route path="/users/:start" element={<UserCardPage />} />
       </Routes>
     </>
   );

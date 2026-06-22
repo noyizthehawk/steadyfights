@@ -2,6 +2,14 @@
 const BASE_URL = "http://localhost:8000";
 
 // one of the benefits of typscript is that we can define the shape of responses
+export type LeaderBoardRow= {
+  name: string;
+  total_picks: number;
+  settled: number;
+  correct: number;
+  winrate: number | null;   // null until fights get settle
+};
+  
 export type PredictResult = {
   fighter_a: string;
   fighter_b: string;
@@ -130,7 +138,12 @@ export async function getFighters(): Promise<string[]> {
   const data: { fighters: string[] } = await res.json();
   return data.fighters;
 }
-
+export async function leaderboard(): Promise<LeaderBoardRow[]> {
+  const res = await fetch(`${BASE_URL}/api/leaderboard`);
+  if (!res.ok) throw new Error("Could not load leaderboard");
+  const data: { rows: LeaderBoardRow[] } = await res.json();
+  return data.rows;
+} 
 
 export async function predict(
   fighterA: string,
@@ -223,4 +236,20 @@ export async function getMyPicks(): Promise<Record<number, string>> {
 // clear the auth cookie server-side
 export async function logout(): Promise<void> {
   await fetch(`${BASE_URL}/api/logout`, { method: "POST", credentials: "include" });
+}
+
+// One row of the worldwide leaderboard. winrate is null until fights settle.
+export type LeaderboardRow = {
+  name: string;
+  total_picks: number;
+  settled: number;
+  correct: number;
+  winrate: number | null;
+};
+
+export async function getLeaderboard(): Promise<LeaderboardRow[]> {
+  const res = await fetch(`${BASE_URL}/api/leaderboard`);
+  if (!res.ok) throw new Error("Could not load leaderboard");
+  const data: { leaderboard: LeaderboardRow[] } = await res.json();
+  return data.leaderboard;
 }
