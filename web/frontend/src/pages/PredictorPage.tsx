@@ -37,36 +37,39 @@ export default function PredictorPage() {
     } finally {
       setLoading(false);
     }
+    setFighterA("");
+    setFighterB("");
   }
 
   return (
     <div className="page">
       <h1>STEADYFIGHTS</h1>
-      <p className="subtitle">Best Model on the market</p>
+      <p className="subtitle"></p>
+      <div className="flex flex-col items-center min-h-screen">
+          <div className="border border-zinc-700 rounded-lg p-4 w-full max-w-xl mt-10 h-fit">
+              <div className="pickers">
+                  <FighterSelect
+                      label="Fighter A"
+                      value={fighterA}
+                      onChange={setFighterA}
+                      options={fighters}
+                  />
+                  <span className="vs">vs</span>
+                  <FighterSelect
+                      label="Fighter B"
+                      value={fighterB}
+                      onChange={setFighterB}
+                      options={fighters}
+                  />
+              </div>
+              <button className="predict-btn" onClick={handlePredict} disabled={loading}>
+                  {loading ? "Predicting…" : "Predict"}
+              </button>
+          </div>
 
-      <div className="pickers">
-        <FighterSelect
-          label="Fighter A"
-          value={fighterA}
-          onChange={setFighterA}
-          options={fighters}
-        />
-        <span className="vs">vs</span>
-        <FighterSelect
-          label="Fighter B"
-          value={fighterB}
-          onChange={setFighterB}
-          options={fighters}
-        />
+          {error && <p className="error">{error}</p>}
+          {result && <ResultCard result={result} />}
       </div>
-
-      <button className="predict-btn" onClick={handlePredict} disabled={loading}>
-        {loading ? "Predicting…" : "Predict"}
-      </button>
-
-      {/* Conditional rendering: only show these if they exist. */}
-      {error && <p className="error">{error}</p>}
-      {result && <ResultCard result={result} />}
     </div>
   );
 }

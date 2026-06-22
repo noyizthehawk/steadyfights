@@ -2,7 +2,7 @@ import { ProbBar } from "./ProbBar";
 import type { PredictResult } from "../api";
 export function ResultCard({ result }: { result: PredictResult }) {
     return (
-      <div className="result">
+      <div className="result border border-zinc-700 rounded-lg p-4 mx-auto max-w-xl mt-6 h-fit">
         <div className="matchup">
           {result.fighter_a} <small>({result.style_a})</small> vs{" "}
           {result.fighter_b} <small>({result.style_b})</small>
@@ -17,7 +17,7 @@ export function ResultCard({ result }: { result: PredictResult }) {
         </div>
   
         <div className="tale-of-the-tape">
-          <h3>Tale of the Tape</h3>
+          <h3 className="font-bold">Tale of the Tape</h3>
           {result.factors.map((f) => (
             <div className="tape-row" key={f.label}>
               {/* Bold whichever fighter's value wins this stat. */}

@@ -177,8 +177,12 @@ h1 {
   color: #9a9aa2;
 }
 
-/* left value right-aligns toward the label, right value left-aligns toward it */
+/* fighter A hugs the left edge, fighter B hugs the right edge, label stays centered */
 .tape-row .tape-val:first-child {
+  text-align: left;
+}
+
+.tape-row .tape-val:last-child {
   text-align: right;
 }
 
