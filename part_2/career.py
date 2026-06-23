@@ -1,3 +1,4 @@
+
 """
 Career analysis for the web API.
 """
@@ -41,17 +42,12 @@ def _load():
 def _is_real_title(division):
     """A real belt  excludes, TUF, tournaments()"""
     d = str(division).lower()
-    excluded = ["ultimate fighter", "tournament", "road to",
+    excluded = ["interim", "ultimate fighter", "tournament", "road to",
                 "tuf nations", "ultimate ultimate", "ultimate japan"]
     return not any(x in d for x in excluded)
 
 
-# --- Population-calibrated labels -------------------------------------------
-# The raw metrics are tightly clustered (e.g. ~half of Opp Str values sit at
-# 0.50), so fixed thresholds would dump everyone in one bucket. Instead we
-# label each fighter by where they RANK in the population: thresholds are the
-# 25th/75th/90th percentiles of the per-fighter averages, computed once and
-# cached. This stays calibrated automatically after a data refresh.
+
 _thresholds = None
 
 
@@ -225,3 +221,24 @@ def career_summary_api(fighter):
             "late": _phase(late),
         },
     }
+
+def top_careers(n = 10, min_fights = 5):
+    df = _load()
+    #GLOBAL MAX
+    max_adj = df["Adj Perf"].max()
+    #group by the fighters
+    results = []
+    for fighter, group in df.groupby("Fighter"):
+        if len(group) < min_fights:
+            continue
+        score = _compute_career_score(group, max_adj)   # reuse the existing formula
+        results.append({
+            "fighter": fighter,
+            "career_score": round(float(score), 1),
+            "total_fights": int(len(group)),
+        })
+
+    # sort highest first, then take the top n
+    results.sort(key=lambda r: r["career_score"], reverse=True)
+    return results[:n]
+    

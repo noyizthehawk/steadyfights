@@ -13,11 +13,12 @@ from fastapi import Response
 from fastapi import Cookie
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from apify_client import ApifyClient
 import os
+import secrets
 import json
 import requests
 import unicodedata
@@ -41,6 +42,10 @@ newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
 #FUTURE FIGHTS API
 UFC_API_KEY = os.getenv("UFC_API_KEY")
 client = ApifyClient(UFC_API_KEY)
+
+# Shared secret that gates the scrape-triggering endpoint so it can't be poked
+# publicly. The CLI script (web.backend.settle) bypasses HTTP, so it never needs this.
+SETTLE_SECRET = os.getenv("SETTLE_SECRET")
 
 def _norm_name(s):
     """Lowercase + strip accents so 'Jiří Procházka' matches 'Jiri Prochazka'."""
@@ -215,9 +220,9 @@ def settle_event(db, event):
 
     return settled
 
-@app.post("/api/settle-events")
-def settle_finished_events(db: DBDep):
-    # query events that afinished, but be smart here query for only events that have at least one none
+def run_settle(db) -> dict:
+    """Settle every finished event that still has an unsettled fight.
+    Plain function so both the HTTP route and the CLI cron script can call it."""
     now = int(time.time())
     events = (
         db.query(UFCEvent)
@@ -225,11 +230,20 @@ def settle_finished_events(db: DBDep):
         .filter(UFCEvent.fights.any(UFCFight.winner.is_(None)))
         .all()
     )
-    total =0
+    total = 0
     for event in events:
         total += settle_event(db, event)
         time.sleep(1)
-    return {"status": "ok", "settled": total, "events": len(events)}
+    return {"events": len(events), "settled": total}
+
+
+@app.post("/api/settle-events")
+def settle_finished_events(db: DBDep, x_settle_token: str | None = Header(default=None)):
+    # cron-driven later; gated by a shared secret so it isn't publicly triggerable.
+    # Fail closed: if no secret is configured, the endpoint is disabled entirely.
+    if not SETTLE_SECRET or not x_settle_token or not secrets.compare_digest(x_settle_token, SETTLE_SECRET):
+        raise HTTPException(status_code=401, detail="Invalid or missing settle token")
+    return {"status": "ok", **run_settle(db)}
 
 def scrape_event_details(event_url):
     #visit individual event
