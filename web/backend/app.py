@@ -167,7 +167,69 @@ def save_events(results: list, db: Session):
 def _clean_odds(text):
     text = text.strip()
     return text if text not in ("", "-") else None
+def scrape_winners(event_url):
+    res = requests.get(BASE + event_url, headers=headers, timeout=10)
+    soup = BeautifulSoup(res.text, "html.parser")
 
+    list_of_winners = []
+    for bout in soup.select(".c-listing-fight"):
+        names = [n.get_text(" ", strip=True) for n in bout.select(".c-listing-fight__corner-name")]
+        if len(names) < 2:
+            continue  # skip incomplete blocks 
+
+        fighter_a, fighter_b = names[0], names[1]
+
+        # pull outcomes — .c-listing-fight__outcome-wrapper, one per corner
+        wrappers = bout.select(".c-listing-fight__outcome-wrapper")
+        if len(wrappers) < 2:
+            continue   # not scored yet → leave unsettled
+
+        a_won = wrappers[0].select_one(".c-listing-fight__outcome--win") is not None
+        b_won = wrappers[1].select_one(".c-listing-fight__outcome--win") is not None
+
+        if a_won:
+            winner = fighter_a
+        elif b_won:
+            winner = fighter_b
+        else:
+            winner = None
+        list_of_winners.append({
+            "matchup": f"{fighter_a} vs {fighter_b}",
+            "fighter_a": fighter_a,
+            "fighter_b": fighter_b,
+            "winner": winner
+        })
+
+    return list_of_winners
+def settle_event(db, event):
+    # match in db and get winner
+    winners = scrape_winners(event.event_link)
+    results = {w["matchup"]: w["winner"] for w in winners}
+    settled = 0
+    for fight in event.fights:
+        winner = results.get(fight.matchup)
+        if winner and fight.winner is None:
+            fight.winner = winner
+            settled += 1
+    db.commit()
+
+    return settled
+
+@app.post("/api/settle-events")
+def settle_finished_events(db: DBDep):
+    # query events that afinished, but be smart here query for only events that have at least one none
+    now = int(time.time())
+    events = (
+        db.query(UFCEvent)
+        .filter(UFCEvent.date < now)
+        .filter(UFCEvent.fights.any(UFCFight.winner.is_(None)))
+        .all()
+    )
+    total =0
+    for event in events:
+        total += settle_event(db, event)
+        time.sleep(1)
+    return {"status": "ok", "settled": total, "events": len(events)}
 
 def scrape_event_details(event_url):
     #visit individual event

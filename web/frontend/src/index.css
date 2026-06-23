@@ -116,3 +116,12 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* card switch animation (used by the user-card carousel) */
+@keyframes card-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-card-in {
+  animation: card-in 0.25s ease-out;
+}

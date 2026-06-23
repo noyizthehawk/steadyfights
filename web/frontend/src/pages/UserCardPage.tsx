@@ -63,7 +63,10 @@ export default function UserCardPage() {
           ◀
         </button>
 
-        <div className="w-72 rounded-xl border border-zinc-700 bg-zinc-900 p-6 text-center shadow-2xl">
+        <div
+          key={i}
+          className="w-72 animate-card-in rounded-xl border border-zinc-700 bg-zinc-900 p-6 text-center shadow-2xl"
+        >
           <div className="text-sm font-bold text-zinc-500">#{rank}</div>
           <h2 className="mt-1 text-xl font-bold text-white">{user.name}</h2>
 
