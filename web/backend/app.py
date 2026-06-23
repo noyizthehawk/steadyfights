@@ -657,3 +657,8 @@ def get_pending(db: DBDep, user: User = Depends(get_curr_user)):
         if requester:
             pending.append({"invite_id": f.id, "from": requester.email})
     return {"pending": pending}
+@app.get("/api/careers/top")
+def top_careers_endpoint(n: int = 10, min_fights: int = 5):
+    #max 100 users can search i dont want a siutuation where a user can query 10,000 for example
+    n = max(1, min(n, 100))   
+    return {"careers": career.top_careers(n, min_fights)}

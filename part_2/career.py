@@ -232,6 +232,9 @@ def top_careers(n = 10, min_fights = 5):
         if len(group) < min_fights:
             continue
         score = _compute_career_score(group, max_adj)   # reuse the existing formula
+        if pd.isna(score): #if unscorable skip
+            continue
+
         results.append({
             "fighter": fighter,
             "career_score": round(float(score), 1),

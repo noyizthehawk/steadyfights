@@ -96,6 +96,12 @@ export type NewsArticle = {
   published_at: string | null;
   image: string | null;
 };
+export type TopCareer = {           // shape → export type
+  fighter: string;
+  career_score: number;
+  total_fights: number;
+};
+
 export type LoginResponse = { message: string };
 export type SignupResponse = { id: number; email: string };
 export type MeResponse = { email: string };
@@ -294,4 +300,10 @@ export async function getPending(): Promise<PendingInvite[]> {
   if (!res.ok) return [];
   const data: { pending: PendingInvite[] } = await res.json();
   return data.pending;
+}
+
+export async function getTopCareers(n = 10): Promise<TopCareer[]> {
+  const res = await fetch(`${BASE_URL}/api/careers/top?n=${n}`);
+  const data = await res.json();
+  return data.careers;           // assert the shape via the return type
 }
