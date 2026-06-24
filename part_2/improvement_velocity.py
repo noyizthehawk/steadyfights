@@ -244,47 +244,9 @@ fight_level_df.to_csv(
 print("Fight-level CSV for all fighters saved!")
 print("All calculations complete\n")
 
-def is_real_title(division):
-    """Check if a title fight is a real belt (exclude interim, TUF, tournaments)"""
-    d = str(division).lower()
-    excluded = ['interim', 'ultimate fighter', 'tournament', 'road to', 'tuf nations', 'ultimate ultimate', 'ultimate japan']
-    return not any(x in d for x in excluded)
-
-
-def compute_career_score(fighter_fights: pd.DataFrame, max_adj_perf: float) -> float:
-    """Calculate career quality score for a fighter"""
-    win_rate = fighter_fights['win_flag_indicator'].mean()
-    avg_adj_perf = fighter_fights['adjusted_performance'].mean()
-
-    title_fights = fighter_fights[fighter_fights['title_fight'] == 1]
-    num_title_fights = len(title_fights)
-    num_title_wins = title_fights['win_flag_indicator'].sum()
-
-    # Title bonus
-    title_bonus = 0.03 * num_title_fights + 0.10 * num_title_wins
-    title_bonus = min(title_bonus, 0.25)
-
-    # Double champ bonus — real belts only, no interim or TUF
-    real_title_wins = title_fights[
-        (title_fights['win_flag_indicator'].astype(int) == 1) &
-        (title_fights['division'].apply(is_real_title).astype(bool))
-    ]
-    divisions_won = real_title_wins['division'].str.lower().unique()
-    double_champ_bonus = 0.03 if len(divisions_won) >= 2 else 0.0
-
-    norm_adj_perf = avg_adj_perf / max_adj_perf
-
-    career_quality_score = 0.6 * win_rate + 0.4 * norm_adj_perf
-
-    total_fights = len(fighter_fights)
-    longevity_factor = min(np.sqrt(total_fights / 25.0), 1.0)
-
-    career_quality_title_adjusted = (
-        0.7 * (career_quality_score + title_bonus + double_champ_bonus) +
-        0.3 * longevity_factor
-    ) * 100
-
-    return min(career_quality_title_adjusted, 100.0)
+# Career score now lives in one place (part_2/career_score.py) so the web API and
+# this refresh script can't drift. This file's columns differ, so pass their names.
+from career_score import compute_career_score
 
 
 def get_top_careers_by_metric(top_n: int = 20, min_fights: int = 5):
@@ -297,7 +259,10 @@ def get_top_careers_by_metric(top_n: int = 20, min_fights: int = 5):
             continue
 
         fighter_fights = group.sort_values('fight_number')
-        score = compute_career_score(fighter_fights, max_adj_perf)
+        score = compute_career_score(
+            fighter_fights, max_adj_perf,
+            win_col='win_flag_indicator', perf_col='adjusted_performance',
+        )
 
         results.append({
             'name': fighter_name,
@@ -397,7 +362,10 @@ def get_fighter_stats(fighter):
 
         # Use the same  function as the GOAT list
         max_adj_perf = fighters_df['adjusted_performance'].max()
-        career_quality_title_adjusted = compute_career_score(fighter_fights, max_adj_perf)
+        career_quality_title_adjusted = compute_career_score(
+            fighter_fights, max_adj_perf,
+            win_col='win_flag_indicator', perf_col='adjusted_performance',
+        )
 
         print(f"Career efficiency (Title-Adjusted): {career_quality_title_adjusted:.3f}")
 

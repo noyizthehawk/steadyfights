@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getTopCareers, type TopCareer } from "../api";
 import { useNavigate } from "react-router-dom";
+import { rankColor } from "../lib/rankColor";
 
 export default function TopCareerPage() {
     const [n, setN] = useState<number>(10); // at default, show the top 10
@@ -14,14 +15,7 @@ export default function TopCareerPage() {
         .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"));     
     }, [n]);
 
-    function rankColor(rank: number) {
-        if (rank === 1) return "text-yellow-400";
-        if (rank === 2) return "text-zinc-300";
-        if (rank === 3) return "text-amber-600";
-        return "text-zinc-500";
-      }
-      
-      return (
+    return (
         <div className="page">
           <h1 className="mb-1 text-2xl font-bold text-white">Top Careers</h1>
           <p className="mb-6 text-sm text-zinc-400">
@@ -54,6 +48,7 @@ export default function TopCareerPage() {
               <li
                 key={career.fighter}
                 className="flex items-center gap-4 rounded-lg bg-zinc-800 p-3 transition-transform hover:scale-105 hover:bg-zinc-700"
+                onClick={() => navigate(`/fighters/${career.fighter}/career`)}
               >
                 <span className={`w-8 text-center text-lg font-bold ${rankColor(i + 1)}`}>
                   {i + 1}

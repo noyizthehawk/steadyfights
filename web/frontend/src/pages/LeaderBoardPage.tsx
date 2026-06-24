@@ -1,14 +1,7 @@
 import { useEffect, useState } from "react";
 import { getLeaderboard, type LeaderboardRow } from "../api";
 import { useNavigate } from "react-router-dom";
-
-// medal colors for the top 3, muted zinc otherwise
-function rankColor(rank: number) {
-  if (rank === 1) return "text-yellow-400";
-  if (rank === 2) return "text-zinc-300";
-  if (rank === 3) return "text-amber-600";
-  return "text-zinc-500";
-}
+import { rankColor } from "../lib/rankColor";
 
 export default function LeaderboardPage() {
   const [rows, setRows] = useState<LeaderboardRow[]>([]);

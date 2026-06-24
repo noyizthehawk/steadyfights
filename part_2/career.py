@@ -7,6 +7,8 @@ import os
 import numpy as np
 import pandas as pd
 
+from part_2.career_score import compute_career_score
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 career_csv = os.path.join(script_dir, "../csv/fighter_opponent_strength_extra.csv")
 fighter_csv = os.path.join(script_dir, "../csv/fighter_level_data.csv")
@@ -37,15 +39,6 @@ def _load():
     )
     _career_df = career
     return career
-
-# CAn manipulate this to exclude tournament fights
-def _is_real_title(division):
-    """A real belt  excludes, TUF, tournaments()"""
-    d = str(division).lower()
-    excluded = ["interim", "ultimate fighter", "tournament", "road to",
-                "tuf nations", "ultimate ultimate", "ultimate japan"]
-    return not any(x in d for x in excluded)
-
 
 
 _thresholds = None
@@ -96,33 +89,11 @@ def _opp_label(avg_opp):
 
 
 def _compute_career_score(fights, max_adj_perf):
-    #carerer score
-    win_rate = fights["win(1)/loss(0)"].mean()
-    avg_adj_perf = fights["Adj Perf"].mean()
-
-    title_fights = fights[fights["title_fight"] == 1]
-    num_title_fights = len(title_fights)
-    num_title_wins = title_fights["win(1)/loss(0)"].sum()
-
-    title_bonus = min(0.03 * num_title_fights + 0.10 * num_title_wins, 0.25)
-
-    real_title_wins = title_fights[
-        (title_fights["win(1)/loss(0)"].astype(int) == 1)
-        & (title_fights["division"].apply(_is_real_title).astype(bool))
-    ]
-    divisions_won = real_title_wins["division"].str.lower().unique()
-    double_champ_bonus = 0.03 if len(divisions_won) >= 2 else 0.0
-
-    norm_adj_perf = avg_adj_perf / max_adj_perf
-    career_quality_score = 0.6 * win_rate + 0.4 * norm_adj_perf
-
-    longevity_factor = min(np.sqrt(len(fights) / 25.0), 1.0)
-
-    score = (
-        0.7 * (career_quality_score + title_bonus + double_champ_bonus)
-        + 0.3 * longevity_factor
-    ) * 100
-    return min(score, 100.0)
+    """Thin adapter over the shared scorer, passing career.py's column names."""
+    return compute_career_score(
+        fights, max_adj_perf,
+        win_col="win(1)/loss(0)", perf_col="Adj Perf",
+    )
 
 
 def _phase(sub):
@@ -222,7 +193,7 @@ def career_summary_api(fighter):
         },
     }
 
-def top_careers(n = 10, min_fights = 5):
+def top_careers(n = 10, min_fights = 8):
     df = _load()
     #GLOBAL MAX
     max_adj = df["Adj Perf"].max()
