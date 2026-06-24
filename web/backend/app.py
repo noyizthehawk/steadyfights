@@ -130,43 +130,47 @@ def fighter_career(name: str):
     if data is None:
         raise HTTPException(status_code=404, detail="Fighter not found")
     return data
-def save_events(results: list, db: Session):
-    for r in results:
-        # Find the existing event, or create a new one. We UPDATE existing events
-        # rather than skipping them, so a card that firms up (main event announced,
-        # title changes from "TBD vs TBD", odds posted) actually refreshes.
-        event = db.query(UFCEvent).filter_by(event_link=r["event_link"]).first()
+def apply_event_details(event: UFCEvent, an_event: dict):
+    """Copy the main event fields from scraped data onto the DB object."""
+    event.title = an_event["title"]
+    event.date = an_event["date"]
+    event.venue = an_event["venue"]
+    event.poster = an_event["poster"]
+
+
+def apply_fight_odds(fight: UFCFight, scraped_fight: dict):
+    """Copy the volatile odds fields from scraped data onto the DB object."""
+    fight.odds_a = scraped_fight["odds_a"]
+    fight.odds_b = scraped_fight["odds_b"]
+    fight.img_a = scraped_fight["img_a"]
+    fight.img_b = scraped_fight["img_b"]
+
+
+def save_events(events: list, db: Session):
+    """Upsert scraped events and their fights into the database."""
+    #for an event in the list of events
+    for an_event in events: 
+        event = db.query(UFCEvent).filter_by(event_link=an_event["event_link"]).first()
+        #if that event doestn exist in the db we apply the event detail onto the db
         if event is None:
-            event = UFCEvent(event_link=r["event_link"])
+            event = UFCEvent(event_link=an_event["event_link"])
             db.add(event)
 
-        event.title = r["title"]
-        event.date = r["date"]
-        event.venue = r["venue"]
-        event.poster = r["poster"]
+        apply_event_details(event, an_event) #apply event details
 
-        # Upsert fights keyed on matchup. We never DELETE fight rows here so that
-        # any picks referencing them stay valid (stale/cancelled bouts can be
-        # cleaned up separately later).
         existing_fights = {f.matchup: f for f in event.fights}
-        for f in r["fights"]:
-            fight = existing_fights.get(f["matchup"])
-            if fight is None:
-                event.fights.append(UFCFight(
-                    matchup=f["matchup"],
-                    fighter_a=f["fighter_a"],
-                    fighter_b=f["fighter_b"],
-                    odds_a=f["odds_a"],
-                    odds_b=f["odds_b"],
-                    img_a=f["img_a"],
-                    img_b=f["img_b"],
-                ))
-            else:
-                # refresh the volatile fields on a bout we've already stored
-                fight.odds_a = f["odds_a"]
-                fight.odds_b = f["odds_b"]
-                fight.img_a = f["img_a"]
-                fight.img_b = f["img_b"]
+
+        for scraped_fight in an_event["fights"]:
+            fight_record = existing_fights.get(scraped_fight["matchup"])
+            if fight_record is None:
+                fight_record = UFCFight(
+                    matchup=scraped_fight["matchup"],
+                    fighter_a=scraped_fight["fighter_a"],
+                    fighter_b=scraped_fight["fighter_b"],
+                )
+                event.fights.append(fight_record)
+            apply_fight_odds(fight_record, scraped_fight)
+
     db.commit()
     
 def _clean_odds(text):

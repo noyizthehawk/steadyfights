@@ -12,6 +12,7 @@ import LeaderBoardPage from "./pages/LeaderBoardPage";
 import UserCardPage from "./pages/UserCardPage";
 import FriendsPage from "./pages/FriendsPage";
 import TopCareerPage from "./pages/TopCareerPage";
+import LandingPage from "./pages/LandingPage";
 import { me, logout } from "./api";
 
 export default function App() {
@@ -39,7 +40,8 @@ export default function App() {
     <>
       <nav className="nav">
         <div className="nav-left">
-          <Link to="/">Predictor</Link>
+          <Link to="/">Home</Link>
+          <Link to="/predictor">Predictor</Link>
           <Link to="/fighters">Fighter Cards</Link>
           <Link to="/prediction-game">Casual Checker</Link>
           <Link to="/leaderboard">Leaderboard</Link>
@@ -76,7 +78,7 @@ export default function App() {
       </nav>
 
       <Routes>
-        <Route path="/" element={<PredictorPage />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/fighters" element={<FightersPage />} />
@@ -88,6 +90,7 @@ export default function App() {
         <Route path="/users/:start" element={<UserCardPage />} />
         <Route path="/friends" element={<FriendsPage />} />
         <Route path="/top-career" element={<TopCareerPage />} />
+        <Route path="/predictor" element={<PredictorPage />} />
       </Routes>
     </>
   );
