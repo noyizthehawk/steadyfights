@@ -48,8 +48,7 @@ newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
 UFC_API_KEY = os.getenv("UFC_API_KEY")
 client = ApifyClient(UFC_API_KEY)
 
-# Shared secret that gates the scrape-triggering endpoint so it can't be poked
-# publicly. The CLI script (web.backend.settle) bypasses HTTP, so it never needs this.
+
 SETTLE_SECRET = os.getenv("SETTLE_SECRET")
 
 def _norm_name(s):
@@ -68,6 +67,23 @@ async def lifespan(app: FastAPI):
 #load env
 app = FastAPI(title="UFC Fight Predictor API", lifespan=lifespan)
 DBDep = Annotated[Session, Depends(get_db)]
+
+def rate_limit(name: str, limit: int, window: int):
+    #rate limit with redis, we use incr to increment counter 
+    def dependency(request: Request):
+        ip = request.client.host
+        key = f"ratelimit:{name}:{ip}"
+        try:
+            count = redis_client.incr(key)         # 1 on the first hit (key auto-created)
+            if count == 1:
+                redis_client.expire(key, window)   # first hit → start the window timer
+        except RedisError:
+            return  # Redis down → fail open, don't lock anyone out
+
+        if count > limit:
+            raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
+
+    return dependency
 
 
 def get_curr_user(db: DBDep, token: str = Cookie(None)):
@@ -253,12 +269,17 @@ def run_settle(db) -> dict:
     return {"events": len(events), "settled": total}
 
 
-@app.post("/api/settle-events")
-def settle_finished_events(db: DBDep, x_settle_token: str | None = Header(default=None)):
-    # cron-driven later; gated by a shared secret so it isn't publicly triggerable.
-    # Fail closed: if no secret is configured, the endpoint is disabled entirely.
+def verify_admin_token(x_settle_token: str | None = Header(default=None)):
+    """Shared gate for cron/admin endpoints (scrape + settle). Fail closed: if no
+    secret is configured the endpoint is disabled entirely. The CLI scripts
+    (settle.py, refresh_data.py) bypass HTTP, so they never need this."""
     if not SETTLE_SECRET or not x_settle_token or not secrets.compare_digest(x_settle_token, SETTLE_SECRET):
-        raise HTTPException(status_code=401, detail="Invalid or missing settle token")
+        raise HTTPException(status_code=401, detail="Invalid or missing admin token")
+
+
+@app.post("/api/settle-events", dependencies=[Depends(verify_admin_token)])
+def settle_finished_events(db: DBDep):
+    # cron-driven later; gated by verify_admin_token (shared secret).
     return {"status": "ok", **run_settle(db)}
 
 def scrape_event_details(event_url):
@@ -337,9 +358,9 @@ def scrape_and_save(db: Session):
     results = scrape_events()   
     save_events(results, db)
     return results
-@app.post("/api/scrape-events")
+@app.post("/api/scrape-events", dependencies=[Depends(verify_admin_token)])
 def scrape_events_endpoint(db: DBDep):
-   # cron later
+   # cron later; gated by verify_admin_token so the live ufc.com scrape isn't public
     results = scrape_and_save(db)
     return {"count": len(results), "saved": True}
 
@@ -556,7 +577,7 @@ def predict(req: PredictRequest):
         raise HTTPException(status_code=400, detail="Pick two different fighters.")
     return model.predict_fight_api(req.fighter_a, req.fighter_b)
 
-@app.post("/api/sign_up")
+@app.post("/api/sign_up", dependencies=[Depends(rate_limit("sign_up", limit=5, window=900))])
 def sign_up(user: SignUpRequest, db: DBDep):
     #check for existing user before anything else
     existing = db.execute(
@@ -577,7 +598,7 @@ def sign_up(user: SignUpRequest, db: DBDep):
     return {"id": new_user.id, "email": new_user.email}
 
 
-@app.post("/api/login")
+@app.post("/api/login", dependencies=[Depends(rate_limit("login", limit=5, window=900))])
 def login(user: SignUpRequest, db: DBDep, response: Response):
     # verify an existing user: find by email, then check the password.
     db_user = db.execute(
