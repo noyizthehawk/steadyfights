@@ -31,6 +31,11 @@ import time
 from sqlalchemy import Column, String, Integer, JSON, ForeignKey
 
 
+from redis import RedisError
+from .redis_client import redis_client
+
+LEADERBOARD_TTL = 60  # seconds
+NEWS_TTL = 600  # 10 minutes cache
 
 
 BASE = "https://www.ufc.com"
@@ -430,6 +435,16 @@ def my_stats(db: DBDep, user: User = Depends(get_curr_user)):
 @app.get("/api/leaderboard")
 def leaderboard(db: DBDep, limit: int = 50):
     """Worldwide leaderboard.ranked by winrate over settled fights."""
+    cache_key = f"leaderboard:{limit}"
+
+    #never make redis calls, cache a hard dependency
+    try:
+        cached = redis_client.get(cache_key)
+        if cached is not None:
+            return {"leaderboard": json.loads(cached)}
+    except RedisError:
+        pass
+
     rows = (
         db.query(
             User.id,                                             # so cards can identify the user
@@ -464,7 +479,15 @@ def leaderboard(db: DBDep, limit: int = 50):
         key=lambda r: (r["winrate"] is not None, r["winrate"] or 0, r["total_picks"]),
         reverse=True,
     )
-    return {"leaderboard": board[:limit]}
+    result = board[:limit]
+
+    # best-effort cache write — a Redis failure must not break the response
+    try:
+        redis_client.set(cache_key, json.dumps(result), ex=LEADERBOARD_TTL)
+    except RedisError:
+        pass
+
+    return {"leaderboard": result}
 
 
        
@@ -472,6 +495,18 @@ def leaderboard(db: DBDep, limit: int = 50):
 def get_news(q: str = "UFC"):
     if newsapi is None:
         raise HTTPException(status_code=503, detail="News API not configured (set NEWS_API_KEY).")
+
+    # normalize the query for the key so "UFC" and "ufc" share one cached entry
+    cache_key = f"news:{q.lower()}"
+
+    # serve cached news if present; on a miss OR a Redis outage, fall through to
+    # the live API so the cache is never a hard dependency.
+    try:
+        cached = redis_client.get(cache_key)
+        if cached is not None:
+            return json.loads(cached)
+    except RedisError:
+        pass
 
     query = q if "ufc" in q.lower() else f"{q} UFC"   # keep results on-topic
     try:
@@ -485,7 +520,7 @@ def get_news(q: str = "UFC"):
         # Don't leak provider internals; just report it's unavailable.
         raise HTTPException(status_code=502, detail="News provider unavailable.")
 
-    return {
+    payload = {
         "query": q,
         "articles": [
             {
@@ -498,6 +533,14 @@ def get_news(q: str = "UFC"):
             for a in result.get("articles", [])
         ],
     }
+
+    # cache only successful responses (the 502/503 paths above never reach here)
+    try:
+        redis_client.set(cache_key, json.dumps(payload), ex=NEWS_TTL)
+    except RedisError:
+        pass
+
+    return payload
 
 @app.get("/api/me")
 def get_me(user: User = Depends(get_curr_user)):
