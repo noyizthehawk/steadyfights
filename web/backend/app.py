@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from apify_client import ApifyClient
 import os
 import secrets
@@ -78,7 +78,7 @@ def get_curr_user(db: DBDep, token: str = Cookie(None)):
         raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
-
+    # look up the user in the db, the payload contains very minimal info to identify a suer
     user = db.execute(
         select(User).where(User.email == email)
     ).scalar_one_or_none()
@@ -109,9 +109,15 @@ class PickRequest(BaseModel):
     picked: str
 
 class InviteRequest(BaseModel):
-    # invite by email (Friends page) OR by user_id (from a card) — one is required
+    # invite by email or user_id
     email: str | None = None
     user_id: int | None = None
+    # handle situation where user and user_id is none there must be one of them
+    @model_validator(mode="after")
+    def check_one_required(self):
+        if self.email is None and self.user_id is None:
+            raise ValueError("either email or user_id is required")
+        return self
 @app.get("/api/health")
 def health():
     """Quick check that the server is up."""
@@ -120,7 +126,8 @@ def health():
 
 @app.get("/api/fighters")
 def get_fighters():
-    """List every fighter the model knows about, used to fill the dropdowns."""
+    """List every fighter the model knows about this is used to fill the dropdowns
+    """
     return {"fighters": model.list_fighters()}
 
 @app.get("/api/fighters/{name}/career")

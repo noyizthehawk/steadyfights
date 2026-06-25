@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 #hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # bcrypt uses salt and is inherently slow, hard for attackers
 
 secret_key = os.getenv("JWT_SECRET")                                 
 algorithm = os.getenv("JWT_ALGORITHM", "HS256")                    
