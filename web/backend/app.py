@@ -13,7 +13,7 @@ from fastapi import Response
 from fastapi import Cookie
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Header
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, model_validator
 from apify_client import ApifyClient
@@ -29,6 +29,7 @@ from part_2 import Prediction_model as model
 from part_2 import career
 import time
 from sqlalchemy import Column, String, Integer, JSON, ForeignKey
+
 
 
 from redis import RedisError
@@ -568,7 +569,7 @@ def get_me(user: User = Depends(get_curr_user)):
     return {"id": user.id, "email": user.email}
 
 @app.post("/api/predict")
-def predict(req: PredictRequest):
+def predict(req: PredictRequest, user: User = Depends(get_curr_user)):
     """Predict a matchup. Returns win probabilities, styles, and the pick and fighhter advantages"""
     names = set(model.list_fighters())
     if req.fighter_a not in names or req.fighter_b not in names:

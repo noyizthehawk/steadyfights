@@ -145,6 +145,7 @@ export async function predict(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fighter_a: fighterA, fighter_b: fighterB }),
+    credentials: "include", //tell the browser to imnclude the cookie
   });
   if (!res.ok) {
     // FastAPI puts error text in `detail`.
