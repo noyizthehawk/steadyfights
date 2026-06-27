@@ -82,8 +82,14 @@ class User(Base):
     # We store the bcrypt HASH of the password, never the password itself
     hashed_password = Column(String, nullable=False)
 
-    # When the account was created. 
+    # When the account was created.
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Stripe billing — both start empty; filled once the user subscribes.
+    # stripe_customer_id links this user to Stripe's Customer (looked up in webhooks).
+    stripe_customer_id = Column(String, nullable=True, index=True)
+    # Mirror of Stripe's subscription state: "active" / "canceled" / None.
+    subscription_status = Column(String, nullable=True)
 
     def __repr__(self):
         return f"<User id={self.id} email={self.email!r}>"

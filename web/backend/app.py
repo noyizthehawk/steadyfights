@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, relationship
 from sqlalchemy import select, func, case, and_, or_
 from fastapi import Response
 from fastapi import Cookie
+import stripe
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Header, Request
@@ -49,8 +50,11 @@ newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
 UFC_API_KEY = os.getenv("UFC_API_KEY")
 client = ApifyClient(UFC_API_KEY)
 
-
 SETTLE_SECRET = os.getenv("SETTLE_SECRET")
+stripe.api_key = os.getenv("STRIPE_API_KEY")
+STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID")
+FRONTEND_URL = "http://localhost:5173"
+
 
 def _norm_name(s):
     """Lowercase + strip accents so 'Jiří Procházka' matches 'Jiri Prochazka'."""
