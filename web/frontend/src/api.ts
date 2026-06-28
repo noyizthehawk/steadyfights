@@ -34,6 +34,14 @@ export type Phase = {
   opp_strength: number;
   bouts: PhaseBout[];
 };
+export type UserEvents = {
+  event_id: number;
+  title: string;
+  date: number;
+  poster: string | null;
+
+}
+
 export type CareerSummary = {
   fighter: string;
   total_fights: number;
@@ -104,7 +112,7 @@ export type TopCareer = {           // shape → export type
 
 export type LoginResponse = { message: string };
 export type SignupResponse = { id: number; email: string };
-export type MeResponse = { email: string };
+export type MeResponse = { id: number; email: string };
 
 
 export async function getUpcomingEvents(): Promise<UFCEvent[]> {
@@ -135,6 +143,50 @@ export async function getFighters(): Promise<string[]> {
   if (!res.ok) throw new Error("Could not load fighters");
   const data: { fighters: string[] } = await res.json();
   return data.fighters;
+}
+export async function get_user_past_events(userId: number): Promise<UserEvents[]> {
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/events`, {
+    credentials: "include", // endpoint requires the auth cookie
+  });
+  if (!res.ok) throw new Error("Could not load events");
+  const data: { events: UserEvents[] } = await res.json();
+  return data.events;
+}
+
+// One fight in a user's event breakdown: who they picked, who won, did they nail it.
+export type UserEventFight = {
+  event_id: number;
+  matchup: string;
+  fighter_a: string;
+  fighter_b: string;
+  img_a: string | null;
+  img_b: string | null;
+  picked: string;
+  winner: string | null;   // null until the fight is settled
+  correct: boolean;
+};
+
+// A user's stats for one event: summary numbers + the per-fight breakdown.
+export type UserEventStats = {
+  user_id: number;
+  event_id: number | null;
+  picks_made: number;
+  fights_settled: number;
+  correct: number;
+  winrate: number | null;  // null until at least one fight settles
+  fights: UserEventFight[];
+};
+
+export async function getUserEventStats(
+  userId: number,
+  eventId: number,
+): Promise<UserEventStats> {
+  const res = await fetch(
+    `${BASE_URL}/api/users/${userId}/stats?event_id=${eventId}`,
+    { credentials: "include" }, // endpoint requires the auth cookie
+  );
+  if (!res.ok) throw new Error("Could not load event stats");
+  return res.json() as Promise<UserEventStats>;
 }
 
 export async function predict(

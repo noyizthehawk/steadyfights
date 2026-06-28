@@ -13,11 +13,15 @@ import UserCardPage from "./pages/UserCardPage";
 import FriendsPage from "./pages/FriendsPage";
 import TopCareerPage from "./pages/TopCareerPage";
 import LandingPage from "./pages/LandingPage";
+import UserEventDetailPage from "./pages/UserEventDetailPage";
+import UserPastEvents from "./pages/UserPastEvents";
 import { me, logout } from "./api";
 
 export default function App() {
   // the logged-in user's email, or null when logged out
   const [email, setEmail] = useState<string | null>(null);
+  // the logged-in user's id — used to link to their own past events
+  const [userId, setUserId] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -25,13 +29,20 @@ export default function App() {
   // re-check auth on every route change so the nav updates right after login
   useEffect(() => {
     me()
-      .then((u) => setEmail(u.email))
-      .catch(() => setEmail(null));
+      .then((u) => {
+        setEmail(u.email);
+        setUserId(u.id);
+      })
+      .catch(() => {
+        setEmail(null);
+        setUserId(null);
+      });
   }, [location.pathname]);
 
   async function handleLogout() {
     await logout();
     setEmail(null);
+    setUserId(null);
     setMenuOpen(false);
     navigate("/");
   }
@@ -47,6 +58,9 @@ export default function App() {
           <Link to="/leaderboard">Leaderboard</Link>
           <Link to="/friends">Friends</Link>
           <Link to="/top-career">Top Career</Link>
+          {userId !== null && (
+            <Link to={`/users/${userId}/events`}>Past Events</Link>
+          )}
         </div>
         <div className="nav-right">
           {email ? (
@@ -88,6 +102,8 @@ export default function App() {
         <Route path="/leaderboard" element={<LeaderBoardPage />} />
         <Route path="/users" element={<UserCardPage />} />
         <Route path="/users/:start" element={<UserCardPage />} />
+        <Route path="/users/:userId/events" element={<UserPastEvents />} />
+        <Route path="/users/:userId/events/:eventId" element={<UserEventDetailPage />} />
         <Route path="/friends" element={<FriendsPage />} />
         <Route path="/top-career" element={<TopCareerPage />} />
         <Route path="/predictor" element={<PredictorPage />} />
