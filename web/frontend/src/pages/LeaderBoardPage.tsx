@@ -26,7 +26,7 @@ export default function LeaderboardPage() {
         {rows.map((row, i) => (
           <li
             key={row.name}
-            onClick={() => navigate(`/users/${i}`)}
+            onClick={() => navigate(`/users/${row.id}`)}
             className="flex cursor-pointer items-center gap-4 rounded-lg bg-zinc-800 p-3 transition-colors hover:bg-zinc-700 transition-transform hover:scale-105"
           >
             <span className={`w-8 text-center text-lg font-bold ${rankColor(i + 1)}`}>

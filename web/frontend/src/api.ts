@@ -189,6 +189,39 @@ export async function getUserEventStats(
   return res.json() as Promise<UserEventStats>;
 }
 
+// A user's full profile — identity, overall stats, world rank, and highlights.
+export type UserProfile = {
+  id: number;
+  name: string;
+  member_since: number | null;          // unix seconds
+  stats: {
+    total_picks: number;
+    settled: number;
+    correct: number;
+    winrate: number | null;
+  };
+  world_rank: { rank: number; total_ranked: number } | null;  // null if unranked
+  friends_count: number;
+  events_count: number;
+  recent_form: string[];                // ["W","W","L",...] most recent first
+  current_streak: { type: "win" | "loss"; count: number } | null;
+  best_event: {
+    event_id: number;
+    title: string;
+    correct: number;
+    of: number;
+    winrate: number;
+  } | null;
+};
+
+export async function getUserProfile(userId: number): Promise<UserProfile> {
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/profile`, {
+    credentials: "include", // endpoint requires the auth cookie
+  });
+  if (!res.ok) throw new Error("Could not load profile");
+  return res.json() as Promise<UserProfile>;
+}
+
 export async function predict(
   fighterA: string,
   fighterB: string,

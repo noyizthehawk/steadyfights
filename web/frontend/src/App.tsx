@@ -9,7 +9,7 @@ import FightersPage from "./pages/FightersPage";
 import PredictionGamePage from "./pages/PredictionGamePage";
 import EventDetailPage from "./pages/EventDetailPage";
 import LeaderBoardPage from "./pages/LeaderBoardPage";
-import UserCardPage from "./pages/UserCardPage";
+import ProfilePage from "./pages/ProfilePage";
 import FriendsPage from "./pages/FriendsPage";
 import TopCareerPage from "./pages/TopCareerPage";
 import LandingPage from "./pages/LandingPage";
@@ -100,8 +100,7 @@ export default function App() {
         <Route path="/prediction-game" element={<PredictionGamePage />} />
         <Route path="/events/:slug" element={<EventDetailPage />} />
         <Route path="/leaderboard" element={<LeaderBoardPage />} />
-        <Route path="/users" element={<UserCardPage />} />
-        <Route path="/users/:start" element={<UserCardPage />} />
+        <Route path="/users/:userId" element={<ProfilePage />} />
         <Route path="/users/:userId/events" element={<UserPastEvents />} />
         <Route path="/users/:userId/events/:eventId" element={<UserEventDetailPage />} />
         <Route path="/friends" element={<FriendsPage />} />
