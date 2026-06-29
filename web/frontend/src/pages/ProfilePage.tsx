@@ -41,7 +41,7 @@ export default function ProfilePage() {
   const label = casualLabel(profile.stats.winrate);
 
   return (
-    <div className="page w-full px-6 py-8">
+    <div className="page w-full px-6 pt-8 pb-12 border border-zinc-700 rounded-lg">
       {/* header */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <h1 className="text-3xl font-bold text-white">{profile.name}</h1>
@@ -122,9 +122,9 @@ export default function ProfilePage() {
       {/* footer counts */}
       <div className="flex gap-6 text-sm text-zinc-400">
         <Link to={`/users/${profile.id}/events`} className="hover:text-white">
-          {profile.events_count} past event{profile.events_count === 1 ? "" : "s"} →
+          {profile.events_count} Latest Predictions{profile.events_count === 1 ? "" : "s"} →
         </Link>
-        <span>{profile.friends_count} friend{profile.friends_count === 1 ? "" : "s"}</span>
+        <span>{profile.friends_count} Friend{profile.friends_count === 1 ? "" : "s"}</span>
       </div>
     </div>
   );

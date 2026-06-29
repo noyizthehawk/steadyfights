@@ -20,8 +20,6 @@ import { me, logout } from "./api";
 export default function App() {
   // the logged-in user's email, or null when logged out
   const [email, setEmail] = useState<string | null>(null);
-  // the logged-in user's id — used to link to their own past events
-  const [userId, setUserId] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -29,20 +27,13 @@ export default function App() {
   // re-check auth on every route change so the nav updates right after login
   useEffect(() => {
     me()
-      .then((u) => {
-        setEmail(u.email);
-        setUserId(u.id);
-      })
-      .catch(() => {
-        setEmail(null);
-        setUserId(null);
-      });
+      .then((u) => setEmail(u.email))
+      .catch(() => setEmail(null));
   }, [location.pathname]);
 
   async function handleLogout() {
     await logout();
     setEmail(null);
-    setUserId(null);
     setMenuOpen(false);
     navigate("/");
   }
@@ -58,9 +49,6 @@ export default function App() {
           <Link to="/leaderboard">Leaderboard</Link>
           <Link to="/friends">Friends</Link>
           <Link to="/top-career">Top Career</Link>
-          {userId !== null && (
-            <Link to={`/users/${userId}/events`}>Past Events</Link>
-          )}
         </div>
         <div className="nav-right">
           {email ? (
