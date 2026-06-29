@@ -209,9 +209,33 @@ def save_events(events: list, db: Session):
 def _clean_odds(text):
     text = text.strip()
     return text if text not in ("", "-") else None
+def render_html(url, wait_selector=None):
+    """Fetch a page through a headless browser so JS-injected content is present.
+    ufc.com renders fight outcomes client-side (keyed by data-fmid), so plain
+    `requests` never sees winners — only the settle pipeline needs this."""
+    from playwright.sync_api import sync_playwright  # lazy: only settling needs it
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(user_agent=headers["User-Agent"])
+        try:
+            # domcontentloaded, not networkidle: ufc.com's ads/polling keep the
+            # network busy so networkidle never fires. The selector wait below is
+            # the real "JS finished injecting results" signal.
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            if wait_selector:
+                try:
+                    page.wait_for_selector(wait_selector, timeout=15000)
+                except Exception:
+                    pass  # card may not be scored yet — return what's loaded
+            return page.content()
+        finally:
+            browser.close()
+
+
 def scrape_winners(event_url):
-    res = requests.get(BASE + event_url, headers=headers, timeout=10)
-    soup = BeautifulSoup(res.text, "html.parser")
+    # render first: the win/loss markers are injected by JS, absent from static HTML
+    html = render_html(BASE + event_url, wait_selector=".c-listing-fight__outcome--win")
+    soup = BeautifulSoup(html, "html.parser")
 
     list_of_winners = []
     for bout in soup.select(".c-listing-fight"):

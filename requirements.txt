@@ -23,6 +23,7 @@ newsapi-python==0.2.7
 numpy==2.4.4
 pandas==3.0.2
 passlib==1.7.4
+playwright==1.60.0
 pycparser==3.0
 pydantic==2.13.4
 pydantic_core==2.46.4

@@ -33,9 +33,9 @@ export default function UserEventDetailPage() {
                     <div className="text-xs text-zinc-400">win rate</div>
                 </div>
                 <div className="text-sm text-zinc-400">
-                    {stats.correct}/{stats.fights_settled} correct
-                    {" · "}
-                    {stats.picks_made} picks made
+                    {stats.correct} of {stats.fights_settled} correct
+                    {stats.picks_made > stats.fights_settled &&
+                        ` · ${stats.picks_made - stats.fights_settled} awaiting results`}
                 </div>
             </div>
 

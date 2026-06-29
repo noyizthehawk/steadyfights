@@ -18,7 +18,7 @@ export default function LeaderboardPage() {
   return (
     <div className="page">
       <h1 className="mb-1 text-2xl font-bold text-white">Leaderboard</h1>
-      <p className="mb-6 text-sm text-zinc-400">Ranked by win rate over settled picks</p>
+      <p className="mb-6 text-sm text-zinc-400">Ranked by win rate over finished fights</p>
 
       {error && <p className="error">{error}</p>}
 
@@ -40,7 +40,7 @@ export default function LeaderboardPage() {
                 {row.winrate === null ? "—" : `${row.winrate}%`}
               </div>
               <div className="text-xs text-zinc-400">
-                {row.correct}/{row.settled} settled
+                {row.correct} of {row.settled} correct
               </div>
             </div>
           </li>
