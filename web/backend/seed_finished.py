@@ -11,7 +11,7 @@ Run from the PROJECT ROOT:
 import time
 
 from .database import SessionLocal
-from .app import scrape_event_details, save_events
+from .scraping import scrape_event_details, save_events
 from .models import UFCEvent
 
 EVENT_LINK = "/event/ufc-fight-night-may-30-2026"  # a finished card on ufc.com

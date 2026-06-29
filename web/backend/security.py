@@ -31,7 +31,7 @@ def create_access_token(data: dict) -> str:
     now = datetime.now(timezone.utc)
     payload = data.copy()
     payload["exp"] = now + timedelta(minutes=expires_in_minutes)  # when it expires
-    payload["iat"] = now                                          # issued-at time
+    payload["iat"] = now                                          # issued-at time all part of payload
     return jwt.encode(payload, secret_key, algorithm=algorithm)
 
 def decode_token(token: str) -> dict:

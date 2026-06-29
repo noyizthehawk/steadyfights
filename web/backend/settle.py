@@ -3,7 +3,7 @@ Run from the PROJECT ROOT:
     python -m web.backend.settle
 """
 from .database import SessionLocal
-from .app import run_settle
+from .scraping import run_settle
 
 
 def main():
