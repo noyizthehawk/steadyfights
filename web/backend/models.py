@@ -2,9 +2,8 @@
 Database models. Each class here maps to one table.
 """
 from datetime import datetime, timezone
-
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, UniqueConstraint, ForeignKey, JSON
-
+import enum
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, UniqueConstraint, ForeignKey, JSON, Enum
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -75,7 +74,6 @@ class User(Base):
 
     # Primary key
     id = Column(Integer, primary_key=True, index=True)
-
     # The login identifier. unique=True means the DB itself forbids two users same adress
     email = Column(String, unique=True, index=True, nullable=False)
 
@@ -93,4 +91,21 @@ class User(Base):
 
     def __repr__(self):
         return f"<User id={self.id} email={self.email!r}>"
+class CoinReason(enum.Enum):
+    purchase    = "purchase"      # + bought coins via Stripe
+    room_buyin  = "room_buyin"    # − paid to join a room
+    room_payout = "room_payout"   # + won a share of the pot
+    refund      = "refund"
+    
 
+class CoinLedger(Base):
+    __tablename__ = "coin_ledger"
+
+    #make sure the db know who a coin belongs to 
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    amount = Column(Integer, nullable=False)
+    #reason for moving coins, every row in coin ledger is one coin movement
+    reason = Column(Enum(CoinReason), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    reference_id = Column(Integer, nullable=True)
