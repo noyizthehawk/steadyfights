@@ -29,3 +29,5 @@ SETTLE_SECRET = os.getenv("SETTLE_SECRET")
 stripe.api_key = os.getenv("STRIPE_API_KEY")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID")
 FRONTEND_URL = "http://localhost:5173"
+
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")

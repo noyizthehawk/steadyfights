@@ -14,7 +14,7 @@ def get_balance(db : Session, user_id):
 def record_movement(db : Session, 
                     user_id: int, amount: int, 
                     reason: CoinReason, 
-                    reference_id: int | None = None) -> CoinLedger:
+                    reference_id: int | None = None, external_id: str | None = None) -> CoinLedger:
     #what type of movement happened
     if amount < 0: # money going out(coins)
         balance = get_balance(db, user_id)
@@ -25,7 +25,8 @@ def record_movement(db : Session,
         user_id=user_id, 
         amount=amount, 
         reason=reason,
-        reference_id=reference_id
+        reference_id=reference_id,
+        external_id=external_id
     )
     db.add(entry)
     db.commit()

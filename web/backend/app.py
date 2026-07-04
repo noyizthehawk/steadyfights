@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from part_2 import Prediction_model as model
-from .routers import auth, predict, picks, events, friends, leaderboard, news, admin, profile
+from .routers import auth, predict, picks, events, friends, leaderboard, news, admin, profile, coins
 
 
 @asynccontextmanager
@@ -45,3 +45,4 @@ app.include_router(leaderboard.router)
 app.include_router(news.router)
 app.include_router(admin.router)
 app.include_router(profile.router)
+app.include_router(coins.router)

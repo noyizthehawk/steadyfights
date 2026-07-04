@@ -109,3 +109,5 @@ class CoinLedger(Base):
     reason = Column(Enum(CoinReason), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     reference_id = Column(Integer, nullable=True)
+    external_id = Column(String, unique=True, nullable=True, index=True)
+
