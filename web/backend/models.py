@@ -110,4 +110,22 @@ class CoinLedger(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     reference_id = Column(Integer, nullable=True)
     external_id = Column(String, unique=True, nullable=True, index=True)
+class Group(Base):
+    __tablename__ = "groups"
 
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    entry_fee = Column(Integer, nullable=False, default=0)
+    closes_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class GroupMember(Base):
+    __tablename__ = "group_members"
+    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_group_user"),)
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    status = Column(String, default="pending", nullable=False)

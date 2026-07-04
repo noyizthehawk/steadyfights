@@ -51,9 +51,14 @@ def compute_user_stats(db, user_id, event_id=None):
     }
 
 
-def compute_leaderboard(db):
-    """The leaderboard is a list of users with stats for each event. user must have more that 3 settled picks."""
-    rows = (
+def compute_leaderboard(db, user_ids=None, min_settled=3):
+    """The leaderboard is a list of users with pick stats, ranked by winrate.
+
+    Global board: call with no args (all users, >= 3 settled picks).
+    Room board:   pass user_ids=[member ids] to score only that room's members,
+                  and usually a lower min_settled (a small room can't clear 3).
+    """
+    q = (
         db.query(
             User.id,                                             # so cards can identify the user
             User.email,                                          # user email
@@ -64,8 +69,14 @@ def compute_leaderboard(db):
         )
         .join(Pick, Pick.user_id == User.id)
         .join(UFCFight, Pick.fight_id == UFCFight.id)            # inner join fights on picks
-        .group_by(User.id)
-        .having(func.count(UFCFight.winner) >= 3)                # only users with >= 3 settled picks
+    )
+    # room-scoped boards narrow to the given members; the global board passes nothing
+    if user_ids is not None:
+        q = q.filter(User.id.in_(user_ids))
+
+    rows = (
+        q.group_by(User.id)
+        .having(func.count(UFCFight.winner) >= min_settled)     # min settled picks to qualify
         .all()
     )
 

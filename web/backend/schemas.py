@@ -1,5 +1,6 @@
 """Pydantic request models — the shapes the API accepts in request bodies."""
 from pydantic import BaseModel, model_validator
+from datetime import datetime
 
 
 class PredictRequest(BaseModel):
@@ -28,3 +29,7 @@ class InviteRequest(BaseModel):
         if self.email is None and self.user_id is None:
             raise ValueError("either email or user_id is required")
         return self
+class GroupCreate(BaseModel):
+    name: str
+    entry_fee: int = 0      # COINS, not dollars — same unit as CoinLedger.amount
+    closes_at: datetime
