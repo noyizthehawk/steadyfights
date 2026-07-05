@@ -16,11 +16,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from ..database import Base
-from ..models import User, Group, GroupMember, CoinReason, CoinLedger, UFCFight, Pick
+from ..models import (
+    User, Group, GroupMember, CoinReason, CoinLedger, UFCFight, Pick, Friendship,
+)
 from ..ledgers import get_balance, record_movement
 from ..routers.groups import (
     create_group, join_group, group_leaderboard,
     my_groups, group_detail, my_balance,
+    browse_public_rooms, browse_private_rooms,
 )
 from ..schemas import GroupCreate
 
@@ -40,10 +43,16 @@ def make_db():
     return db, user
 
 
-def a_group(entry_fee=300, days_ahead=7):
+def a_group(entry_fee=300, days_ahead=7, is_public=False, name="High Rollers"):
     """A valid GroupCreate body closing in the future."""
-    return GroupCreate(name="High Rollers", entry_fee=entry_fee,
+    return GroupCreate(name=name, entry_fee=entry_fee, is_public=is_public,
                        closes_at=datetime.utcnow() + timedelta(days=days_ahead))
+
+
+def _make_friends(db, a, b):
+    """Create an accepted friendship between two users."""
+    db.add(Friendship(requester_id=a.id, addressee_id=b.id, status="accepted"))
+    db.commit()
 
 
 def test_create_group():
@@ -269,6 +278,76 @@ def test_pots_and_members_are_isolated_between_rooms():
     assert bob.id not in board_a_ids
 
 
+def test_public_lobby_shows_only_open_public_rooms():
+    """Public lobby: public + open only. Private rooms and closed rooms excluded."""
+    db, owner = make_db()
+
+    public_open = create_group(a_group(is_public=True, name="Open Public"), db, owner)
+    create_group(a_group(is_public=False, name="A Private"), db, owner)   # private -> hidden
+    # a closed public room (inserted directly; create_group rejects past closes_at)
+    db.add(Group(name="Closed Public", owner_id=owner.id, entry_fee=0,
+                 is_public=True, closes_at=datetime.utcnow() - timedelta(days=1)))
+    db.commit()
+
+    out = browse_public_rooms(db, owner)
+    assert out["total"] == 1
+    assert [r["id"] for r in out["rooms"]] == [public_open["id"]]
+
+
+def test_private_lobby_shows_only_friends_private_rooms():
+    """The leak guard: private rooms show ONLY if their owner is my friend.
+    A stranger's private room must never appear."""
+    db, me = make_db()
+    friend = _add_user(db, "friend@x.com")
+    stranger = _add_user(db, "stranger@x.com")
+    _make_friends(db, me, friend)
+
+    friend_private = create_group(a_group(is_public=False, name="Friend Private"), db, friend)
+    create_group(a_group(is_public=True, name="Friend Public"), db, friend)     # public -> not here
+    stranger_private = create_group(a_group(is_public=False, name="Stranger Private"), db, stranger)
+
+    out = browse_private_rooms(db, me)
+    ids = {r["id"] for r in out["rooms"]}
+    assert ids == {friend_private["id"]}                 # only the friend's private room
+    assert stranger_private["id"] not in ids             # stranger's room is NOT leaked
+
+
+def test_private_lobby_empty_without_friends():
+    db, me = make_db()
+    lonely = _add_user(db, "lonely_owner@x.com")
+    create_group(a_group(is_public=False, name="Nobody's Friend"), db, lonely)
+
+    out = browse_private_rooms(db, me)                   # me has no friends
+    assert out["rooms"] == []
+    assert out["total"] == 0
+
+
+def test_lobby_name_search_is_case_insensitive():
+    db, owner = make_db()
+    create_group(a_group(is_public=True, name="Alpha Room"), db, owner)
+    create_group(a_group(is_public=True, name="Beta Room"), db, owner)
+
+    out = browse_public_rooms(db, owner, q="alph")       # lowercase query, "Alpha" name
+    assert [r["name"] for r in out["rooms"]] == ["Alpha Room"]
+    assert out["total"] == 1
+
+
+def test_lobby_pagination():
+    db, owner = make_db()
+    for i in range(22):                                  # 22 > PAGE_SIZE (20)
+        create_group(a_group(is_public=True, name=f"Room {i:02d}"), db, owner)
+
+    page1 = browse_public_rooms(db, owner, page=1)
+    page2 = browse_public_rooms(db, owner, page=2)
+
+    assert page1["total"] == 22 and page2["total"] == 22
+    assert page1["page_size"] == 20
+    assert len(page1["rooms"]) == 20                     # full first page
+    assert len(page2["rooms"]) == 2                      # remainder
+    # no overlap between pages
+    assert not ({r["id"] for r in page1["rooms"]} & {r["id"] for r in page2["rooms"]})
+
+
 if __name__ == "__main__":
     tests = [
         test_create_group,
@@ -282,6 +361,11 @@ if __name__ == "__main__":
         test_my_groups_lists_only_my_rooms,
         test_group_detail_pot_members_and_flags,
         test_pots_and_members_are_isolated_between_rooms,
+        test_public_lobby_shows_only_open_public_rooms,
+        test_private_lobby_shows_only_friends_private_rooms,
+        test_private_lobby_empty_without_friends,
+        test_lobby_name_search_is_case_insensitive,
+        test_lobby_pagination,
     ]
     passed = 0
     for t in tests:

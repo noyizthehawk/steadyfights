@@ -104,9 +104,8 @@ def my_groups(db: DBDep, user: User = Depends(get_curr_user)):
                 GroupMember.status == "active")
         .all()
     )
-    #list all groups user is in
-    return {"groups": [{"id": g.id, "name": g.name, "entry_fee": g.entry_fee,
-                        "closes_at": g.closes_at} for g in groups]}
+    #list all groups user is in — same summary shape the lobby endpoints use
+    return {"groups": [_room_summary(g) for g in groups]}
     
     
 @router.get("/api/groups/{group_id}")

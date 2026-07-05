@@ -15,6 +15,8 @@ import TopCareerPage from "./pages/TopCareerPage";
 import LandingPage from "./pages/LandingPage";
 import UserEventDetailPage from "./pages/UserEventDetailPage";
 import UserPastEvents from "./pages/UserPastEvents";
+import RoomsPage from "./pages/RoomsPage";
+import CreateRoomPage from "./pages/CreateRoomPage";
 import { me, logout } from "./api";
 
 export default function App() {
@@ -48,6 +50,7 @@ export default function App() {
           <Link to="/prediction-game">Casual Checker</Link>
           <Link to="/leaderboard">Leaderboard</Link>
           <Link to="/friends">Friends</Link>
+          <Link to="/rooms">Rooms</Link>
           <Link to="/top-career">Top Career</Link>
         </div>
         <div className="nav-right">
@@ -92,6 +95,9 @@ export default function App() {
         <Route path="/users/:userId/events" element={<UserPastEvents />} />
         <Route path="/users/:userId/events/:eventId" element={<UserEventDetailPage />} />
         <Route path="/friends" element={<FriendsPage />} />
+        {/* /rooms/new is deliberately NOT in the nav — reached from the lobby button */}
+        <Route path="/rooms" element={<RoomsPage />} />
+        <Route path="/rooms/new" element={<CreateRoomPage />} />
         <Route path="/top-career" element={<TopCareerPage />} />
         <Route path="/predictor" element={<PredictorPage />} />
       </Routes>

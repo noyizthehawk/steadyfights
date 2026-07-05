@@ -4,21 +4,30 @@ interface GroupCreate {
   name: string;
   entry_fee: number;   // coins, matches the backend
   closes_at: string;   // ISO datetime string, e.g. "2026-08-01T18:00:00Z"
+  is_public: boolean;  // public = anyone can find it; private = friends only
 }
 
 export type CoinPack = "small" | "medium" | "large";
 
-export type Room = {              // list item (from GET /api/groups)
+export type RoomPage = {          // paginated envelope from the browse endpoints
+  rooms: Room[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type Room = {              // list item (from GET /api/groups, /api/rooms/*)
   id: number;
   name: string;
   entry_fee: number;
   closes_at: string;
+  is_public: boolean;
+  owner_id: number;
 };
 
 export type RoomMember = { id: number; name: string };
 
 export type RoomDetail = Room & { // from GET /api/groups/{id}
-  owner_id: number;
   is_open: boolean;
   pot: number;
   member_count: number;
@@ -141,6 +150,26 @@ export type TopCareer = {           // shape → export type
 export type LoginResponse = { message: string };
 export type SignupResponse = { id: number; email: string };
 export type MeResponse = { id: number; email: string };
+
+export async function getPublicRooms(q = "", page = 1): Promise<RoomPage> {
+  const res = await fetch(
+    `${BASE_URL}/api/rooms/public?q=${encodeURIComponent(q)}&page=${page}`,
+    { credentials: "include" },
+  );
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load public rooms");
+  return res.json() as Promise<RoomPage>;
+}
+
+export async function getPrivateRooms(q = "", page = 1): Promise<RoomPage> {
+  const res = await fetch(
+    `${BASE_URL}/api/rooms/private?q=${encodeURIComponent(q)}&page=${page}`,
+    { credentials: "include" },
+  );
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load private rooms");
+  return res.json() as Promise<RoomPage>;
+}
 
 export async function getBalance(): Promise<number> {
   const res = await fetch(`${BASE_URL}/api/coins/balance`, {
