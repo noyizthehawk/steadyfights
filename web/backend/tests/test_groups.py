@@ -322,6 +322,27 @@ def test_private_lobby_empty_without_friends():
     assert out["total"] == 0
 
 
+def test_private_lobby_shows_my_own_rooms():
+    """The 'creator can't see their own room' fix: my own private rooms appear
+    in my private lobby even if I have zero friends."""
+    db, me = make_db()
+    mine = create_group(a_group(is_public=False, name="My Secret Room"), db, me)
+
+    out = browse_private_rooms(db, me)                   # me has no friends
+    assert [r["id"] for r in out["rooms"]] == [mine["id"]]
+    assert out["total"] == 1
+
+
+def test_my_groups_includes_rooms_i_own_but_havent_joined():
+    """Creating doesn't auto-join (the owner pays their buy-in like everyone
+    else), but the room must still show in 'My rooms' so the owner can find it."""
+    db, owner = make_db()
+    created = create_group(a_group(name="Fresh Room"), db, owner)   # never joins
+
+    out = my_groups(db, owner)["groups"]
+    assert [g["id"] for g in out] == [created["id"]]
+
+
 def test_lobby_name_search_is_case_insensitive():
     db, owner = make_db()
     create_group(a_group(is_public=True, name="Alpha Room"), db, owner)
@@ -364,6 +385,8 @@ if __name__ == "__main__":
         test_public_lobby_shows_only_open_public_rooms,
         test_private_lobby_shows_only_friends_private_rooms,
         test_private_lobby_empty_without_friends,
+        test_private_lobby_shows_my_own_rooms,
+        test_my_groups_includes_rooms_i_own_but_havent_joined,
         test_lobby_name_search_is_case_insensitive,
         test_lobby_pagination,
     ]

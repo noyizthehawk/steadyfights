@@ -50,7 +50,7 @@ export function RoomCard({ room }: { room: Room }) {
           >
             ▶
           </span>
-          <h3 className="truncate font-semibold text-white">{room.name}</h3>
+          <h3 className="truncate uppercase font-display text-white">{room.name}</h3>
           <span className="sm:hidden">{badge}</span>
         </div>
         {/* compact stats (phones only) — from sm: up the readout columns take

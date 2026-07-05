@@ -72,7 +72,7 @@ export default function RoomsPage() {
             tab === "public"
               ? await getPublicRooms(debouncedQ, page)
               : await getPrivateRooms(debouncedQ, page);
-          if (!cancelled) {
+          if (!cancelled) { // to counter bug when changing tabs
             setRooms(data.rooms);
             setTotal(data.total);
             setPageSize(data.page_size);
@@ -107,11 +107,11 @@ export default function RoomsPage() {
       );
     if (tab === "mine")
       return <p className="text-zinc-400">You haven't joined any rooms yet — browse the public lobby.</p>;
-    return <p className="text-zinc-400">No public rooms yet — create the first one!</p>;
+    return <p className="text-zinc-400">No public rooms yet.</p>;
   }
 
   return (
-    <div className="page">
+    <div className="w-full px-6 py-8 text-left">
       {/* header: title + gold balance + create (create is NOT in the nav, only here) */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold text-white">Rooms</h1>

@@ -97,14 +97,18 @@ def my_balance(db: DBDep, user: User = Depends(get_curr_user)):
 #get list of groups for a user
 @router.get("/api/groups")
 def my_groups(db: DBDep, user: User = Depends(get_curr_user)):
-    groups = (
-        db.query(Group)
-        .join(GroupMember, GroupMember.group_id == Group.id)
+    #groups I'm an active member of
+    member_group_ids = [
+        gid for (gid,) in db.query(GroupMember.group_id)
         .filter(GroupMember.user_id == user.id,
                 GroupMember.status == "active")
-        .all()
-    )
-    #list all groups user is in — same summary shape the lobby endpoints use
+    ]
+    #"my rooms" = rooms I'm in OR rooms I own — creating doesn't auto-join
+    #(the owner pays their buy-in like everyone else), so without the owner_id
+    #check a freshly created room would appear in no tab at all
+    groups = db.query(Group).filter(
+        or_(Group.owner_id == user.id, Group.id.in_(member_group_ids))
+    ).all()
     return {"groups": [_room_summary(g) for g in groups]}
     
     
@@ -196,7 +200,7 @@ def browse_public_rooms(db: DBDep, user: User = Depends(get_curr_user),
 @router.get("/api/rooms/private")
 def browse_private_rooms(db: DBDep, user: User = Depends(get_curr_user),
                          q: str = "", page: int = 1):
-    """Private lobby — private rooms owned by MY friends (open ones only)."""
+    """Private lobby — private rooms owned by my friends or by me (open ones only)."""
     # my accepted friendships (either direction) -> the friend is the OTHER side
     friendships = db.query(Friendship).filter(
         Friendship.status == "accepted",
@@ -205,12 +209,12 @@ def browse_private_rooms(db: DBDep, user: User = Depends(get_curr_user),
     ).all()
     friend_ids = [f.addressee_id if f.requester_id == user.id else f.requester_id
                   for f in friendships]
-    if not friend_ids:                              # no friends -> empty private lobby
-        return {"rooms": [], "total": 0, "page": max(1, page), "page_size": PAGE_SIZE}
+    # rooms owned by my friends OR by me — I can always see my own private rooms
+    visible_owner_ids = friend_ids + [user.id]
 
     query = db.query(Group).filter(
         Group.is_public.is_(False),
-        Group.owner_id.in_(friend_ids),
+        Group.owner_id.in_(visible_owner_ids),
         Group.closes_at > datetime.utcnow(),
     )
     if q:
