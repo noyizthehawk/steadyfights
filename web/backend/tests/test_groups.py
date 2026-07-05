@@ -18,7 +18,10 @@ from sqlalchemy.orm import sessionmaker
 from ..database import Base
 from ..models import User, Group, GroupMember, CoinReason, CoinLedger, UFCFight, Pick
 from ..ledgers import get_balance, record_movement
-from ..routers.groups import create_group, join_group, group_leaderboard
+from ..routers.groups import (
+    create_group, join_group, group_leaderboard,
+    my_groups, group_detail, my_balance,
+)
 from ..schemas import GroupCreate
 
 
@@ -178,6 +181,94 @@ def test_non_member_cannot_view_board():
         assert e.status_code == 403
 
 
+def test_my_balance_reflects_ledger():
+    db, user = make_db()                        # 1000 coins from a purchase
+    assert my_balance(db, user)["balance"] == 1000
+
+    group = create_group(a_group(entry_fee=300), db, user)
+    join_group(group["id"], db, user)           # spend 300
+    assert my_balance(db, user)["balance"] == 700
+
+
+def test_my_groups_lists_only_my_rooms():
+    db, owner = make_db()
+    other = _add_user(db, "other@x.com")
+
+    # owner is in A and B; C belongs to someone else and owner never joins it
+    a = create_group(GroupCreate(name="A", entry_fee=0,
+                                 closes_at=datetime.utcnow() + timedelta(days=1)), db, owner)
+    b = create_group(GroupCreate(name="B", entry_fee=0,
+                                 closes_at=datetime.utcnow() + timedelta(days=1)), db, owner)
+    c = create_group(GroupCreate(name="C", entry_fee=0,
+                                 closes_at=datetime.utcnow() + timedelta(days=1)), db, other)
+    join_group(a["id"], db, owner)
+    join_group(b["id"], db, owner)
+    join_group(c["id"], db, other)              # owner is NOT in C
+
+    out = my_groups(db, owner)["groups"]
+    names = {g["name"] for g in out}
+    assert names == {"A", "B"}                  # C excluded
+
+
+def test_group_detail_pot_members_and_flags():
+    db, owner = make_db()
+    alice = _add_user(db, "alice2@x.com")
+    outsider = _add_user(db, "outsider2@x.com")
+
+    group = create_group(a_group(entry_fee=300), db, owner)
+    join_group(group["id"], db, owner)          # pot += 300
+    join_group(group["id"], db, alice)          # pot += 300
+
+    # viewed by the owner
+    detail = group_detail(group["id"], db, owner)
+    assert detail["pot"] == 600                 # two 300-coin buy-ins
+    assert detail["member_count"] == 2
+    assert {m["id"] for m in detail["members"]} == {owner.id, alice.id}
+    assert detail["is_owner"] is True
+    assert detail["is_member"] is True
+    assert detail["is_open"] is True
+
+    # viewed by an outsider — visible, but flags are False
+    outside_view = group_detail(group["id"], db, outsider)
+    assert outside_view["is_owner"] is False
+    assert outside_view["is_member"] is False
+    assert outside_view["pot"] == 600           # pot is the same regardless of viewer
+
+
+def test_pots_and_members_are_isolated_between_rooms():
+    """Two rooms must not bleed into each other: each room's pot and member list
+    reflects ONLY its own buy-ins. Guards the reference_id filter that step 6's
+    payout depends on — if it broke, every pot would include everyone's coins."""
+    db, owner = make_db()                        # 1000 coins
+    alice = _add_user(db, "alice_iso@x.com")     # 1000
+    bob = _add_user(db, "bob_iso@x.com")         # 1000
+
+    room_a = create_group(a_group(entry_fee=100), db, owner)
+    room_b = create_group(a_group(entry_fee=400), db, owner)
+
+    # Room A: owner + alice  -> pot 200
+    join_group(room_a["id"], db, owner)
+    join_group(room_a["id"], db, alice)
+    # Room B: owner + bob     -> pot 800
+    join_group(room_b["id"], db, owner)
+    join_group(room_b["id"], db, bob)
+
+    detail_a = group_detail(room_a["id"], db, owner)
+    detail_b = group_detail(room_b["id"], db, owner)
+
+    # pots reflect ONLY their own room's buy-ins (not the other room's)
+    assert detail_a["pot"] == 200
+    assert detail_b["pot"] == 800
+
+    # member lists don't bleed across rooms
+    assert {m["id"] for m in detail_a["members"]} == {owner.id, alice.id}
+    assert {m["id"] for m in detail_b["members"]} == {owner.id, bob.id}
+
+    # and the leaderboard scopes per-room too (bob not in A's board, alice not in B's)
+    board_a_ids = {r["id"] for r in group_leaderboard(room_a["id"], db, owner)["leaderboard"]}
+    assert bob.id not in board_a_ids
+
+
 if __name__ == "__main__":
     tests = [
         test_create_group,
@@ -187,6 +278,10 @@ if __name__ == "__main__":
         test_cannot_join_closed_room,
         test_room_leaderboard_scopes_to_members,
         test_non_member_cannot_view_board,
+        test_my_balance_reflects_ledger,
+        test_my_groups_lists_only_my_rooms,
+        test_group_detail_pot_members_and_flags,
+        test_pots_and_members_are_isolated_between_rooms,
     ]
     passed = 0
     for t in tests:

@@ -1,9 +1,15 @@
-from .models import CoinLedger, CoinReason
+from .models import CoinLedger, CoinReason, User
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from .dependencies import DBDep, get_curr_user
+from fastapi import HTTPException, Depends
+
+
+
 
 def get_balance(db : Session, user_id):
     #get balance for a user
+    
     balance = (
         db.query(func.sum(CoinLedger.amount))
         .filter(CoinLedger.user_id == user_id) #user_id must match
@@ -37,8 +43,5 @@ def record_movement(db : Session,
                         # but does NOT commit — the caller owns the commit
     return entry
 
-    
-    
-    
 
-    
+

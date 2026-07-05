@@ -1,7 +1,8 @@
-from ..models import  CoinReason, Group, GroupMember, User
+from ..models import  CoinReason, Group, GroupMember, User, CoinLedger
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from ..schemas import GroupCreate
-from ..ledgers import record_movement
+from ..ledgers import record_movement, get_balance
 from ..stats import compute_leaderboard
 from ..dependencies import get_curr_user, DBDep
 from datetime import datetime, timezone
@@ -86,4 +87,66 @@ def group_leaderboard(group_id: int, db: DBDep, user: User = Depends(get_curr_us
     #score ONLY this room's members; min_settled=0 so everyone playing shows up
     board = compute_leaderboard(db, user_ids=member_ids, min_settled=0)
     return {"group_id": group_id, "leaderboard": board}
+@router.get("/api/coins/balance")
+def my_balance(db: DBDep, user: User = Depends(get_curr_user)):
+    balance = get_balance(db, user.id)
+    return {"balance": balance}
+
+#get list of groups for a user
+@router.get("/api/groups")
+def my_groups(db: DBDep, user: User = Depends(get_curr_user)):
+    groups = (
+        db.query(Group)
+        .join(GroupMember, GroupMember.group_id == Group.id)
+        .filter(GroupMember.user_id == user.id,
+                GroupMember.status == "active")
+        .all()
+    )
+    #list all groups user is in
+    return {"groups": [{"id": g.id, "name": g.name, "entry_fee": g.entry_fee,
+                        "closes_at": g.closes_at} for g in groups]}
+    
+    
+@router.get("/api/groups/{group_id}")
+def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
+    #the room must exist
+    group = db.get(Group, group_id)
+    if group is None:
+        raise HTTPException(404, "Group not found")
+
+    #active members, joined to users so we can show names (not full emails)
+    rows = (
+        db.query(User.id, User.email)
+        .join(GroupMember, GroupMember.user_id == User.id)
+        .filter(GroupMember.group_id == group_id,
+                GroupMember.status == "active")
+        .all()
+    )
+    members = [{"id": uid, "name": email.split("@")[0]} for uid, email in rows]
+    member_ids = {uid for uid, _ in rows}
+
+    #pot = coins staked in this room. buy-ins are stored NEGATIVE, so negate the sum.
+    staked = (
+        db.query(func.coalesce(func.sum(CoinLedger.amount), 0))
+        .filter(CoinLedger.reference_id == group_id,
+                CoinLedger.reason == CoinReason.room_buyin)
+        .scalar()
+    )
+    pot = -staked
+
+    return {
+        "id": group.id,
+        "name": group.name,
+        "entry_fee": group.entry_fee,
+        "closes_at": group.closes_at,
+        "owner_id": group.owner_id,
+        "is_open": group.closes_at > datetime.utcnow(),
+        "pot": pot,
+        "member_count": len(members),
+        "members": members,
+        # handy flags so the UI knows what buttons to show this viewer
+        "is_member": user.id in member_ids,
+        "is_owner": user.id == group.owner_id,
+    }
+
 
