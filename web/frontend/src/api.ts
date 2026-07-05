@@ -1,5 +1,33 @@
 
 const BASE_URL = "http://localhost:8000";
+interface GroupCreate {
+  name: string;
+  entry_fee: number;   // coins, matches the backend
+  closes_at: string;   // ISO datetime string, e.g. "2026-08-01T18:00:00Z"
+}
+
+export type CoinPack = "small" | "medium" | "large";
+
+export type Room = {              // list item (from GET /api/groups)
+  id: number;
+  name: string;
+  entry_fee: number;
+  closes_at: string;
+};
+
+export type RoomMember = { id: number; name: string };
+
+export type RoomDetail = Room & { // from GET /api/groups/{id}
+  owner_id: number;
+  is_open: boolean;
+  pot: number;
+  member_count: number;
+  members: RoomMember[];
+  is_member: boolean;
+  is_owner: boolean;
+};
+
+
 
 // one of the benefits of typscript is that we can define the shape of responses
 export type PredictResult = {
@@ -114,7 +142,87 @@ export type LoginResponse = { message: string };
 export type SignupResponse = { id: number; email: string };
 export type MeResponse = { id: number; email: string };
 
+export async function getBalance(): Promise<number> {
+  const res = await fetch(`${BASE_URL}/api/coins/balance`, {
+    credentials: "include", // authed endpoint — send the cookie
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load balance");
+  const data: { balance: number } = await res.json();
+  return data.balance;
+}
 
+export async function buyCoins(pack: CoinPack): Promise<string> {
+  
+  const res = await fetch(`${BASE_URL}/api/coin/checkout?pack_id=${pack}`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not buy coins");
+  }
+  const data: { url: string } = await res.json();
+  return data.url;
+}
+
+export async function getMyRooms(): Promise<Room[]> {
+  const res = await fetch(`${BASE_URL}/api/groups`, {
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load rooms");
+  const data: { groups: Room[] } = await res.json();
+  return data.groups;
+}
+
+export async function createRoom(body: GroupCreate): Promise<Room> {
+  const res = await fetch(`${BASE_URL}/api/groups`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not create room");
+  }
+  return res.json() as Promise<Room>;
+}
+
+export async function getRoom(id: number): Promise<RoomDetail> {
+  const res = await fetch(`${BASE_URL}/api/groups/${id}`, {
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load room");
+  return res.json() as Promise<RoomDetail>; // endpoint returns the object directly
+}
+
+export async function joinRoom(id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/groups/${id}/join`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    // backend explains WHY (not enough coins / closed / already in) — surface it
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not join room");
+  }
+}
+
+export async function getRoomLeaderboard(id: number): Promise<LeaderboardRow[]> {
+  const res = await fetch(`${BASE_URL}/api/groups/${id}/leaderboard`, {
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load room leaderboard");
+  const data: { leaderboard: LeaderboardRow[] } = await res.json();
+  return data.leaderboard;
+}
 export async function getUpcomingEvents(): Promise<UFCEvent[]> {
   const res = await fetch(`${BASE_URL}/api/events/upcoming`);
   if (!res.ok) throw new Error("Could not load events");
