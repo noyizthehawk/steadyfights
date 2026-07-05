@@ -119,6 +119,8 @@ class Group(Base):
     entry_fee = Column(Integer, nullable=False, default=0)
     closes_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # public = anyone can find it in the lobby; private = only the owner's friends see it
+    is_public = Column(Boolean, nullable=False, default=False)
 
 class GroupMember(Base):
     __tablename__ = "group_members"

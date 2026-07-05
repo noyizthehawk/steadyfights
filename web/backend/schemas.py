@@ -33,3 +33,4 @@ class GroupCreate(BaseModel):
     name: str
     entry_fee: int = 0      # COINS, not dollars — same unit as CoinLedger.amount
     closes_at: datetime
+    is_public: bool = False # default private; creator opts into the public lobby

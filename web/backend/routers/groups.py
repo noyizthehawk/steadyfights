@@ -1,6 +1,6 @@
-from ..models import  CoinReason, Group, GroupMember, User, CoinLedger
+from ..models import  CoinReason, Group, GroupMember, User, CoinLedger, Friendship
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from ..schemas import GroupCreate
 from ..ledgers import record_movement, get_balance
 from ..stats import compute_leaderboard
@@ -56,13 +56,15 @@ def create_group(body: GroupCreate, db: DBDep, user: User = Depends(get_curr_use
     
     # create
     group = Group(name=body.name.strip(), owner_id=user.id,
-                  entry_fee=body.entry_fee, closes_at=closes)
+                  entry_fee=body.entry_fee, closes_at=closes,
+                  is_public=body.is_public)
     db.add(group)
     db.commit()
     db.refresh(group)      # reload so group.id is populated
 
     return {"id": group.id, "name": group.name, "entry_fee": group.entry_fee,
-            "owner_id": group.owner_id, "closes_at": group.closes_at}
+            "owner_id": group.owner_id, "closes_at": group.closes_at,
+            "is_public": group.is_public}
 
 
 @router.get("/api/groups/{group_id}/leaderboard")
@@ -148,5 +150,72 @@ def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
         "is_member": user.id in member_ids,
         "is_owner": user.id == group.owner_id,
     }
+
+
+PAGE_SIZE = 20
+
+
+def _room_summary(g: Group) -> dict:
+    """Compact room shape for the lobby tiles."""
+    return {
+        "id": g.id,
+        "name": g.name,
+        "entry_fee": g.entry_fee,
+        "closes_at": g.closes_at,
+        "is_public": g.is_public,
+        "owner_id": g.owner_id,
+    }
+
+
+def _paginate(query, page: int) -> dict:
+    """Shared paging: total count + one page of rooms (soonest-closing first)."""
+    page = max(1, page)
+    total = query.count()
+    rooms = (
+        query.order_by(Group.closes_at.asc())
+        .offset((page - 1) * PAGE_SIZE)
+        .limit(PAGE_SIZE)
+        .all()
+    )
+    return {"rooms": [_room_summary(r) for r in rooms],
+            "total": total, "page": page, "page_size": PAGE_SIZE}
+
+
+@router.get("/api/rooms/public")
+def browse_public_rooms(db: DBDep, user: User = Depends(get_curr_user),
+                        q: str = "", page: int = 1):
+    """Public lobby — every public room that's still open. Optional name search."""
+    query = db.query(Group).filter(
+        Group.is_public.is_(True),
+        Group.closes_at > datetime.utcnow(),        # only joinable (open) rooms
+    )
+    if q:
+        query = query.filter(Group.name.ilike(f"%{q}%"))   # LIKE is case-insensitive on SQLite
+    return _paginate(query, page)
+
+
+@router.get("/api/rooms/private")
+def browse_private_rooms(db: DBDep, user: User = Depends(get_curr_user),
+                         q: str = "", page: int = 1):
+    """Private lobby — private rooms owned by MY friends (open ones only)."""
+    # my accepted friendships (either direction) -> the friend is the OTHER side
+    friendships = db.query(Friendship).filter(
+        Friendship.status == "accepted",
+        or_(Friendship.requester_id == user.id,
+            Friendship.addressee_id == user.id),
+    ).all()
+    friend_ids = [f.addressee_id if f.requester_id == user.id else f.requester_id
+                  for f in friendships]
+    if not friend_ids:                              # no friends -> empty private lobby
+        return {"rooms": [], "total": 0, "page": max(1, page), "page_size": PAGE_SIZE}
+
+    query = db.query(Group).filter(
+        Group.is_public.is_(False),
+        Group.owner_id.in_(friend_ids),
+        Group.closes_at > datetime.utcnow(),
+    )
+    if q:
+        query = query.filter(Group.name.ilike(f"%{q}%"))
+    return _paginate(query, page)
 
 
