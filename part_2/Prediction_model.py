@@ -34,6 +34,35 @@ FEATURE_LABELS = {
 }
 
 
+# Serving-time form snapshot: rolling feature -> (base per-fight column, window).
+# The trained rolling features use shift(1) — form BEFORE that row's fight — so
+# at a fighter's last row they're one fight stale. "Form as of today" is just
+# the plain mean of the base stat over the last k fights: no shift, because the
+# fight being predicted hasn't happened yet, so there's nothing to exclude.
+ROLLING_SNAPSHOT_SPECS = [
+    ("rolling_slpm_3",              "sig_str_landed_per_min",    3),
+    ("rolling_slpm_5",              "sig_str_landed_per_min",    5),
+    ("rolling_sapm_3",              "sig_str_absorbed_per_min",  3),
+    ("rolling_sapm_5",              "sig_str_absorbed_per_min",  5),
+    ("rolling_str_acc_3",           "str_acc_fight",             3),
+    ("rolling_str_acc_5",           "str_acc_fight",             5),
+    ("rolling_td_acc_3",            "td_acc_fight",              3),
+    ("rolling_td_acc_5",            "td_acc_fight",              5),
+    ("rolling_td_def_3",            "td_defense",                3),
+    ("rolling_td_def_5",            "td_defense",                5),
+    ("rolling_win_rate_3",          "win_flag_indicator",        3),
+    ("rolling_win_rate_5",          "win_flag_indicator",        5),
+    ("rolling_td_avg_5",            "td_avg",                    5),
+    ("rolling_sub_avg_5",           "sub_avg",                   5),
+    ("rolling_str_def_5",           "str_def",                   5),
+    ("rolling_opp_elo_3",           "opponent_elo_before_fight", 3),
+    ("rolling_opp_elo_5",           "opponent_elo_before_fight", 5),
+    ("rolling_opponent_strength_3", "opponent_strength",         3),
+    ("rolling_opponent_strength_5", "opponent_strength",         5),
+    ("rolling_finish_rate_5",       "won_by_finish",             5),
+]
+
+
 def _fmt_stat(value, kind):
     """Format a raw stat for display in the tale of the tape."""
     if kind == "pct":
@@ -71,12 +100,12 @@ def _fighter_snapshot(name):
       elo_before_fight      -> final Elo after ALL their fights
       age_at_fight          -> age today
       days_since_last_fight -> days since their last fight, counted from today
-
-    Rolling form stats remain one fight stale (their shift(1) value at the
-    last row) — a much smaller error, fixable later by recomputing the
-    rolling windows without the shift.
+      rolling form stats    -> recomputed over the ACTUAL last k fights
+                               (ROLLING_SNAPSHOT_SPECS), so the most recent
+                               result finally counts
     """
-    last = fighters_df[fighters_df["name"] == name].sort_values("date").iloc[-1]
+    rows = fighters_df[fighters_df["name"] == name].sort_values("date")
+    last = rows.iloc[-1]
     snap = last.copy()
     today = pd.Timestamp.now()
     snap["elo_before_fight"] = elo_ratings.get(name, INITIAL_ELO)
@@ -93,6 +122,19 @@ def _fighter_snapshot(name):
 
     if pd.notna(last["dob"]):
         snap["age_at_fight"] = round((today - last["dob"]).days / 365.25, 2)
+
+    # Form as of today. mean() skips NaNs in the base column (same effect as
+    # the min_periods=1 rolling); if a base is entirely NaN, keep the trained
+    # (stale) value rather than writing NaN into the feature row.
+    for feat, base, k in ROLLING_SNAPSHOT_SPECS:
+        val = rows[base].tail(k).mean()
+        if pd.notna(val):
+            snap[feat] = round(val, 2)
+
+    # derived features must be rebuilt from the snapped components — otherwise
+    # they'd contradict the very stats they're defined from
+    snap["striking_differential_3"] = snap["rolling_slpm_3"] - snap["rolling_sapm_3"]
+    snap["striking_differential_5"] = snap["rolling_slpm_5"] - snap["rolling_sapm_5"]
     return snap
 
 
