@@ -23,6 +23,8 @@ export type Room = {              // list item (from GET /api/groups, /api/rooms
   closes_at: string;
   is_public: boolean;
   owner_id: number;
+  owner_name: string;             // email prefix, links to /users/:owner_id
+  member_count: number;           // active (paid) members
 };
 
 export type RoomMember = { id: number; name: string };

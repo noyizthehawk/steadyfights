@@ -62,9 +62,11 @@ def create_group(body: GroupCreate, db: DBDep, user: User = Depends(get_curr_use
     db.commit()
     db.refresh(group)      # reload so group.id is populated
 
+    #same shape as the lobby tiles; a brand-new room has no members yet
     return {"id": group.id, "name": group.name, "entry_fee": group.entry_fee,
             "owner_id": group.owner_id, "closes_at": group.closes_at,
-            "is_public": group.is_public}
+            "is_public": group.is_public,
+            "owner_name": user.email.split("@")[0], "member_count": 0}
 
 
 @router.get("/api/groups/{group_id}/leaderboard")
@@ -109,7 +111,7 @@ def my_groups(db: DBDep, user: User = Depends(get_curr_user)):
     groups = db.query(Group).filter(
         or_(Group.owner_id == user.id, Group.id.in_(member_group_ids))
     ).all()
-    return {"groups": [_room_summary(g) for g in groups]}
+    return {"groups": _room_summaries(db, groups)}
     
     
 @router.get("/api/groups/{group_id}")
@@ -158,19 +160,41 @@ def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
 PAGE_SIZE = 20
 
 
-def _room_summary(g: Group) -> dict:
-    """Compact room shape for the lobby tiles."""
-    return {
+def _room_summaries(db, rooms: list) -> list[dict]:
+    """Compact room shapes for the lobby tiles. Owner names and live member
+    counts are fetched in TWO batched queries for the whole page — not one
+    pair of queries per room (the classic N+1 trap)."""
+    if not rooms:
+        return []
+
+    #owner display names, same rule as group_detail: the part before the @
+    owner_rows = db.query(User.id, User.email).filter(
+        User.id.in_({r.owner_id for r in rooms})).all()
+    owner_names = {uid: email.split("@")[0] for uid, email in owner_rows}
+
+    #active-member counts, grouped per room in one query
+    count_rows = (
+        db.query(GroupMember.group_id, func.count(GroupMember.id))
+        .filter(GroupMember.group_id.in_([r.id for r in rooms]),
+                GroupMember.status == "active")
+        .group_by(GroupMember.group_id)
+        .all()
+    )
+    counts = dict(count_rows)
+
+    return [{
         "id": g.id,
         "name": g.name,
         "entry_fee": g.entry_fee,
         "closes_at": g.closes_at,
         "is_public": g.is_public,
         "owner_id": g.owner_id,
-    }
+        "owner_name": owner_names.get(g.owner_id, "unknown"),
+        "member_count": counts.get(g.id, 0),
+    } for g in rooms]
 
 
-def _paginate(query, page: int) -> dict:
+def _paginate(db, query, page: int) -> dict:
     """Shared paging: total count + one page of rooms (soonest-closing first)."""
     page = max(1, page)
     total = query.count()
@@ -180,7 +204,7 @@ def _paginate(query, page: int) -> dict:
         .limit(PAGE_SIZE)
         .all()
     )
-    return {"rooms": [_room_summary(r) for r in rooms],
+    return {"rooms": _room_summaries(db, rooms),
             "total": total, "page": page, "page_size": PAGE_SIZE}
 
 
@@ -194,7 +218,7 @@ def browse_public_rooms(db: DBDep, user: User = Depends(get_curr_user),
     )
     if q:
         query = query.filter(Group.name.ilike(f"%{q}%"))   # LIKE is case-insensitive on SQLite
-    return _paginate(query, page)
+    return _paginate(db, query, page)
 
 
 @router.get("/api/rooms/private")
@@ -219,6 +243,6 @@ def browse_private_rooms(db: DBDep, user: User = Depends(get_curr_user),
     )
     if q:
         query = query.filter(Group.name.ilike(f"%{q}%"))
-    return _paginate(query, page)
+    return _paginate(db, query, page)
 
 

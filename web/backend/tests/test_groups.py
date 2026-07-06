@@ -343,6 +343,26 @@ def test_my_groups_includes_rooms_i_own_but_havent_joined():
     assert [g["id"] for g in out] == [created["id"]]
 
 
+def test_lobby_tiles_show_owner_name_and_member_count():
+    """Tapology-style tiles: each lobby room carries its owner's display name
+    (email prefix) and a live count of active members."""
+    db, owner = make_db()                        # tester@example.com -> "tester"
+    alice = _add_user(db, "alice_tap@x.com")
+
+    group = create_group(a_group(is_public=True, entry_fee=100, name="Tap Room"), db, owner)
+    join_group(group["id"], db, owner)
+    join_group(group["id"], db, alice)
+
+    room = browse_public_rooms(db, owner)["rooms"][0]
+    assert room["owner_name"] == "tester"
+    assert room["member_count"] == 2
+
+    # a brand-new room reports its creator and zero members
+    fresh = create_group(a_group(is_public=True, name="Fresh"), db, alice)
+    assert fresh["owner_name"] == "alice_tap"
+    assert fresh["member_count"] == 0
+
+
 def test_lobby_name_search_is_case_insensitive():
     db, owner = make_db()
     create_group(a_group(is_public=True, name="Alpha Room"), db, owner)
@@ -387,6 +407,7 @@ if __name__ == "__main__":
         test_private_lobby_empty_without_friends,
         test_private_lobby_shows_my_own_rooms,
         test_my_groups_includes_rooms_i_own_but_havent_joined,
+        test_lobby_tiles_show_owner_name_and_member_count,
         test_lobby_name_search_is_case_insensitive,
         test_lobby_pagination,
     ]

@@ -41,7 +41,7 @@ export default function ProfilePage() {
   const label = casualLabel(profile.stats.winrate);
 
   return (
-    <div className="page w-full px-6 pt-8 pb-12 border border-zinc-700 rounded-lg">
+    <div className="page w-full px-6 pt-8 pb-12 border border-zinc-500 rounded-lg">
       {/* header */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <h1 className="text-3xl font-bold text-white">{profile.name}</h1>

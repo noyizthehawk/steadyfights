@@ -19,6 +19,10 @@ opp_strength_csv = os.path.join(script_dir, "../csv/fighter_opponent_strength_ex
 #  elo rating system constants
 K_FACTOR = 32
 INITIAL_ELO = 1500
+# Serving-time only: a rating earned years ago is less certain, so an inactive
+# fighter's Elo shrinks toward the mean — keep 85% of the gap above/below 1500
+# per idle year beyond the first. Active fighters (<1yr) are untouched.
+ELO_INACTIVITY_DECAY = 0.85
 VERBOSE = False
 
 # Tale-of-the-tape features: base column name -> (display label, unit format).
@@ -53,9 +57,48 @@ def update_elo(elo_a, elo_b, actual_score_a, k=K_FACTOR):
 
 
 
+def _fighter_snapshot(name):
+    """A fighter's state AS OF TODAY, not as of their last fight.
+
+    Training rows deliberately use pre-fight features (shift(1) rolling stats,
+    elo_before_fight) so a row never contains the result it predicts — right
+    for training, wrong for serving. Predicting from the raw last row froze
+    every fighter at the moment they walked into their most recent bout: Elo
+    excluded their last result, and age/layoff never advanced (2021 McGregor
+    stayed 33 with a 168-day layoff forever). This overrides the three
+    features where that lie is biggest:
+
+      elo_before_fight      -> final Elo after ALL their fights
+      age_at_fight          -> age today
+      days_since_last_fight -> days since their last fight, counted from today
+
+    Rolling form stats remain one fight stale (their shift(1) value at the
+    last row) — a much smaller error, fixable later by recomputing the
+    rolling windows without the shift.
+    """
+    last = fighters_df[fighters_df["name"] == name].sort_values("date").iloc[-1]
+    snap = last.copy()
+    today = pd.Timestamp.now()
+    snap["elo_before_fight"] = elo_ratings.get(name, INITIAL_ELO)
+    snap["days_since_last_fight"] = (today - last["date"]).days
+
+    # Inactivity decay: the layoff feature saturates at the longest layoff the
+    # trees ever saw in training, so a 5-year absence reads like a 2-year one.
+    # Shrinking a long-idle fighter's Elo toward the mean encodes the eroded
+    # certainty in a value the model CAN use.
+    idle_years = max(0.0, (snap["days_since_last_fight"] - 365) / 365.25)
+    if idle_years > 0:
+        gap = snap["elo_before_fight"] - INITIAL_ELO
+        snap["elo_before_fight"] = INITIAL_ELO + gap * (ELO_INACTIVITY_DECAY ** idle_years)
+
+    if pd.notna(last["dob"]):
+        snap["age_at_fight"] = round((today - last["dob"]).days / 365.25, 2)
+    return snap
+
+
 def predict_fight(fighter_a, fighter_b):
-    fa = fighters_df[fighters_df["name"] == fighter_a].sort_values("date").iloc[-1]
-    fb = fighters_df[fighters_df["name"] == fighter_b].sort_values("date").iloc[-1]
+    fa = _fighter_snapshot(fighter_a)
+    fb = _fighter_snapshot(fighter_b)
 
     row = {}
 
@@ -84,8 +127,8 @@ def predict_fight(fighter_a, fighter_b):
 def predict_fight_api(fighter_a, fighter_b):
     """Same logic as predict_fight, but returns a JSON-serializable dict
     instead of printing. This is what the web backend calls."""
-    fa = fighters_df[fighters_df["name"] == fighter_a].sort_values("date").iloc[-1]
-    fb = fighters_df[fighters_df["name"] == fighter_b].sort_values("date").iloc[-1]
+    fa = _fighter_snapshot(fighter_a)
+    fb = _fighter_snapshot(fighter_b)
 
     row = {}
     for feature in numeric_features_to_diff:
@@ -146,6 +189,7 @@ def list_fighters():
 def train():
     global feature_stds
     global fighters_df, calibrated_ensemble, diff_features, numeric_features_to_diff
+    global elo_ratings   # final post-all-fights Elo per fighter — used at predict time
 
     
     fighters_df = pd.read_csv(fighter_csv)
