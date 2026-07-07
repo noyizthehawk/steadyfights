@@ -19,13 +19,11 @@ opp_strength_csv = os.path.join(script_dir, "../csv/fighter_opponent_strength_ex
 #  elo rating system constants
 K_FACTOR = 32
 INITIAL_ELO = 1500
-# Serving-time only: a rating earned years ago is less certain, so an inactive
-# fighter's Elo shrinks toward the mean — keep 85% of the gap above/below 1500
-# per idle year beyond the first. Active fighters (<1yr) are untouched.
+
 ELO_INACTIVITY_DECAY = 0.85
 VERBOSE = False
 
-# Tale-of-the-tape features: base column name -> (display label, unit format).
+# Tale-of-the-tape features: base column name 
 FEATURE_LABELS = {
     "elo_before_fight":      ("Elo rating", "int"),
     "reach":                 ("Reach", "cm"),
@@ -34,11 +32,8 @@ FEATURE_LABELS = {
 }
 
 
-# Serving-time form snapshot: rolling feature -> (base per-fight column, window).
-# The trained rolling features use shift(1) — form BEFORE that row's fight — so
-# at a fighter's last row they're one fight stale. "Form as of today" is just
-# the plain mean of the base stat over the last k fights: no shift, because the
-# fight being predicted hasn't happened yet, so there's nothing to exclude.
+#server time series features
+#before this for training we shift by 1
 ROLLING_SNAPSHOT_SPECS = [
     ("rolling_slpm_3",              "sig_str_landed_per_min",    3),
     ("rolling_slpm_5",              "sig_str_landed_per_min",    5),
@@ -89,20 +84,6 @@ def update_elo(elo_a, elo_b, actual_score_a, k=K_FACTOR):
 def _fighter_snapshot(name):
     """A fighter's state AS OF TODAY, not as of their last fight.
 
-    Training rows deliberately use pre-fight features (shift(1) rolling stats,
-    elo_before_fight) so a row never contains the result it predicts — right
-    for training, wrong for serving. Predicting from the raw last row froze
-    every fighter at the moment they walked into their most recent bout: Elo
-    excluded their last result, and age/layoff never advanced (2021 McGregor
-    stayed 33 with a 168-day layoff forever). This overrides the three
-    features where that lie is biggest:
-
-      elo_before_fight      -> final Elo after ALL their fights
-      age_at_fight          -> age today
-      days_since_last_fight -> days since their last fight, counted from today
-      rolling form stats    -> recomputed over the ACTUAL last k fights
-                               (ROLLING_SNAPSHOT_SPECS), so the most recent
-                               result finally counts
     """
     rows = fighters_df[fighters_df["name"] == name].sort_values("date")
     last = rows.iloc[-1]
@@ -111,10 +92,7 @@ def _fighter_snapshot(name):
     snap["elo_before_fight"] = elo_ratings.get(name, INITIAL_ELO)
     snap["days_since_last_fight"] = (today - last["date"]).days
 
-    # Inactivity decay: the layoff feature saturates at the longest layoff the
-    # trees ever saw in training, so a 5-year absence reads like a 2-year one.
-    # Shrinking a long-idle fighter's Elo toward the mean encodes the eroded
-    # certainty in a value the model CAN use.
+    # Inactivity decay:
     idle_years = max(0.0, (snap["days_since_last_fight"] - 365) / 365.25)
     if idle_years > 0:
         gap = snap["elo_before_fight"] - INITIAL_ELO
