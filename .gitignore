@@ -13,3 +13,6 @@ web/frontend/dist/
 
 # Env / secrets
 .env
+
+# Claude Code local config + skills (machine-local, not project source)
+.claude/
