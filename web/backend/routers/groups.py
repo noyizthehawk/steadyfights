@@ -141,12 +141,18 @@ def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
     )
     pot = -staked
 
+    #owner display name for the "by ..." link (owner may not be a member yet)
+    owner = db.get(User, group.owner_id)
+    owner_name = owner.email.split("@")[0] if owner else "unknown"
+
     return {
         "id": group.id,
         "name": group.name,
         "entry_fee": group.entry_fee,
         "closes_at": group.closes_at,
         "owner_id": group.owner_id,
+        "owner_name": owner_name,
+        "is_public": group.is_public,
         "is_open": group.closes_at > datetime.utcnow(),
         "pot": pot,
         "member_count": len(members),

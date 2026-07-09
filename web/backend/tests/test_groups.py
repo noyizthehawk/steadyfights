@@ -236,6 +236,8 @@ def test_group_detail_pot_members_and_flags():
     assert detail["is_owner"] is True
     assert detail["is_member"] is True
     assert detail["is_open"] is True
+    assert detail["owner_name"] == "tester"      # for the "by ..." profile link
+    assert detail["is_public"] is False          # a_group defaults to private
 
     # viewed by an outsider — visible, but flags are False
     outside_view = group_detail(group["id"], db, outsider)

@@ -17,6 +17,7 @@ import UserEventDetailPage from "./pages/UserEventDetailPage";
 import UserPastEvents from "./pages/UserPastEvents";
 import RoomsPage from "./pages/RoomsPage";
 import CreateRoomPage from "./pages/CreateRoomPage";
+import RoomDetailPage from "./pages/RoomDetailPage";
 import { me, logout } from "./api";
 
 export default function App() {
@@ -98,6 +99,8 @@ export default function App() {
         {/* /rooms/new is deliberately NOT in the nav — reached from the lobby button */}
         <Route path="/rooms" element={<RoomsPage />} />
         <Route path="/rooms/new" element={<CreateRoomPage />} />
+        {/* /rooms/new must stay ABOVE this param route so "new" isn't read as an id */}
+        <Route path="/rooms/:roomId" element={<RoomDetailPage />} />
         <Route path="/top-career" element={<TopCareerPage />} />
         <Route path="/predictor" element={<PredictorPage />} />
       </Routes>

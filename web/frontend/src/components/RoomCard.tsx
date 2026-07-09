@@ -35,7 +35,14 @@ export function RoomCard({ room }: { room: Room }) {
   );
 
   return (
-    <article className="group grid grid-cols-[auto_minmax(0,1fr)] items-center overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 transition-colors hover:border-red-500/60 sm:grid-cols-[auto_minmax(0,1fr)_6.5rem_6.5rem_7rem] lg:grid-cols-[auto_minmax(0,1fr)_9.5rem_7rem_10.5rem_11rem]">
+    <article className="group relative grid grid-cols-[auto_minmax(0,1fr)] items-center overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 transition-colors hover:border-red-500/60 sm:grid-cols-[auto_minmax(0,1fr)_6.5rem_6.5rem_7rem] lg:grid-cols-[auto_minmax(0,1fr)_9.5rem_7rem_10.5rem_11rem]">
+      {/* stretched link: covers the whole row, so the row IS the link — the
+          owner link below sits above it (z-10) and stays clickable on its own */}
+      <Link
+        to={`/rooms/${room.id}`}
+        aria-label={`Open room ${room.name}`}
+        className="absolute inset-0 z-0"
+      />
       {/* aspect-[5/3] matches the svg's 160x96 viewBox exactly, so no pixel
           cells get cropped at the cover edges */}
       <RoomCover seed={room.id} className="aspect-[5/3] h-20 shrink-0 max-sm:h-16" />
@@ -61,7 +68,7 @@ export function RoomCard({ room }: { room: Room }) {
           <span>by</span>
           <Link
             to={`/users/${room.owner_id}`}
-            className="truncate text-zinc-300 underline-offset-2 hover:text-red-400 hover:underline"
+            className="relative z-10 truncate text-zinc-300 underline-offset-2 hover:text-red-400 hover:underline"
           >
             {room.owner_name}
           </Link>
