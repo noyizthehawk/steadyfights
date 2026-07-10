@@ -23,7 +23,7 @@ from ..ledgers import get_balance, record_movement
 from ..routers.groups import (
     create_group, join_group, group_leaderboard,
     my_groups, group_detail, my_balance,
-    browse_public_rooms, browse_private_rooms,
+    browse_public_rooms, browse_private_rooms, split_pot,
 )
 from ..schemas import GroupCreate
 
@@ -391,6 +391,64 @@ def test_lobby_pagination():
     assert not ({r["id"] for r in page1["rooms"]} & {r["id"] for r in page2["rooms"]})
 
 
+# ---------- split_pot (pure payout math, no DB) ----------
+
+def test_split_pot_clean_split():
+    """Pot divides evenly: exact 60/30/10, unpaid 4th simply absent."""
+    out = split_pot(1000, [["A"], ["B"], ["C"], ["D"]])
+    assert out == {"A": 600, "B": 300, "C": 100}
+    assert "D" not in out                       # absent = unpaid, no zero rows
+
+
+def test_split_pot_remainder_goes_to_first():
+    """The agreed acceptance case: pot 950, A+B tied for 1st.
+    They pool 60+30=90% (855): 427 each + the divmod coin to A; then the
+    global leftover coin also lands on A. Total paid == pot exactly."""
+    out = split_pot(950, [["A", "B"], ["C"], ["D"]])
+    assert out == {"A": 428, "B": 427, "C": 95}
+    assert sum(out.values()) == 950
+
+
+def test_split_pot_tie_straddles_paid_boundary():
+    """A tie spanning paid and unpaid ranks pools only what the paid ranks
+    earn: B,C,D tied for 2nd pool 30+10+0 = 40% and split it."""
+    out = split_pot(1000, [["A"], ["B", "C", "D"]])
+    assert out["A"] == 600
+    assert out["B"] + out["C"] + out["D"] == 400
+    assert max(out["B"], out["C"], out["D"]) - min(out["B"], out["C"], out["D"]) <= 1
+
+
+def test_split_pot_small_rooms_winner_takes_all():
+    """Under 3 members the shares collapse to [100]."""
+    assert split_pot(500, [["A"]]) == {"A": 500}            # solo = own refund
+    assert split_pot(500, [["A"], ["B"]]) == {"A": 500}     # 2nd of 2 gets nothing
+    assert split_pot(500, [["A", "B"]]) == {"A": 250, "B": 250}  # 2-way tie splits
+
+
+def test_split_pot_edge_cases():
+    assert split_pot(300, []) == {}                          # empty room
+    out = split_pot(0, [["A"], ["B"], ["C"]])                # free room, zero pot
+    assert sum(out.values()) == 0
+
+
+def test_split_pot_always_pays_exactly_the_pot():
+    """Invariant sweep: for random pots and random tie-group shapes, payouts
+    are non-negative and sum to EXACTLY the pot (no coins minted or lost)."""
+    import random
+    rng = random.Random(42)
+    for _ in range(200):
+        pot = rng.randrange(0, 100_000)
+        n = rng.randrange(1, 9)                              # 1..8 members
+        users, groups = list(range(n)), []
+        while users:
+            take = rng.randrange(1, len(users) + 1)
+            groups.append(users[:take])
+            users = users[take:]
+        out = split_pot(pot, groups)
+        assert all(v >= 0 for v in out.values()), (pot, groups, out)
+        assert sum(out.values()) == pot, (pot, groups, out)
+
+
 if __name__ == "__main__":
     tests = [
         test_create_group,
@@ -412,6 +470,12 @@ if __name__ == "__main__":
         test_lobby_tiles_show_owner_name_and_member_count,
         test_lobby_name_search_is_case_insensitive,
         test_lobby_pagination,
+        test_split_pot_clean_split,
+        test_split_pot_remainder_goes_to_first,
+        test_split_pot_tie_straddles_paid_boundary,
+        test_split_pot_small_rooms_winner_takes_all,
+        test_split_pot_edge_cases,
+        test_split_pot_always_pays_exactly_the_pot,
     ]
     passed = 0
     for t in tests:

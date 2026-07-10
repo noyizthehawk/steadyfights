@@ -121,6 +121,7 @@ class Group(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     # public = anyone can find it in the lobby; private = only the owner's friends see it
     is_public = Column(Boolean, nullable=False, default=False)
+    settled_at = Column(DateTime, nullable=True)
 
 class GroupMember(Base):
     __tablename__ = "group_members"

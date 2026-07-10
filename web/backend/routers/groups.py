@@ -251,4 +251,42 @@ def browse_private_rooms(db: DBDep, user: User = Depends(get_curr_user),
         query = query.filter(Group.name.ilike(f"%{q}%"))
     return _paginate(db, query, page)
 
+def split_pot(pot: int, tie_groups: list): #tie group is a list of groups with user ids ranked from best to worst, ith tiesw
+    #100% of post must me shared
+    total_members = sum(len(members) for members in tie_groups)
+    shares = [100] if total_members < 3 else [60,30,10]
+    
+    payouts = {}
+    position = 0 
+
+    for group in tie_groups:
+        if position >= len(shares):
+            break  #ran out of paid slots
+
+        group_pct = sum(shares[position:position + len(group)])
+        group_amount = pot * group_pct // 100
+
+        base, remainder = divmod(group_amount, len(group))
+        for i, member in enumerate(group):
+            payouts[member] = base + (1 if i < remainder else 0)
+
+        position += len(group)
+    
+    leftover = pot - sum(payouts.values())
+    if leftover and tie_groups:
+        payouts[tie_groups[0][0]] += leftover
+
+    return payouts
+
+
+
+
+       
+   
+
+    
+
+    
+    
+   
 
