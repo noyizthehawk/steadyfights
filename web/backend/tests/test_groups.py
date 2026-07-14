@@ -23,7 +23,7 @@ from ..ledgers import get_balance, record_movement
 from ..routers.groups import (
     create_group, join_group, group_leaderboard,
     my_groups, group_detail, my_balance,
-    browse_public_rooms, browse_private_rooms, split_pot,
+    browse_public_rooms, browse_private_rooms, split_pot, settle_room,
 )
 from ..schemas import GroupCreate
 
@@ -449,6 +449,142 @@ def test_split_pot_always_pays_exactly_the_pot():
         assert sum(out.values()) == pot, (pot, groups, out)
 
 
+# ---------- settle_room (the payout engine, DB-backed) ----------
+
+def _close(db, group_id):
+    """Backdate a room's closes_at so settle_room will act on it.
+    (create_group refuses a past closes_at, so we set it directly after members join.)"""
+    g = db.get(Group, group_id)
+    g.closes_at = datetime.utcnow() - timedelta(minutes=1)
+    db.commit()
+    return g
+
+
+def _pick_record(db, user, fights, correct_n):
+    """Give `user` picks on the fights: the first `correct_n` correct, rest wrong."""
+    for i, f in enumerate(fights):
+        db.add(Pick(user_id=user.id, fight_id=f.id,
+                    picked="A" if i < correct_n else "B"))   # fights seeded winner="A"
+    db.commit()
+
+
+def test_settle_room_pays_top_three_and_stamps():
+    db, owner = make_db()
+    alice = _add_user(db, "alice_s@x.com")
+    bob = _add_user(db, "bob_s@x.com")
+
+    group = create_group(a_group(entry_fee=100), db, owner)
+    for u in (owner, alice, bob):
+        join_group(group["id"], db, u)                       # pot = 300, each now at 700
+
+    fights = _seed_settled_fights(db, 3, winner="A")
+    _pick_record(db, owner, fights, 3)                        # 100%
+    _pick_record(db, alice, fights, 2)                        # 66.7%
+    _pick_record(db, bob, fights, 0)                          # 0%
+
+    g = _close(db, group["id"])
+    settle_room(db, g)
+
+    # each started at 1000, paid the 100 buy-in -> 900; then 60/30/10 of 300 = 180/90/30
+    assert get_balance(db, owner.id) == 1080
+    assert get_balance(db, alice.id) == 990
+    assert get_balance(db, bob.id) == 930
+    assert g.settled_at is not None
+    # the pot was fully distributed, nothing minted or lost
+    assert (1080 - 900) + (990 - 900) + (930 - 900) == 300
+
+
+def test_settle_room_double_settle_is_noop():
+    """The money-safety guard: settling an already-settled room pays nobody again."""
+    db, owner = make_db()
+    alice = _add_user(db, "alice_d@x.com")
+    group = create_group(a_group(entry_fee=100), db, owner)
+    join_group(group["id"], db, owner)
+    join_group(group["id"], db, alice)
+    fights = _seed_settled_fights(db, 3, winner="A")
+    _pick_record(db, owner, fights, 3)
+    _pick_record(db, alice, fights, 0)
+
+    g = _close(db, group["id"])
+    settle_room(db, g)
+    bal_owner, bal_alice = get_balance(db, owner.id), get_balance(db, alice.id)
+    payout_rows = db.query(CoinLedger).filter_by(reason=CoinReason.room_payout).count()
+
+    settle_room(db, g)                                       # second run
+    assert get_balance(db, owner.id) == bal_owner            # unchanged
+    assert get_balance(db, alice.id) == bal_alice
+    assert db.query(CoinLedger).filter_by(reason=CoinReason.room_payout).count() == payout_rows
+
+
+def test_settle_room_open_room_is_noop():
+    """A room that hasn't closed yet must not pay out."""
+    db, owner = make_db()
+    group = create_group(a_group(entry_fee=100), db, owner)
+    join_group(group["id"], db, owner)
+    g = db.get(Group, group["id"])                           # still open (future closes_at)
+
+    settle_room(db, g)
+    assert g.settled_at is None
+    assert get_balance(db, owner.id) == 900                  # only the buy-in was taken
+
+
+def test_settle_room_winner_takes_all_when_small():
+    """Fewer than 3 members -> 1st takes the whole pot."""
+    db, owner = make_db()
+    alice = _add_user(db, "alice_w@x.com")
+    group = create_group(a_group(entry_fee=100), db, owner)
+    join_group(group["id"], db, owner)
+    join_group(group["id"], db, alice)                       # pot = 200
+    fights = _seed_settled_fights(db, 3, winner="A")
+    _pick_record(db, owner, fights, 3)                       # 100%
+    _pick_record(db, alice, fights, 1)                       # 33%
+
+    g = _close(db, group["id"])
+    settle_room(db, g)
+    assert get_balance(db, owner.id) == 1100                 # 900 + whole 200 pot
+    assert get_balance(db, alice.id) == 900                  # 2nd of 2 gets nothing
+
+
+def test_settle_room_free_room_just_stamps():
+    """A 0-coin room pays nobody but must still be marked settled."""
+    db, owner = make_db()
+    group = create_group(a_group(entry_fee=0), db, owner)
+    join_group(group["id"], db, owner)                       # free -> no ledger movement
+    g = _close(db, group["id"])
+
+    settle_room(db, g)
+    assert g.settled_at is not None
+    assert get_balance(db, owner.id) == 1000                 # untouched
+    assert db.query(CoinLedger).filter_by(reason=CoinReason.room_payout).count() == 0
+
+
+def test_settle_room_member_with_no_picks_is_included_not_paid():
+    """A member who never made a pick is dropped by the leaderboard's inner join;
+    settle_room must still count them (ranked last) without crashing."""
+    db, owner = make_db()
+    alice = _add_user(db, "alice_np@x.com")
+    bob = _add_user(db, "bob_np@x.com")
+    carol = _add_user(db, "carol_np@x.com")                  # will make ZERO picks
+    group = create_group(a_group(entry_fee=100), db, owner)
+    for u in (owner, alice, bob, carol):
+        join_group(group["id"], db, u)                       # pot = 400
+
+    fights = _seed_settled_fights(db, 3, winner="A")
+    _pick_record(db, owner, fights, 3)                       # 100%
+    _pick_record(db, alice, fights, 2)                       # 66.7%
+    _pick_record(db, bob, fights, 1)                         # 33%
+    # carol: no picks at all
+
+    g = _close(db, group["id"])
+    settle_room(db, g)
+    # each paid the 100 buy-in -> 900; 60/30/10 of 400 = 240/120/40; carol (4th) gets nothing
+    assert get_balance(db, owner.id) == 1140                 # 900 + 240
+    assert get_balance(db, alice.id) == 1020                 # 900 + 120
+    assert get_balance(db, bob.id) == 940                    # 900 + 40
+    assert get_balance(db, carol.id) == 900                  # paid nothing, buy-in only
+    assert g.settled_at is not None
+
+
 if __name__ == "__main__":
     tests = [
         test_create_group,
@@ -476,6 +612,12 @@ if __name__ == "__main__":
         test_split_pot_small_rooms_winner_takes_all,
         test_split_pot_edge_cases,
         test_split_pot_always_pays_exactly_the_pot,
+        test_settle_room_pays_top_three_and_stamps,
+        test_settle_room_double_settle_is_noop,
+        test_settle_room_open_room_is_noop,
+        test_settle_room_winner_takes_all_when_small,
+        test_settle_room_free_room_just_stamps,
+        test_settle_room_member_with_no_picks_is_included_not_paid,
     ]
     passed = 0
     for t in tests:

@@ -278,7 +278,51 @@ def split_pot(pot: int, tie_groups: list): #tie group is a list of groups with u
 
     return payouts
 
+def settle_room(db: DBDep, group: Group):
+    #if group is alredy settled, do nothing
+    if group.settled_at is not None:
+        return 
+    #if room is not closed yet do nothing 
+    if group.closes_at > datetime.utcnow():
+        return
+    member_ids = [m.user_id for m in db.query(GroupMember)
+                  .filter_by(group_id=group.id, status="active")]
+    
+    staked = (db.query(func.coalesce(func.sum(CoinLedger.amount), 0))
+              .filter(CoinLedger.reference_id == group.id,
+                      CoinLedger.reason == CoinReason.room_buyin).scalar())
+    pot = -staked
+    board = compute_leaderboard(db, user_ids=member_ids, min_settled=0)
+    
+    
+    tie_groups = []
+    prev = object()                             # sentinel so the first row starts a group
+    for row in board:
+        if row["winrate"] == prev and tie_groups:
+            tie_groups[-1].append(row["id"])    # same winrate -> tie
+        else:
+            tie_groups.append([row["id"]])
+        prev = row["winrate"]
+    found = {r["id"] for r in board}
+    missing = [uid for uid in member_ids if uid not in found]
+    if missing:
+        tie_groups.append(missing)
+    payouts = split_pot(pot, tie_groups)
+    try:
+        for user_id, amount in payouts.items():
+            if amount > 0:
+                record_movement(db, user_id, amount, CoinReason.room_payout,
+                                reference_id=group.id, commit=False)
+        group.settled_at = datetime.utcnow()    # stamp ALWAYS — even a 0 pot
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
+
+
+   
+    
 
 
        
