@@ -320,6 +320,34 @@ def settle_room(db: DBDep, group: Group):
         raise
 
 
+def run_settle_rooms(db) -> dict:
+    """Pay out every room whose close time has passed and that hasn't settled yet.
+    Plain function so both a cron script and (optionally) an admin route can call it.
+
+    ORDER MATTERS: run this AFTER fights are settled (run_settle), because rooms
+    rank their members on SETTLED picks — settling rooms first would score everyone
+    on still-unsettled fights.
+
+    Each room settles in its own transaction, so one bad room can't block the
+    others: a failure leaves that room's settled_at NULL and the next run retries
+    it (safe, because settle_room is idempotent on settled_at)."""
+    now = datetime.utcnow()
+    due = (
+        db.query(Group)
+        .filter(Group.settled_at.is_(None), Group.closes_at <= now)
+        .all()
+    )
+    settled = failed = 0
+    for room in due:
+        try:
+            settle_room(db, room)
+            settled += 1
+        except Exception as e:                  # noqa: BLE001 — isolate per room
+            failed += 1
+            print(f"[settle_rooms] room {room.id} failed: {e}")
+    return {"rooms": len(due), "settled": settled, "failed": failed}
+
+
 
    
     

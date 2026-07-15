@@ -4,14 +4,20 @@ Run from the PROJECT ROOT:
 """
 from .database import SessionLocal
 from .scraping import run_settle
+from .routers.groups import run_settle_rooms
 
 
 def main():
     db = SessionLocal()
     try:
-        result = run_settle(db)
-        print(f"Settled {result['settled']} fight(s) "
-              f"across {result['events']} finished event(s).")
+        # 1) settle fights FIRST — room leaderboards rank on settled picks
+        fights = run_settle(db)
+        print(f"Settled {fights['settled']} fight(s) "
+              f"across {fights['events']} finished event(s).")
+        # 2) THEN pay out any rooms whose close time has passed
+        rooms = run_settle_rooms(db)
+        print(f"Paid out {rooms['settled']} room(s) "
+              f"({rooms['failed']} failed) of {rooms['rooms']} due.")
     finally:
         db.close()
 

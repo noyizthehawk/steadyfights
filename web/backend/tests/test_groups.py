@@ -24,6 +24,7 @@ from ..routers.groups import (
     create_group, join_group, group_leaderboard,
     my_groups, group_detail, my_balance,
     browse_public_rooms, browse_private_rooms, split_pot, settle_room,
+    run_settle_rooms,
 )
 from ..schemas import GroupCreate
 
@@ -585,6 +586,35 @@ def test_settle_room_member_with_no_picks_is_included_not_paid():
     assert g.settled_at is not None
 
 
+def test_run_settle_rooms_only_touches_due_unsettled_rooms():
+    """The runner settles closed+unsettled rooms, and leaves open rooms and
+    already-settled rooms alone."""
+    db, owner = make_db()
+
+    # a closed, unsettled room -> SHOULD settle
+    due = create_group(a_group(entry_fee=0, name="Due"), db, owner)
+    join_group(due["id"], db, owner)
+    _close(db, due["id"])
+
+    # a still-open room -> should be skipped
+    open_room = create_group(a_group(entry_fee=0, name="Open"), db, owner)
+    join_group(open_room["id"], db, owner)
+
+    # a closed room that's ALREADY settled -> should be skipped
+    done = create_group(a_group(entry_fee=0, name="Done"), db, owner)
+    join_group(done["id"], db, owner)
+    done_g = _close(db, done["id"])
+    settle_room(db, done_g)
+    stamped_before = done_g.settled_at
+
+    result = run_settle_rooms(db)
+    assert result == {"rooms": 1, "settled": 1, "failed": 0}   # only "Due" was due
+
+    assert db.get(Group, due["id"]).settled_at is not None      # now settled
+    assert db.get(Group, open_room["id"]).settled_at is None    # left open
+    assert db.get(Group, done["id"]).settled_at == stamped_before  # not re-stamped
+
+
 if __name__ == "__main__":
     tests = [
         test_create_group,
@@ -618,6 +648,7 @@ if __name__ == "__main__":
         test_settle_room_winner_takes_all_when_small,
         test_settle_room_free_room_just_stamps,
         test_settle_room_member_with_no_picks_is_included_not_paid,
+        test_run_settle_rooms_only_touches_due_unsettled_rooms,
     ]
     passed = 0
     for t in tests:
