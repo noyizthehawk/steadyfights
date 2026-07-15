@@ -117,12 +117,17 @@ export default function RoomsPage() {
         <h1 className="text-2xl font-bold text-white">Rooms</h1>
         <div className="ml-auto flex items-center gap-3">
           {balance !== null && (
-            <span className="flex items-center gap-2 rounded-full border border-[#ffce4f66] bg-[#ffce4f14] px-3 py-1.5 text-[#ffd75e]">
+            <Link
+              to="/coins"
+              title="Buy coins"
+              className="flex items-center gap-2 rounded-full border border-[#ffce4f66] bg-[#ffce4f14] px-3 py-1.5 text-[#ffd75e] transition-colors hover:bg-[#ffce4f24]"
+            >
               <CoinIcon size={14} className="shrink-0" />
               <span style={{ fontFamily: "var(--font-display)" }} className="text-[11px]">
                 {balance.toLocaleString()}
               </span>
-            </span>
+              <span className="text-sm leading-none">+</span>
+            </Link>
           )}
           <Link
             to="/rooms/new"
