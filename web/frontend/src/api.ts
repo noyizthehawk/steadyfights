@@ -463,6 +463,7 @@ export type LeaderboardRow = {
   settled: number;
   correct: number;
   winrate: number | null;
+  points: number;      // room score: 10 per correct pick (rooms rank by this)
 };
 
 export async function getLeaderboard(): Promise<LeaderboardRow[]> {

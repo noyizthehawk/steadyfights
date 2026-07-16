@@ -274,9 +274,9 @@ export default function RoomDetailPage() {
                     </span>
                     <span
                       style={{ fontFamily: "var(--font-display)" }}
-                      className="w-16 shrink-0 text-right text-[11px] text-zinc-300"
+                      className="w-20 shrink-0 text-right text-[11px] text-[#ffd75e]"
                     >
-                      {row.winrate === null ? "—" : `${row.winrate.toFixed(0)}%`}
+                      {row.points} PTS
                     </span>
                   </li>
                 ))}

@@ -9,7 +9,7 @@ transaction, error translation — without needing an HTTP server or auth cookie
 Runs against in-memory SQLite, so it never touches data/app.db.
 Run:  .venv/bin/python -m web.backend.tests.test_groups
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import create_engine
@@ -20,6 +20,7 @@ from ..models import (
     User, Group, GroupMember, CoinReason, CoinLedger, UFCFight, Pick, Friendship,
 )
 from ..ledgers import get_balance, record_movement
+from ..stats import compute_leaderboard
 from ..routers.groups import (
     create_group, join_group, group_leaderboard,
     my_groups, group_detail, my_balance,
@@ -586,6 +587,58 @@ def test_settle_room_member_with_no_picks_is_included_not_paid():
     assert g.settled_at is not None
 
 
+def test_room_board_resets_on_entry():
+    """Picks made BEFORE joining a room don't count toward the room board —
+    only picks made after joining do (Picks are global, so history must not leak)."""
+    db, owner = make_db()
+    fights = _seed_settled_fights(db, 4, winner="A")
+
+    # two correct picks made a month ago, i.e. BEFORE this room ever existed
+    old = datetime.now(timezone.utc) - timedelta(days=30)
+    db.add(Pick(user_id=owner.id, fight_id=fights[0].id, picked="A", created_at=old))
+    db.add(Pick(user_id=owner.id, fight_id=fights[1].id, picked="A", created_at=old))
+    db.commit()
+
+    group = create_group(a_group(entry_fee=0), db, owner)
+    join_group(group["id"], db, owner)          # join time is NOW, after those picks
+
+    # the old picks are excluded -> owner has no in-window picks -> not on the board
+    board = compute_leaderboard(db, user_ids=[owner.id], min_settled=0,
+                                group_id=group["id"], rank_by="points")
+    assert board == []
+
+    # a fresh correct pick made AFTER joining does count
+    db.add(Pick(user_id=owner.id, fight_id=fights[2].id, picked="A"))
+    db.commit()
+    board = compute_leaderboard(db, user_ids=[owner.id], min_settled=0,
+                                group_id=group["id"], rank_by="points")
+    assert [(r["correct"], r["points"]) for r in board] == [(1, 10)]  # only the new pick
+
+
+def test_settle_room_points_beat_small_sample_winrate():
+    """The small-sample fix: 2/2 (100% winrate, but only 20 pts) must LOSE to
+    27/30 (90% winrate, 270 pts). Under the old winrate ranking the sniper would
+    have taken the pot; points rank by volume+accuracy instead."""
+    db, grinder = make_db()
+    sniper = _add_user(db, "sniper@x.com")
+
+    group = create_group(a_group(entry_fee=100), db, grinder)
+    join_group(group["id"], db, grinder)
+    join_group(group["id"], db, sniper)         # pot = 200
+
+    fights = _seed_settled_fights(db, 30, winner="A")
+    _pick_record(db, grinder, fights, 27)       # 27/30 correct -> 270 pts
+    db.add(Pick(user_id=sniper.id, fight_id=fights[0].id, picked="A"))
+    db.add(Pick(user_id=sniper.id, fight_id=fights[1].id, picked="A"))
+    db.commit()                                 # 2/2 correct -> 20 pts
+
+    g = _close(db, group["id"])
+    settle_room(db, g)
+    # 2 members -> winner-takes-all; the grinder's 270 pts win the whole pot
+    assert get_balance(db, grinder.id) == 1100  # 900 + 200
+    assert get_balance(db, sniper.id) == 900    # 100% winrate but out-pointed -> nothing
+
+
 def test_run_settle_rooms_only_touches_due_unsettled_rooms():
     """The runner settles closed+unsettled rooms, and leaves open rooms and
     already-settled rooms alone."""
@@ -648,6 +701,8 @@ if __name__ == "__main__":
         test_settle_room_winner_takes_all_when_small,
         test_settle_room_free_room_just_stamps,
         test_settle_room_member_with_no_picks_is_included_not_paid,
+        test_room_board_resets_on_entry,
+        test_settle_room_points_beat_small_sample_winrate,
         test_run_settle_rooms_only_touches_due_unsettled_rooms,
     ]
     passed = 0

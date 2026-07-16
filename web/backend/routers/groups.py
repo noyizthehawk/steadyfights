@@ -88,8 +88,9 @@ def group_leaderboard(group_id: int, db: DBDep, user: User = Depends(get_curr_us
     if not member_ids:
         return {"group_id": group_id, "leaderboard": []}
 
-    #score ONLY this room's members; min_settled=0 so everyone playing shows up
-    board = compute_leaderboard(db, user_ids=member_ids, min_settled=0)
+    #score ONLY this room's members, on picks made after they joined; rank by points
+    board = compute_leaderboard(db, user_ids=member_ids, min_settled=0,
+                                group_id=group_id, rank_by="points")
     return {"group_id": group_id, "leaderboard": board}
 @router.get("/api/coins/balance")
 def my_balance(db: DBDep, user: User = Depends(get_curr_user)):
@@ -292,17 +293,19 @@ def settle_room(db: DBDep, group: Group):
               .filter(CoinLedger.reference_id == group.id,
                       CoinLedger.reason == CoinReason.room_buyin).scalar())
     pot = -staked
-    board = compute_leaderboard(db, user_ids=member_ids, min_settled=0)
-    
-    
+    # rank members by room points (10/correct pick, scoped to after they joined),
+    # the SAME board the leaderboard endpoint shows — so paid winners == shown winners
+    board = compute_leaderboard(db, user_ids=member_ids, min_settled=0,
+                                group_id=group.id, rank_by="points")
+
     tie_groups = []
     prev = object()                             # sentinel so the first row starts a group
     for row in board:
-        if row["winrate"] == prev and tie_groups:
-            tie_groups[-1].append(row["id"])    # same winrate -> tie
+        if row["points"] == prev and tie_groups:
+            tie_groups[-1].append(row["id"])    # same points -> tie
         else:
             tie_groups.append([row["id"]])
-        prev = row["winrate"]
+        prev = row["points"]
     found = {r["id"] for r in board}
     missing = [uid for uid in member_ids if uid not in found]
     if missing:

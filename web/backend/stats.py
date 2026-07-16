@@ -1,7 +1,7 @@
 """shared stats functions, imported by the routers"""
 from sqlalchemy import func, case, and_
 
-from .models import User, UFCFight, Pick
+from .models import User, UFCFight, Pick, GroupMember
 
 
 def compute_user_stats(db, user_id, event_id=None):
@@ -51,12 +51,12 @@ def compute_user_stats(db, user_id, event_id=None):
     }
 
 
-def compute_leaderboard(db, user_ids=None, min_settled=3):
-    """The leaderboard is a list of users with pick stats, ranked by winrate.
+POINTS_PER_CORRECT = 10  
 
-    Global board: call with no args (all users, >= 3 settled picks).
-    Room board:   pass user_ids=[member ids] to score only that room's members,
-                  and usually a lower min_settled (a small room can't clear 3).
+
+def compute_leaderboard(db, user_ids=None, min_settled=3, group_id=None,
+                        rank_by="winrate"):
+    """A list of users with pick stats, ranked either by winrate or by points.
     """
     q = (
         db.query(
@@ -74,6 +74,16 @@ def compute_leaderboard(db, user_ids=None, min_settled=3):
     if user_ids is not None:
         q = q.filter(User.id.in_(user_ids))
 
+    # reset-on-entry: within a room, count only picks made AFTER the member joined.
+    # The join to GroupMember (unique per group+user, so no fan-out) gives each row
+    # that member's own join time as the cutoff.
+    if group_id is not None:
+        q = (
+            q.join(GroupMember, and_(GroupMember.user_id == User.id,
+                                     GroupMember.group_id == group_id))
+             .filter(Pick.created_at >= GroupMember.created_at)
+        )
+
     rows = (
         q.group_by(User.id)
         .having(func.count(UFCFight.winner) >= min_settled)     # min settled picks to qualify
@@ -86,16 +96,20 @@ def compute_leaderboard(db, user_ids=None, min_settled=3):
         winrate = round(correct / settled * 100, 1) if settled else None
         board.append({
             "id": uid,                       # used to send a friend invite from a card
-            "name": email.split("@")[0],     # local part only — don't expose the full email
+            "name": email.split("@")[0],     # local part only 
             "total_picks": total,
             "settled": settled,
             "correct": correct,
             "winrate": winrate,
+            "points": correct * POINTS_PER_CORRECT,
         })
 
-    #sort it
-    board.sort(
-        key=lambda r: (r["winrate"] is not None, r["winrate"] or 0, r["total_picks"]),
-        reverse=True,
-    )
+    # sort the board
+    if rank_by == "points":
+        board.sort(key=lambda r: (r["points"], r["total_picks"]), reverse=True)
+    else:
+        board.sort(
+            key=lambda r: (r["winrate"] is not None, r["winrate"] or 0, r["total_picks"]),
+            reverse=True,
+        )
     return board
