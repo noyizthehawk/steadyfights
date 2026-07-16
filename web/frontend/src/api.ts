@@ -57,6 +57,7 @@ export type PredictResult = {
     value_b: string;
     favors: string;
   }[];
+  free_remaining: number | null;   // free predictions left; null = unlimited (subscriber)
 };
 export type PhaseBout = {
   fight_number: number;
@@ -371,6 +372,11 @@ export async function predict(
     body: JSON.stringify({ fighter_a: fighterA, fighter_b: fighterB }),
     credentials: "include", //tell the browser to imnclude the cookie
   });
+  if (res.status === 402) {
+    // free predictions used up — a distinct error so the page can show a paywall
+    const err = await res.json().catch(() => ({}));
+    throw new PaywallError(err.detail || "You've used your free predictions.");
+  }
   if (!res.ok) {
     // FastAPI puts error text in `detail`.
     const err = await res.json().catch(() => ({}));
@@ -426,6 +432,7 @@ export async function me(): Promise<MeResponse> {
 }
 // Thrown when an action needs a logged-in user. The UI catches this to redirect to login.
 export class AuthError extends Error {}
+export class PaywallError extends Error {}   // thrown on 402: free predictions used up
 
 // Create or update the current user's pick for a fight. Needs the auth cookie.
 export async function makePick(fightId: number, picked: string): Promise<void> {

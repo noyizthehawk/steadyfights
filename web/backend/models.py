@@ -88,6 +88,7 @@ class User(Base):
     stripe_customer_id = Column(String, nullable=True, index=True)
     # Mirror of Stripe's subscription state: "active" / "canceled" / None.
     subscription_status = Column(String, nullable=True)
+    free_predictions_used = Column(Integer, nullable=False, default=0)
 
     def __repr__(self):
         return f"<User id={self.id} email={self.email!r}>"
