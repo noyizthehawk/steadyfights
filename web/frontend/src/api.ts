@@ -199,6 +199,21 @@ export async function buyCoins(pack: CoinPack): Promise<string> {
   return data.url;
 }
 
+export async function startSubscription(): Promise<string> {
+  // opens a $10/mo subscription checkout; returns the Stripe URL to redirect to
+  const res = await fetch(`${BASE_URL}/api/billing/checkout`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not start subscription");
+  }
+  const data: { url: string } = await res.json();
+  return data.url;
+}
+
 export async function getMyRooms(): Promise<Room[]> {
   const res = await fetch(`${BASE_URL}/api/groups`, {
     credentials: "include",
