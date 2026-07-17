@@ -16,3 +16,6 @@ web/frontend/dist/
 
 # Claude Code local config + skills (machine-local, not project source)
 .claude/
+
+# cron job logs
+logs/

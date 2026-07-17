@@ -246,7 +246,10 @@ print("All calculations complete\n")
 
 # Career score now lives in one place (part_2/career_score.py) so the web API and
 # this refresh script can't drift. This file's columns differ, so pass their names.
-from career_score import compute_career_score
+try:
+    from part_2.career_score import compute_career_score  # imported as a package by the web app
+except ImportError:
+    from career_score import compute_career_score  # run directly as a script by refresh_data.py
 
 
 def get_top_careers_by_metric(top_n: int = 20, min_fights: int = 5):
