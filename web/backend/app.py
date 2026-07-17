@@ -7,11 +7,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from part_2 import Prediction_model as model
+from .database import Base, engine
 from .routers import auth, predict, picks, events, friends, leaderboard, news, admin, profile, coins, groups
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create any missing tables before anything else touches the DB. Idempotent:
+    # on an existing DB this is a no-op; on a fresh one (first Railway boot with
+    # empty Postgres) it builds the whole schema. Runs before model.train() so a
+    # bad DB connection fails fast instead of after minutes of training.
+    Base.metadata.create_all(bind=engine)
     print("Training model (one time, please wait)...")
     model.train()
     print("Model ready. API is live.")
