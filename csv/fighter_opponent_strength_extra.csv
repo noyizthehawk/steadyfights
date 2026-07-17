@@ -562,8 +562,8 @@ CJ Vergara,8,Edgar Chairez,0,41.09557840427519,0.42471296752705295,5.64867606967
 Max Griffin,19,Victor Valenzuela,0,45.36106407905305,0.4568469079205422,38.86748749612219,High-level competitive fight,UFC Fight Night: Sterling vs. Zalal
 Paul Varelans,1,Cal Worsham,1,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
 Paul Varelans,2,David Abbott,0,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
-Paul Varelans,3,Mark Hall,1,,0.5,,Outmatched performance,UFC 7: The Brawl in Buffalo
-Paul Varelans,4,Gerry Harris,1,,0.5,,Outmatched performance,UFC 7: The Brawl in Buffalo
+Paul Varelans,3,Gerry Harris,1,,0.5,,Outmatched performance,UFC 7: The Brawl in Buffalo
+Paul Varelans,4,Mark Hall,1,,0.5,,Outmatched performance,UFC 7: The Brawl in Buffalo
 Paul Varelans,5,Marco Ruas,0,,0.5,,Outmatched performance,UFC 7: The Brawl in Buffalo
 Paul Varelans,6,Dan Severn,0,,0.6388888888888888,,Outmatched performance,UFC - Ultimate Ultimate '95
 Paul Varelans,7,Joe Moreira,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
@@ -1016,8 +1016,8 @@ Sam Adkins,2,Don Frye,0,,0.5,,Outmatched performance,UFC 8: David vs Goliath
 Sam Adkins,3,Felix Lee Mitchell,1,,0.5,,Outmatched performance,UFC 10: The Tournament
 Sam Adkins,4,David Abbott,0,,0.5625,,Outmatched performance,UFC 11: The Proving Ground
 Scott Fiedler,1,Brian Johnston,0,,0.5,,Outmatched performance,UFC 10: The Tournament
-Vitor Belfort,1,Tra Telligman,1,,0.5,,Outmatched performance,UFC 12: Judgement Day
-Vitor Belfort,2,Scott Ferrozzo,1,,0.5625,,Outmatched performance,UFC 12: Judgement Day
+Vitor Belfort,1,Scott Ferrozzo,1,,0.5625,,Outmatched performance,UFC 12: Judgement Day
+Vitor Belfort,2,Tra Telligman,1,,0.5,,Outmatched performance,UFC 12: Judgement Day
 Vitor Belfort,3,David Abbott,1,,0.55,,Outmatched performance,UFC 13: The Ultimate Force
 Vitor Belfort,4,Randy Couture,0,,0.5,,Outmatched performance,UFC 15: Collision Course
 Vitor Belfort,5,Joe Charles,1,,0.53125,,Outmatched performance,UFC - Ultimate Japan
@@ -1293,8 +1293,8 @@ Jared Cannonier,17,Nassourdine Imavov,0,48.109105809404,0.559074139270965,46.140
 Jared Cannonier,18,Caio Borralho,0,38.43047724193577,0.6968767713865146,42.15349779997744,High-level competitive fight,UFC Fight Night: Cannonier vs. Borralho
 Jared Cannonier,19,Gregory Rodrigues,1,47.57977354452899,0.6432397287044331,54.39508739886569,Effective performance,UFC Fight Night: Cannonier vs. Rodrigues
 Jared Cannonier,20,Michael Page,0,50.040083638911995,0.5228685078103039,46.180417318545516,High-level competitive fight,UFC 319: Du Plessis vs. Chimaev
-Kevin Jackson,1,Tony Fryklund,1,,0.5,,Outmatched performance,UFC 14: Showdown
-Kevin Jackson,2,Todd Butler,1,,0.5,,Outmatched performance,UFC 14: Showdown
+Kevin Jackson,1,Todd Butler,1,,0.5,,Outmatched performance,UFC 14: Showdown
+Kevin Jackson,2,Tony Fryklund,1,,0.5,,Outmatched performance,UFC 14: Showdown
 Kevin Jackson,3,Frank Shamrock,0,,0.5,,Outmatched performance,UFC - Ultimate Japan
 Kevin Jackson,4,Jerry Bohlander,0,,0.59375,,Outmatched performance,UFC 16: Battle in the Bayou
 Brad Kohler,1,Tra Telligman,0,,0.5,,Outmatched performance,UFC - Ultimate Japan
@@ -1787,8 +1787,8 @@ Roan Carneiro,6,Mark Munoz,1,46.91030211460144,0.5399887093677427,48.78618455221
 Roan Carneiro,7,Derek Brunson,0,31.7227081495119,0.6388980041940552,5.7857244367744745,Outmatched performance,UFC Fight Night: Cowboy vs Cowboy
 Roan Carneiro,8,Kenny Robertson,1,47.22429887541524,0.496865798254256,47.076288395438375,High-level competitive fight,UFC Fight Night: Poirier vs. Johnson
 Roan Carneiro,9,Ryan LaFlare,0,41.263248229615726,0.6227930493392131,42.20376348240956,High-level competitive fight,UFC 208: Holm vs. De Randamie
-Dan Henderson,1,Allan Goes,1,,0.5,,Outmatched performance,UFC 17: Redemption
-Dan Henderson,2,Carlos Newton,1,,0.5,,Outmatched performance,UFC 17: Redemption
+Dan Henderson,1,Carlos Newton,1,,0.5,,Outmatched performance,UFC 17: Redemption
+Dan Henderson,2,Allan Goes,1,,0.5,,Outmatched performance,UFC 17: Redemption
 Dan Henderson,3,Quinton Jackson,0,48.8216686719901,0.5,43.93950180479109,High-level competitive fight,UFC 75: Champion vs Champion
 Dan Henderson,4,Anderson Silva,0,46.088835773854974,0.6814374568769128,32.78508718113299,High-level competitive fight,UFC 82: Pride of a Champion
 Dan Henderson,5,Rousimar Palhares,1,46.07397127004903,0.5,46.07397127004903,High-level competitive fight,UFC 88: Breakthrough
@@ -1886,12 +1886,12 @@ Robert Whiteford,4,Darren Elkins,0,46.087865080951204,0.5729295110817232,44.8402
 Robert Whiteford,5,Lucas Martins,0,44.20159276222034,0.47091405107973,38.49578821672179,High-level competitive fight,UFC Fight Night: Rothwell vs Dos Santos
 Oleg Taktarov,1,Ernie Verdicia,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
 Oleg Taktarov,2,Dan Severn,0,,0.59375,,Outmatched performance,UFC 5: The Return of the Beast
-Oleg Taktarov,3,Dave Beneteau,1,,0.53125,,Outmatched performance,UFC 6: Clash of the Titans
+Oleg Taktarov,3,David Abbott,1,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
 Oleg Taktarov,4,Anthony Macias,1,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
-Oleg Taktarov,5,David Abbott,1,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
+Oleg Taktarov,5,Dave Beneteau,1,,0.53125,,Outmatched performance,UFC 6: Clash of the Titans
 Oleg Taktarov,6,Ken Shamrock,0,,0.5625,,Outmatched performance,UFC 7: The Brawl in Buffalo
-Oleg Taktarov,7,Dave Beneteau,1,,0.5,,Outmatched performance,UFC - Ultimate Ultimate '95
-Oleg Taktarov,8,Marco Ruas,1,,0.625,,Outmatched performance,UFC - Ultimate Ultimate '95
+Oleg Taktarov,7,Marco Ruas,1,,0.625,,Outmatched performance,UFC - Ultimate Ultimate '95
+Oleg Taktarov,8,Dave Beneteau,1,,0.5,,Outmatched performance,UFC - Ultimate Ultimate '95
 Oleg Taktarov,9,Dan Severn,0,,0.6388888888888888,,Outmatched performance,UFC - Ultimate Ultimate '95
 Lawrence Lui,1,Sulangrangbo,1,46.0589991999528,0.5,46.0589991999528,High-level competitive fight,UFC 325: Volkanovski vs. Lopes 2
 Chance Rencountre,1,Belal Muhammad,0,35.67901774087776,0.5455258409699895,33.73543325442662,High-level competitive fight,UFC Fight Night: Rivera vs. Moraes
@@ -2182,11 +2182,11 @@ Yusaku Kinoshita,2,Billy Ray Goff,0,36.15383746033022,0.5,8.279228778415622,Outm
 Erik Silva,1,TJ Brown,0,50.738066284115654,0.4652348671655474,40.04686939792432,High-level competitive fight,UFC 282: Blachowicz vs. Ankalaev
 Erik Silva,2,Muhammad Naimov,0,37.698904888381016,0.5,1.6587518150887648,Outmatched performance,UFC Fight Night: Moreno vs. Royval 2
 Francis Marshall,6,Erik Silva,1,45.09791076604321,0.44651139385753347,42.685686379230226,High-level competitive fight,UFC Fight Night: Moreno vs. Kavanagh
-Mark Coleman,1,Don Frye,1,,0.6875,,Outmatched performance,UFC 10: The Tournament
-Mark Coleman,2,Gary Goodridge,1,,0.53125,,Outmatched performance,UFC 10: The Tournament
-Mark Coleman,3,Moti Horenstein,1,,0.5,,Outmatched performance,UFC 10: The Tournament
-Mark Coleman,4,Brian Johnston,1,,0.53125,,Outmatched performance,UFC 11: The Proving Ground
-Mark Coleman,5,Julian Sanchez,1,,0.5,,Outmatched performance,UFC 11: The Proving Ground
+Mark Coleman,1,Gary Goodridge,1,,0.53125,,Outmatched performance,UFC 10: The Tournament
+Mark Coleman,2,Moti Horenstein,1,,0.5,,Outmatched performance,UFC 10: The Tournament
+Mark Coleman,3,Don Frye,1,,0.6875,,Outmatched performance,UFC 10: The Tournament
+Mark Coleman,4,Julian Sanchez,1,,0.5,,Outmatched performance,UFC 11: The Proving Ground
+Mark Coleman,5,Brian Johnston,1,,0.53125,,Outmatched performance,UFC 11: The Proving Ground
 Mark Coleman,6,Dan Severn,1,,0.6590909090909092,,Outmatched performance,UFC 12: Judgement Day
 Mark Coleman,7,Maurice Smith,0,,0.5,,Outmatched performance,UFC 14: Showdown
 Mark Coleman,8,Pete Williams,0,,0.5,,Outmatched performance,UFC 17: Redemption
@@ -2549,16 +2549,16 @@ Gabriel Gonzaga,19,Matt Mitrione,0,40.59265372622067,0.6131690388173345,5.437932
 Gabriel Gonzaga,20,Mirko Filipovic,0,49.30876931814674,0.4214220348475031,36.45297866622441,High-level competitive fight,UFC Fight Night: Gonzaga vs Cro Cop 2
 Gabriel Gonzaga,21,Konstantin Erokhin,1,47.05642956682466,0.5,47.05642956682466,High-level competitive fight,The Ultimate Fighter: Team McGregor vs. Team Faber Finale
 Gabriel Gonzaga,22,Derrick Lewis,0,53.042033457932334,0.6022237699377446,17.011195755959335,Outmatched performance,UFC Fight Night: Rothwell vs Dos Santos
-Don Frye,1,Sam Adkins,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
+Don Frye,1,Gary Goodridge,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
 Don Frye,2,Thomas Ramirez,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
-Don Frye,3,Gary Goodridge,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
+Don Frye,3,Sam Adkins,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
 Don Frye,4,Amaury Bitetti,1,,0.5,,Outmatched performance,UFC 9: Motor City Madness
 Don Frye,5,Mark Hall,1,,0.5625,,Outmatched performance,UFC 10: The Tournament
 Don Frye,6,Brian Johnston,1,,0.5,,Outmatched performance,UFC 10: The Tournament
 Don Frye,7,Mark Coleman,0,,0.5,,Outmatched performance,UFC 10: The Tournament
 Don Frye,8,David Abbott,1,,0.5833333333333333,,Outmatched performance,UFC - Ultimate Ultimate '96
-Don Frye,9,Mark Hall,1,,0.5625,,Outmatched performance,UFC - Ultimate Ultimate '96
-Don Frye,10,Gary Goodridge,1,,0.5,,Outmatched performance,UFC - Ultimate Ultimate '96
+Don Frye,9,Gary Goodridge,1,,0.5,,Outmatched performance,UFC - Ultimate Ultimate '96
+Don Frye,10,Mark Hall,1,,0.5625,,Outmatched performance,UFC - Ultimate Ultimate '96
 Curt Warburton,1,Spencer Fisher,0,48.57006097657218,0.536125551749458,45.46767513019845,High-level competitive fight,UFC 120: Bisping vs Akiyama
 Curt Warburton,2,Maciej Jewtuszko,1,54.99963800162357,0.5,54.99963800162357,Effective performance,UFC 127: Penn vs Fitch
 Curt Warburton,3,Joe Lauzon,0,36.70362888675844,0.5925148352833395,4.776233054559269,Outmatched performance,UFC Live: Kongo vs Barry
@@ -4529,14 +4529,14 @@ Demian Maia,30,Anthony Rocco Martin,1,49.9187084502281,0.5652510283997991,53.175
 Demian Maia,31,Ben Askren,1,48.85871316094072,0.5,48.85871316094072,Effective performance,UFC Fight Night: Maia vs. Askren
 Demian Maia,32,Gilbert Burns,0,57.71665927487783,0.6245133459000519,10.118054563348073,Outmatched performance,UFC Fight Night: Lee vs. Oliveira
 Demian Maia,33,Belal Muhammad,0,43.42110224360432,0.5761563170020325,42.385783246285484,High-level competitive fight,UFC 263: Adesanya vs. Vettori 2
-Royce Gracie,1,Patrick Smith,1,,0.59375,,Outmatched performance,UFC 2: No Way Out
-Royce Gracie,2,Remco Pardoel,1,,0.5,,Outmatched performance,UFC 2: No Way Out
-Royce Gracie,3,Jason DeLucia,1,,0.5,,Outmatched performance,UFC 2: No Way Out
-Royce Gracie,4,Minoki Ichihara,1,,0.5,,Outmatched performance,UFC 2: No Way Out
+Royce Gracie,1,Minoki Ichihara,1,,0.5,,Outmatched performance,UFC 2: No Way Out
+Royce Gracie,2,Jason DeLucia,1,,0.5,,Outmatched performance,UFC 2: No Way Out
+Royce Gracie,3,Remco Pardoel,1,,0.5,,Outmatched performance,UFC 2: No Way Out
+Royce Gracie,4,Patrick Smith,1,,0.59375,,Outmatched performance,UFC 2: No Way Out
 Royce Gracie,5,Kimo Leopoldo,1,,0.5,,Outmatched performance,UFC 3: The American Dream
-Royce Gracie,6,Ron van Clief,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
-Royce Gracie,7,Dan Severn,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
-Royce Gracie,8,Keith Hackney,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
+Royce Gracie,6,Dan Severn,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
+Royce Gracie,7,Keith Hackney,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
+Royce Gracie,8,Ron van Clief,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
 Royce Gracie,9,Ken Shamrock,0,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
 Royce Gracie,10,Matt Hughes,0,41.1647957225953,0.7109968887401643,14.177527591762619,Outmatched performance,UFC 60: Hughes vs Gracie
 Damian Stasiak,1,Yaotzin Meza,0,47.685322080677366,0.4220855091704933,39.20141228265262,High-level competitive fight,UFC Fight Night: Gonzaga vs Cro Cop 2
@@ -4753,9 +4753,9 @@ Joey Beltran,7,Lavar Johnson,0,35.162083291114094,0.5,9.282789988854121,Outmatch
 Joey Beltran,8,James Te Huna,0,38.026625598383625,0.5793862997711732,37.24275613758471,High-level competitive fight,UFC on FUEL TV: Munoz vs Weidman
 Joey Beltran,9,Igor Pokrajac,0,46.30436946266607,0.4992130474520805,41.63749317487101,High-level competitive fight,UFC on FX: Sotiropoulos vs Pearson
 Joey Beltran,10,Fabio Maldonado,0,39.73452693036505,0.46645617551776686,34.42822624009182,High-level competitive fight,UFC Fight Night: Maia vs Shields
-Patrick Smith,1,Scott Morris,1,,0.5,,Outmatched performance,UFC 2: No Way Out
-Patrick Smith,2,Ray Wizard,1,,0.5,,Outmatched performance,UFC 2: No Way Out
-Patrick Smith,3,Johnny Rhodes,1,,0.5,,Outmatched performance,UFC 2: No Way Out
+Patrick Smith,1,Ray Wizard,1,,0.5,,Outmatched performance,UFC 2: No Way Out
+Patrick Smith,2,Johnny Rhodes,1,,0.5,,Outmatched performance,UFC 2: No Way Out
+Patrick Smith,3,Scott Morris,1,,0.5,,Outmatched performance,UFC 2: No Way Out
 Patrick Smith,4,Royce Gracie,0,,0.59375,,Outmatched performance,UFC 2: No Way Out
 Patrick Smith,5,Rudyard Moncayo,1,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
 Abu Azaitar,1,Vitor Miranda,1,51.115931791209555,0.48877782170969447,50.542299691173504,Effective performance,UFC Fight Night: Shogun vs. Smith
@@ -6099,9 +6099,9 @@ Zach Reese,8,Michel Pereira,0,45.39656939225284,0.5288705520678444,42.1675364733
 Michel Pereira,16,Shara Magomedov,0,42.95337135040594,0.6269698067290527,44.111815474087614,High-level competitive fight,UFC Fight Night: Fiziev vs. Torres
 Abdul-Kareem Al-Selwady,1,Loik Radzhabov,0,47.33461658574697,0.5,30.720166164149784,Ineffective performance,UFC Fight Night: Rozenstruik vs. Gaziev
 Shem Rock,2,Abdul-Kareem Al-Selwady,0,47.93048822656766,0.5,43.137439403910896,High-level competitive fight,UFC Fight Night: Evloev vs. Murphy
-Marco Ruas,1,Larry Cureton,1,,0.5,,Outmatched performance,UFC 7: The Brawl in Buffalo
+Marco Ruas,1,Remco Pardoel,1,,0.5625,,Outmatched performance,UFC 7: The Brawl in Buffalo
 Marco Ruas,2,Paul Varelans,1,,0.5625,,Outmatched performance,UFC 7: The Brawl in Buffalo
-Marco Ruas,3,Remco Pardoel,1,,0.5625,,Outmatched performance,UFC 7: The Brawl in Buffalo
+Marco Ruas,3,Larry Cureton,1,,0.5,,Outmatched performance,UFC 7: The Brawl in Buffalo
 Marco Ruas,4,Keith Hackney,1,,0.53125,,Outmatched performance,UFC - Ultimate Ultimate '95
 Marco Ruas,5,Oleg Taktarov,0,,0.625,,Outmatched performance,UFC - Ultimate Ultimate '95
 Marco Ruas,6,Maurice Smith,0,60.46383012732869,0.5,18.139149038198607,Outmatched performance,UFC 21: Return of the Champions
@@ -6661,8 +6661,8 @@ Brandon Thatch,3,Benson Henderson,0,43.19773920788937,0.6194150868430407,44.0364
 Brandon Thatch,4,Gunnar Nelson,0,43.1526160687815,0.6041355051153972,8.377340960433498,Outmatched performance,UFC 189: Mendes vs McGregor
 Brandon Thatch,5,Siyar Bahadurzada,0,44.245521892730025,0.4611323146573609,36.026847363648685,High-level competitive fight,UFC 196: McGregor vs Diaz
 Brandon Thatch,6,Niko Price,0,43.074897513884636,0.5,11.630222328748852,Outmatched performance,UFC 207: Nunes vs. Rousey
-Ken Shamrock,1,Christophe Leninger,1,,0.5,,Outmatched performance,UFC 3: The American Dream
-Ken Shamrock,2,Felix Lee Mitchell,1,,0.5,,Outmatched performance,UFC 3: The American Dream
+Ken Shamrock,1,Felix Lee Mitchell,1,,0.5,,Outmatched performance,UFC 3: The American Dream
+Ken Shamrock,2,Christophe Leninger,1,,0.5,,Outmatched performance,UFC 3: The American Dream
 Ken Shamrock,3,Royce Gracie,0,,0.75,,Outmatched performance,UFC 5: The Return of the Beast
 Ken Shamrock,4,Dan Severn,1,,0.625,,Outmatched performance,UFC 6: Clash of the Titans
 Ken Shamrock,5,Oleg Taktarov,0,,0.59375,,Outmatched performance,UFC 7: The Brawl in Buffalo
@@ -7914,8 +7914,8 @@ Elijah Smith,1,Vince Morales,1,49.042860580815365,0.3804284560039281,43.17873001
 Elijah Smith,2,Toshiomi Kazama,1,62.636106581102446,0.45154174544649545,59.600870184154935,Clear elite performance,UFC Fight Night: Dolidze vs. Hernandez
 Elijah Smith,3,SuYoung You,1,48.5034743324709,0.5929702858411944,53.01285620545176,Effective performance,UFC Fight Night: Emmett vs. Vallejos
 Malcolm Wellmaker,4,Juan Diaz,0,52.03693079403146,0.5277515736969761,29.395538611243094,Ineffective performance,UFC Fight Night: Allen vs. Costa
-Remco Pardoel,1,Alberta Cerra Leon,1,,0.5,,Outmatched performance,UFC 2: No Way Out
-Remco Pardoel,2,Orlando Wiet,1,,0.5,,Outmatched performance,UFC 2: No Way Out
+Remco Pardoel,1,Orlando Wiet,1,,0.5,,Outmatched performance,UFC 2: No Way Out
+Remco Pardoel,2,Alberta Cerra Leon,1,,0.5,,Outmatched performance,UFC 2: No Way Out
 Remco Pardoel,3,Royce Gracie,0,,0.59375,,Outmatched performance,UFC 2: No Way Out
 Remco Pardoel,4,Ryan Parker,1,,0.5,,Outmatched performance,UFC 7: The Brawl in Buffalo
 Remco Pardoel,5,Marco Ruas,0,,0.5,,Outmatched performance,UFC 7: The Brawl in Buffalo
@@ -10178,8 +10178,8 @@ Marco Tulio,4,Roman Kopylov,0,42.46019230710363,0.5109979410080906,38.6811477665
 Jerry Bohlander,1,Scott Ferrozzo,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
 Jerry Bohlander,2,Gary Goodridge,0,,0.5,,Outmatched performance,UFC 8: David vs Goliath
 Jerry Bohlander,3,Fabio Gurgel,1,,0.5,,Outmatched performance,UFC 11: The Proving Ground
-Jerry Bohlander,4,Rainy Martinez,1,,0.5,,Outmatched performance,UFC 12: Judgement Day
-Jerry Bohlander,5,Nick Sanzo,1,,0.5,,Outmatched performance,UFC 12: Judgement Day
+Jerry Bohlander,4,Nick Sanzo,1,,0.5,,Outmatched performance,UFC 12: Judgement Day
+Jerry Bohlander,5,Rainy Martinez,1,,0.5,,Outmatched performance,UFC 12: Judgement Day
 Jerry Bohlander,6,Kevin Jackson,1,,0.53125,,Outmatched performance,UFC 16: Battle in the Bayou
 Jerry Bohlander,7,Tito Ortiz,0,,0.5,,Outmatched performance,UFC 18: The Road to the Heavyweight Title
 Levan Makashvili,1,Mark Eddiva,1,52.58805288808835,0.5,52.58805288808835,Effective performance,UFC Fight Night: Edgar vs Faber
@@ -10366,8 +10366,8 @@ Claudio Ribeiro,2,Joseph Holmes,1,52.92218600593825,0.4680237478845351,51.229932
 Claudio Ribeiro,3,Roman Kopylov,0,45.8716257223451,0.49220000698665894,15.142865972287309,Outmatched performance,UFC 291: Poirier vs. Gaethje 2
 Claudio Ribeiro,4,Christian Leroy Duncan,0,34.94197399239152,0.5326818026141501,15.099914391089152,Outmatched performance,UFC Fight Night: Rozenstruik vs. Gaziev
 Scott Ferrozzo,1,Jerry Bohlander,0,,0.5,,Outmatched performance,UFC 8: David vs Goliath
-Scott Ferrozzo,2,Sam Fulton,1,,0.5,,Outmatched performance,UFC 11: The Proving Ground
-Scott Ferrozzo,3,David Abbott,1,,0.5625,,Outmatched performance,UFC 11: The Proving Ground
+Scott Ferrozzo,2,David Abbott,1,,0.5625,,Outmatched performance,UFC 11: The Proving Ground
+Scott Ferrozzo,3,Sam Fulton,1,,0.5,,Outmatched performance,UFC 11: The Proving Ground
 Scott Ferrozzo,4,Jim Mullen,1,,0.5,,Outmatched performance,UFC 12: Judgement Day
 Scott Ferrozzo,5,Vitor Belfort,0,,0.5,,Outmatched performance,UFC 12: Judgement Day
 CJ Fernandes,1,Brad Gumm,0,55.91250532950926,0.5,33.54750319770555,High-level competitive fight,UFC 27: Ultimate Bad Boyz
@@ -10604,8 +10604,8 @@ Justin Salas,6,Joe Proctor,0,41.87304493984969,0.5182418070784371,21.65993032210
 Justin Salas,7,Jason Saggo,0,45.16782972650635,0.5,12.240481855883221,Outmatched performance,UFC 196: McGregor vs Diaz
 Ricky Rainey,1,Muslim Salikhov,0,40.86613567473637,0.5,22.558106892454475,Outmatched performance,UFC Fight Night: Poirier vs. Gaethje
 Ricky Rainey,2,Tim Means,0,36.97180519655174,0.5052871246861383,2.9007419324730046,Outmatched performance,The Ultimate Fighter: Heavy Hitters Finale
-Kazushi Sakuraba,1,Marcus Silveira,0,,0.5,,Outmatched performance,UFC - Ultimate Japan
-Kazushi Sakuraba,2,Marcus Silveira,1,,0.5,,Outmatched performance,UFC - Ultimate Japan
+Kazushi Sakuraba,1,Marcus Silveira,1,,0.5,,Outmatched performance,UFC - Ultimate Japan
+Kazushi Sakuraba,2,Marcus Silveira,0,,0.5,,Outmatched performance,UFC - Ultimate Japan
 Todd Brown,1,Tim Boetsch,0,40.79901555679132,0.4882612722087639,36.24018546334061,High-level competitive fight,UFC 117: Silva vs Sonnen
 Todd Brown,2,Igor Pokrajac,0,46.04076666738986,0.42707778129633667,12.693098381482379,Outmatched performance,UFC Live: Sanchez vs Kampmann
 Paul Taylor,1,Edilberto de Oliveira,1,46.9494139045698,0.5,46.9494139045698,High-level competitive fight,UFC 70: Nations Collide
@@ -10851,8 +10851,8 @@ Shannon Gugerty,2,Spencer Fisher,0,48.021544193732446,0.5633758821139205,42.9729
 Shannon Gugerty,3,Matt Grice,1,48.620254219588254,0.47888121017773333,47.593453289619596,High-level competitive fight,UFC 100
 Shannon Gugerty,4,Terry Etim,0,42.65319205018317,0.543874451094491,17.177283513085676,Outmatched performance,UFC 105: Couture vs Vera
 Shannon Gugerty,5,Clay Guida,0,36.78863952703952,0.5019804664454979,19.172188672285642,Outmatched performance,UFC Live: Vera vs Jones
-Kenichi Yamamoto,1,Daiju Takase,1,56.267953124148896,0.5,56.267953124148896,Effective performance,UFC 23: Ultimate Japan 2
-Kenichi Yamamoto,2,Katsuhisa Fujii,1,39.619245983044046,0.5,39.619245983044046,High-level competitive fight,UFC 23: Ultimate Japan 2
+Kenichi Yamamoto,1,Katsuhisa Fujii,1,39.619245983044046,0.5,39.619245983044046,High-level competitive fight,UFC 23: Ultimate Japan 2
+Kenichi Yamamoto,2,Daiju Takase,1,56.267953124148896,0.5,56.267953124148896,Effective performance,UFC 23: Ultimate Japan 2
 Kenichi Yamamoto,3,Pat Miletich,0,38.6120557016166,0.6896053101875599,19.54006065403447,Outmatched performance,UFC 29: Defense of the Belts
 Regina Tarin,1,Ernesta Kareckaite,1,47.5715045954812,0.5,47.5715045954812,High-level competitive fight,UFC Fight Night: Moreno vs. Kavanagh
 Klaudia Sygula,1,Melissa Mullins,0,40.80177076395408,0.5,15.504672890302551,Outmatched performance,UFC Fight Night: Magny vs. Prates
@@ -10900,8 +10900,8 @@ Justin Scoggins,6,Ray Borg,1,53.02663536678677,0.586556486536556,57.616434616990
 Justin Scoggins,7,Pedro Munhoz,0,46.68429033545148,0.45586775034027543,18.423961218265084,Outmatched performance,UFC Fight Night: Bader vs. Nogueira
 Justin Scoggins,8,Yuta Sasaki,0,50.59404253900872,0.4523370044183426,23.90940461655259,Ineffective performance,UFC Fight Night: Holm vs. Correia
 Justin Scoggins,9,Said Nurmagomedov,0,39.204852082635774,0.5,35.284366874372196,High-level competitive fight,UFC Fight Night: Dos Santos vs. Ivanov
-Dave Beneteau,1,Asbel Cancio,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
-Dave Beneteau,2,Todd Medina,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
+Dave Beneteau,1,Todd Medina,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
+Dave Beneteau,2,Asbel Cancio,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
 Dave Beneteau,3,Dan Severn,0,,0.59375,,Outmatched performance,UFC 5: The Return of the Beast
 Dave Beneteau,4,Oleg Taktarov,0,,0.5625,,Outmatched performance,UFC 6: Clash of the Titans
 Dave Beneteau,5,Oleg Taktarov,0,,0.625,,Outmatched performance,UFC - Ultimate Ultimate '95
@@ -11399,8 +11399,8 @@ Julija Stoliarenko,6,Chelsea Chandler,0,42.761742640813836,0.5,10.90424437340752
 Julija Stoliarenko,7,Molly McCann,1,49.72449424367883,0.5305632338294564,51.244235588299844,Effective performance,UFC Fight Night: Aspinall vs. Tybura
 Julija Stoliarenko,8,Luana Carolina,0,41.00297401643128,0.5142878150897234,37.1552882409911,High-level competitive fight,UFC Fight Night: Dolidze vs. Imavov
 Julija Stoliarenko,9,Gabriella Fernandes,0,41.12132526977602,0.4803058097788742,36.19934154079067,High-level competitive fight,UFC Fight Night: Dolidze vs. Hernandez
-Mark Kerr,1,Dan Bobish,1,,0.5,,Outmatched performance,UFC 14: Showdown
-Mark Kerr,2,Moti Horenstein,1,,0.5,,Outmatched performance,UFC 14: Showdown
+Mark Kerr,1,Moti Horenstein,1,,0.5,,Outmatched performance,UFC 14: Showdown
+Mark Kerr,2,Dan Bobish,1,,0.5,,Outmatched performance,UFC 14: Showdown
 Mark Kerr,3,Greg Stott,1,,0.5,,Outmatched performance,UFC 15: Collision Course
 Mark Kerr,4,Dwayne Cason,1,,0.5,,Outmatched performance,UFC 15: Collision Course
 Rob Broughton,1,Vinicius Queiroz,1,52.435267130066514,0.5,52.435267130066514,Effective performance,UFC 120: Bisping vs Akiyama
@@ -12125,15 +12125,15 @@ Jason Miller,3,CB Dollaway,0,40.416040897767914,0.5320412887427619,37.6694188442
 Chris Saunders,1,Myles Jury,0,44.98821429198825,0.5,10.932136072953146,Outmatched performance,The Ultimate Fighter: Live Finale
 Jose Maria,1,John Lineker,0,42.53033443260544,0.525536509348865,15.87656216645137,Outmatched performance,UFC 163: Aldo vs Jung
 Jose Maria,2,Dustin Ortiz,0,44.34908378048588,0.5,35.434917940608216,High-level competitive fight,UFC Fight Night: Belfort vs Henderson 2
-David Abbott,1,John Matua,1,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
-David Abbott,2,Paul Varelans,1,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
+David Abbott,1,Paul Varelans,1,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
+David Abbott,2,John Matua,1,,0.5,,Outmatched performance,UFC 6: Clash of the Titans
 David Abbott,3,Oleg Taktarov,0,,0.5625,,Outmatched performance,UFC 6: Clash of the Titans
 David Abbott,4,Steve Jennum,1,,0.5,,Outmatched performance,UFC - Ultimate Ultimate '95
 David Abbott,5,Dan Severn,0,,0.6388888888888888,,Outmatched performance,UFC - Ultimate Ultimate '95
 David Abbott,6,Sam Adkins,1,,0.53125,,Outmatched performance,UFC 11: The Proving Ground
 David Abbott,7,Scott Ferrozzo,0,,0.5,,Outmatched performance,UFC 11: The Proving Ground
-David Abbott,8,Steve Nelmark,1,,0.5,,Outmatched performance,UFC - Ultimate Ultimate '96
-David Abbott,9,Cal Worsham,1,,0.5,,Outmatched performance,UFC - Ultimate Ultimate '96
+David Abbott,8,Cal Worsham,1,,0.5,,Outmatched performance,UFC - Ultimate Ultimate '96
+David Abbott,9,Steve Nelmark,1,,0.5,,Outmatched performance,UFC - Ultimate Ultimate '96
 David Abbott,10,Don Frye,0,,0.6944444444444444,,Outmatched performance,UFC - Ultimate Ultimate '96
 David Abbott,11,Vitor Belfort,0,,0.5,,Outmatched performance,UFC 13: The Ultimate Force
 David Abbott,12,Maurice Smith,0,,0.5,,Outmatched performance,UFC 15: Collision Course
@@ -13334,16 +13334,16 @@ Tai Tuivasa,15,Marcin Tybura,0,45.228020744025706,0.5464696657128544,11.79569279
 Tai Tuivasa,16,Jairzinho Rozenstruik,0,37.7014013194636,0.5568976155050116,36.076381023792216,High-level competitive fight,UFC 305: Du Plessis vs. Adesanya
 Tallison Teixeira,3,Tai Tuivasa,1,48.948303317903644,0.5,48.948303317903644,Effective performance,UFC 325: Volkanovski vs. Lopes 2
 Louie Sutherland,3,Tai Tuivasa,1,45.35427107084024,0.5,45.35427107084024,High-level competitive fight,UFC Fight Night: Della Maddalena vs. Prates
-Dan Severn,1,Marcus Bossett,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
-Dan Severn,2,Anthony Macias,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
+Dan Severn,1,Anthony Macias,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
+Dan Severn,2,Marcus Bossett,1,,0.5,,Outmatched performance,UFC 4: Revenge of the Warriors
 Dan Severn,3,Royce Gracie,0,,0.71875,,Outmatched performance,UFC 4: Revenge of the Warriors
-Dan Severn,4,Joe Charles,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
+Dan Severn,4,Dave Beneteau,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
 Dan Severn,5,Oleg Taktarov,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
-Dan Severn,6,Dave Beneteau,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
+Dan Severn,6,Joe Charles,1,,0.5,,Outmatched performance,UFC 5: The Return of the Beast
 Dan Severn,7,Ken Shamrock,0,,0.53125,,Outmatched performance,UFC 6: Clash of the Titans
-Dan Severn,8,Oleg Taktarov,1,,0.625,,Outmatched performance,UFC - Ultimate Ultimate '95
+Dan Severn,8,David Abbott,1,,0.5625,,Outmatched performance,UFC - Ultimate Ultimate '95
 Dan Severn,9,Paul Varelans,1,,0.53125,,Outmatched performance,UFC - Ultimate Ultimate '95
-Dan Severn,10,David Abbott,1,,0.5625,,Outmatched performance,UFC - Ultimate Ultimate '95
+Dan Severn,10,Oleg Taktarov,1,,0.625,,Outmatched performance,UFC - Ultimate Ultimate '95
 Dan Severn,11,Ken Shamrock,1,,0.5625,,Outmatched performance,UFC 9: Motor City Madness
 Dan Severn,12,Mark Coleman,0,,0.65625,,Outmatched performance,UFC 12: Judgement Day
 Dan Severn,13,Pedro Rizzo,0,37.31899741821131,0.562064523305015,3.710005957675164,Outmatched performance,UFC 27: Ultimate Bad Boyz
@@ -17229,8 +17229,8 @@ Josh Emmett,16,Youssef Zalal,0,,0.5635542531297894,,Outmatched performance,UFC 3
 Kevin Vallejos,4,Josh Emmett,1,36.68734324241238,0.5882989626554196,39.92679759330071,High-level competitive fight,UFC Fight Night: Emmett vs. Vallejos
 Torrez Finney,1,Robert Valentin,1,59.67211739889226,0.5,59.67211739889226,Clear elite performance,UFC Fight Night: Emmett vs. Murphy
 Torrez Finney,2,Jacob Malkoun,0,37.56747031962246,0.527808591515072,34.855421724033185,High-level competitive fight,UFC 325: Volkanovski vs. Lopes 2
-Gary Goodridge,1,Paul Herrera,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
-Gary Goodridge,2,Jerry Bohlander,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
+Gary Goodridge,1,Jerry Bohlander,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
+Gary Goodridge,2,Paul Herrera,1,,0.5,,Outmatched performance,UFC 8: David vs Goliath
 Gary Goodridge,3,Don Frye,0,,0.5,,Outmatched performance,UFC 8: David vs Goliath
 Gary Goodridge,4,Mark Schultz,0,,0.5,,Outmatched performance,UFC 9: Motor City Madness
 Gary Goodridge,5,John Campetella,1,,0.5,,Outmatched performance,UFC 10: The Tournament
