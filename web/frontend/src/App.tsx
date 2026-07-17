@@ -1,5 +1,5 @@
 import { Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import PredictorPage from "./pages/PredictorPage";
 import LoginPage from "./pages/LoginPage";
@@ -27,6 +27,7 @@ export default function App() {
   // the logged-in user's email, or null when logged out
   const [email, setEmail] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null); // wraps the username button + dropdown
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -36,6 +37,18 @@ export default function App() {
       .then((u) => setEmail(u.email))
       .catch(() => setEmail(null));
   }, [location.pathname]);
+
+  // close the user dropdown when clicking anywhere outside it
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [menuOpen]);
 
   async function handleLogout() {
     await logout();
@@ -53,13 +66,12 @@ export default function App() {
           <Link to="/fighters">Fighter Cards</Link>
           <Link to="/prediction-game">Casual Checker</Link>
           <Link to="/leaderboard">Leaderboard</Link>
-          <Link to="/friends">Friends</Link>
           <Link to="/rooms">Rooms</Link>
           <Link to="/top-career">Top Career</Link>
         </div>
         <div className="nav-right">
           {email ? (
-            <div className="relative">
+            <div className="relative" ref={menuRef}>
               <button
                 className="nav-email cursor-pointer"
                 onClick={() => setMenuOpen((o) => !o)}
@@ -68,6 +80,13 @@ export default function App() {
               </button>
               {menuOpen && (
                 <div className="absolute right-0 z-50 mt-2 w-40 rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">
+                  <Link
+                    to="/friends"
+                    className="block w-full px-4 py-2 text-left text-sm text-white hover:bg-zinc-800"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Friends
+                  </Link>
                   <button
                     className="block w-full px-4 py-2 text-left text-sm text-white hover:bg-zinc-800"
                     onClick={handleLogout}
