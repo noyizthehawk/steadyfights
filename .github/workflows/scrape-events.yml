@@ -1,0 +1,19 @@
+name: Scrape upcoming events
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # every day 09:00 UTC
+  workflow_dispatch: # manual "Run workflow" button for testing
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      # No checkout / Python needed: the Railway server does the scraping.
+      # This job just knocks on the admin endpoint with the shared secret.
+      # -f makes curl exit non-zero on HTTP errors so a 401/500 turns the run red.
+      - name: Call scrape-events endpoint
+        run: |
+          curl -f -X POST "${{ secrets.BACKEND_URL }}/api/scrape-events" \
+            -H "x-settle-token: ${{ secrets.SETTLE_SECRET }}" \
+            --max-time 600

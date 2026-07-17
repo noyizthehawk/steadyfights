@@ -1,0 +1,32 @@
+name: Settle finished events
+
+on:
+  schedule:
+    - cron: '0 10 * * 0' # Sundays 10:00 UTC, after Saturday-night cards end
+  workflow_dispatch: # manual "Run workflow" button for testing
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # The winner scrape renders ufc.com with Playwright (the results are
+      # JS-rendered), so this runner needs a real browser installed.
+      - name: Install Playwright browser
+        run: playwright install --with-deps chromium
+
+      # Talks directly to the Railway Postgres (public URL) — same code path
+      # as running `python -m web.backend.settle` on your laptop.
+      - name: Run settle
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -m web.backend.settle
