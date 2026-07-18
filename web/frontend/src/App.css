@@ -392,3 +392,68 @@ h1 {
   color: #9a9aa2;
   padding: 0.5rem 0;
 }
+
+/* ---- Footer ---------------------------------------------------------- */
+/* #root becomes a full-height column so the footer's margin-top: auto
+   pushes it to the bottom even on short pages (login, cancel, etc.). */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.footer {
+  margin-top: auto;
+  padding: 2rem 1.5rem 1.25rem;
+  border-top: 1px solid #2e303a;
+}
+
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap; /* stacks brand over links on narrow phones */
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.footer-logo {
+  color: #e7e7ea;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.footer-tagline {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.footer-links {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.footer-links a {
+  color: #e7e7ea;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.footer-links a:hover {
+  color: #d33a2c; /* same hover red as the top nav */
+}
+
+.footer-legal {
+  max-width: 960px;
+  margin: 1.5rem auto 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.footer-legal p {
+  margin: 0.25rem 0;
+}

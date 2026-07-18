@@ -22,6 +22,7 @@ import CoinsPage from "./pages/CoinsPage";
 import CoinsSuccessPage from "./pages/CoinsSuccessPage";
 import CoinsCancelPage from "./pages/CoinsCancelPage";
 import { me, logout } from "./api";
+import Footer from "./components/Footer";
 
 export default function App() {
   // the logged-in user's email, or null when logged out
@@ -130,6 +131,8 @@ export default function App() {
         <Route path="/top-career" element={<TopCareerPage />} />
         <Route path="/predictor" element={<PredictorPage />} />
       </Routes>
+
+      <Footer />
     </>
   );
 }
