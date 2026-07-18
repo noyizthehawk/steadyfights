@@ -28,6 +28,8 @@ client = ApifyClient(UFC_API_KEY)
 SETTLE_SECRET = os.getenv("SETTLE_SECRET")
 stripe.api_key = os.getenv("STRIPE_API_KEY")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID")
-FRONTEND_URL = "http://localhost:5173"
+# Where Stripe sends users back after checkout. In prod (FastAPI serves the
+# frontend) this is the app's own public URL — set FRONTEND_URL on Railway.
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")

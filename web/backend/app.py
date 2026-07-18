@@ -2,9 +2,12 @@
 router. The actual endpoint logic lives in the routers/ package; scraping and
 settling live in scraping.py; shared deps in dependencies.py."""
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from part_2 import Prediction_model as model
 from .database import Base, engine
@@ -18,11 +21,6 @@ async def lifespan(app: FastAPI):
     # empty Postgres) it builds the whole schema. Runs before model.train() so a
     # bad DB connection fails fast instead of after minutes of training.
     Base.metadata.create_all(bind=engine)
-    # TEMP DEBUG (remove once cron auth works): fingerprint of the admin secret
-    # as this process sees it — length + edges only, never the full value.
-    import os
-    _s = os.getenv("SETTLE_SECRET")
-    print(f"SETTLE_SECRET: {'NOT SET' if not _s else f'{len(_s)} chars, {_s[:2]}..{_s[-2:]}'}")
     print("Training model (one time, please wait)...")
     model.train()
     print("Model ready. API is live.")
@@ -58,3 +56,24 @@ app.include_router(admin.router)
 app.include_router(profile.router)
 app.include_router(coins.router)
 app.include_router(groups.router)
+
+
+# ---- Serve the built React frontend (production) ----------------------------
+# `npm run build` outputs web/frontend/dist. In prod, FastAPI serves those files
+# from the SAME origin as the API, so no CORS / separate host is needed. Routes
+# are matched in registration order, so every /api/... above wins first; this
+# catch-all only sees what's left. Unknown paths get index.html because React
+# Router owns the URL bar client-side — a refresh on /leaderboard must load the
+# app shell, not 404. In dev this block is inert (Vite serves the frontend).
+FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+
+if FRONTEND_DIST.is_dir():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_frontend(full_path: str):
+        candidate = FRONTEND_DIST / full_path
+        # real file at top level (favicon, poster images, etc.)? serve it as-is
+        if full_path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(FRONTEND_DIST / "index.html")

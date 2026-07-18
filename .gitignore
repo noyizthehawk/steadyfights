@@ -9,7 +9,8 @@ __pycache__/
 
 # Node / frontend
 web/frontend/node_modules/
-web/frontend/dist/
+# dist/ IS committed on purpose: Railway serves it via FastAPI and doesn't run
+# npm. Rule: rebuild (npm run build) before pushing frontend changes.
 
 # Env / secrets
 .env

@@ -8,7 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# dist is committed on purpose (FastAPI serves it in prod; Railway doesn't run npm)
 dist-ssr
 *.local
 

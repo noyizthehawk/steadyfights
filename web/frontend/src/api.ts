@@ -1,5 +1,8 @@
 
-const BASE_URL = "http://localhost:8000";
+// Dev: Vite serves the app on :5173, so API calls must cross to :8000.
+// Prod: FastAPI serves both the app and the API from ONE origin, so requests
+// use a relative path ("" = same domain the page loaded from).
+const BASE_URL = import.meta.env.DEV ? "http://localhost:8000" : "";
 interface GroupCreate {
   name: string;
   entry_fee: number;   // coins, matches the backend
