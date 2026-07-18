@@ -18,6 +18,11 @@ async def lifespan(app: FastAPI):
     # empty Postgres) it builds the whole schema. Runs before model.train() so a
     # bad DB connection fails fast instead of after minutes of training.
     Base.metadata.create_all(bind=engine)
+    # TEMP DEBUG (remove once cron auth works): fingerprint of the admin secret
+    # as this process sees it — length + edges only, never the full value.
+    import os
+    _s = os.getenv("SETTLE_SECRET")
+    print(f"SETTLE_SECRET: {'NOT SET' if not _s else f'{len(_s)} chars, {_s[:2]}..{_s[-2:]}'}")
     print("Training model (one time, please wait)...")
     model.train()
     print("Model ready. API is live.")
