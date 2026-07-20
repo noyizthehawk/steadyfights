@@ -20,12 +20,13 @@ def get_news(q: str = "UFC"):
 
     # serve cached news if present; on a miss OR a Redis outage, fall through to
     # the live API so the cache is never a hard dependency.
-    try:
-        cached = redis_client.get(cache_key)
-        if cached is not None:
-            return json.loads(cached)
-    except RedisError:
-        pass
+    if redis_client is not None:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached is not None:
+                return json.loads(cached)
+        except RedisError:
+            pass    # don't leak Redis errors
 
     query = q if "ufc" in q.lower() else f"{q} UFC"   # keep results on-topic
     try:
@@ -54,9 +55,10 @@ def get_news(q: str = "UFC"):
     }
 
     # cache only successful responses (the 502/503 paths above never reach here)
-    try:
-        redis_client.set(cache_key, json.dumps(payload), ex=NEWS_TTL)
-    except RedisError:
-        pass
+    if redis_client is not None:
+        try:
+            redis_client.set(cache_key, json.dumps(payload), ex=NEWS_TTL)
+        except RedisError:
+            pass
 
     return payload

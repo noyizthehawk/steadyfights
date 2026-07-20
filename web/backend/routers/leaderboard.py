@@ -18,21 +18,20 @@ def leaderboard(db: DBDep, limit: int = 50):
     """Worldwide leaderboard.ranked by winrate over settled fights."""
     cache_key = f"leaderboard:{limit}"
 
-    #never make redis calls, cache a hard dependency
-    try:
-        cached = redis_client.get(cache_key)
-        if cached is not None:
-            return {"leaderboard": json.loads(cached)}
-    except RedisError:
-        pass
+    if redis_client is not None:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached is not None:
+                return {"leaderboard": json.loads(cached)}
+        except RedisError:
+            pass
 
-    # full sorted board, then trim to the requested page size
     result = compute_leaderboard(db)[:limit]
 
-    # best-effort cache write — a Redis failure must not break the response
-    try:
-        redis_client.set(cache_key, json.dumps(result), ex=LEADERBOARD_TTL)
-    except RedisError:
-        pass
+    if redis_client is not None:
+        try:
+            redis_client.set(cache_key, json.dumps(result), ex=LEADERBOARD_TTL)
+        except RedisError:
+            pass
 
     return {"leaderboard": result}

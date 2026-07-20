@@ -1,8 +1,14 @@
 import redis
 import os
 
-redis_client = redis.Redis(
-    host=os.getenv("REDIS_HOST", "localhost"),
-    port=int(os.getenv("REDIS_PORT", 6379)),
-    decode_responses=True,   # returns strings instead of bytes
+REDIS_URL = os.getenv("REDIS_URL")
+redis_client = (
+    redis.from_url(
+        REDIS_URL,
+        decode_responses=True,
+        socket_connect_timeout=0.2,  # max wait to establish a connection
+        socket_timeout=0.5,          # max wait for any get/set to answer
+    )
+    if REDIS_URL
+    else None
 )
