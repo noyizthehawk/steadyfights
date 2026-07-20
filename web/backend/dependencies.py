@@ -21,6 +21,8 @@ DBDep = Annotated[Session, Depends(get_db)]
 def rate_limit(name: str, limit: int, window: int):
     # rate limit with redis, we use incr to increment counter
     def dependency(request: Request):
+        if redis_client is None:
+            return
         ip = request.client.host
         key = f"ratelimit:{name}:{ip}"
         try:
