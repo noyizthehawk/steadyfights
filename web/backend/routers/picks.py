@@ -10,6 +10,8 @@ from ..schemas import PickRequest
 
 router = APIRouter()
 
+EARLY_START_BUFFER = 5 * 3600  # seconds; picks lock this long before UFC's listed time
+
 
 @router.post("/api/picks")
 def make_pick(req: PickRequest, db: DBDep, user: User = Depends(get_curr_user)):
@@ -22,8 +24,9 @@ def make_pick(req: PickRequest, db: DBDep, user: User = Depends(get_curr_user)):
     if req.picked not in (fight.fighter_a, fight.fighter_b):
         raise HTTPException(status_code=400, detail="Picked fighter is not in this fight")
 
-    # Picks lock at the event's start time
-    if fight.event and fight.event.date and fight.event.date <= int(time.time()):
+    # Picks lock EARLY_START_BUFFER before the listed main-card time, since
+    # prelims (and thus real fights) start hours before UFC's advertised time.
+    if fight.event and fight.event.date and (fight.event.date - EARLY_START_BUFFER) <= int(time.time()):
         raise HTTPException(status_code=403, detail="Picks are locked for this event")
 
     # Upsert: update the existing pick, or insert a new one
