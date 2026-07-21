@@ -58,13 +58,7 @@ app.include_router(coins.router)
 app.include_router(groups.router)
 
 
-# ---- Serve the built React frontend (production) ----------------------------
-# `npm run build` outputs web/frontend/dist. In prod, FastAPI serves those files
-# from the SAME origin as the API, so no CORS / separate host is needed. Routes
-# are matched in registration order, so every /api/... above wins first; this
-# catch-all only sees what's left. Unknown paths get index.html because React
-# Router owns the URL bar client-side — a refresh on /leaderboard must load the
-# app shell, not 404. In dev this block is inert (Vite serves the frontend).
+
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"
 
 if FRONTEND_DIST.is_dir():
@@ -73,7 +67,7 @@ if FRONTEND_DIST.is_dir():
     @app.get("/{full_path:path}", include_in_schema=False)
     def serve_frontend(full_path: str):
         candidate = FRONTEND_DIST / full_path
-        # real file at top level (favicon, poster images, etc.)? serve it as-is
+      
         if full_path and candidate.is_file():
             return FileResponse(candidate)
         return FileResponse(FRONTEND_DIST / "index.html")

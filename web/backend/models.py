@@ -49,7 +49,7 @@ class Pick(Base):
 
     fight = relationship("UFCFight")
 
-    __table_args__ = (UniqueConstraint("user_id", "fight_id", name="uq_user_fight"),)
+    __table_args__ = (UniqueConstraint("user_id", "fight_id", name="uq_user_fight"),) # a user can't pick twice
 
 
 class Friendship(Base):

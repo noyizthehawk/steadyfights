@@ -24,11 +24,25 @@ import CoinsCancelPage from "./pages/CoinsCancelPage";
 import { me, logout } from "./api";
 import Footer from "./components/Footer";
 
+// The main page links, defined once and rendered in TWO places: the horizontal
+// desktop row and the mobile hamburger dropdown. Editing this array updates both.
+const navLinks = [
+  { to: "/", label: "Home" },
+  { to: "/predictor", label: "Predictor" },
+  { to: "/fighters", label: "Fighter Cards" },
+  { to: "/prediction-game", label: "Casual Checker" },
+  { to: "/leaderboard", label: "Leaderboard" },
+  { to: "/rooms", label: "Rooms" },
+  { to: "/top-career", label: "Top Career" },
+];
+
 export default function App() {
   // the logged-in user's email, or null when logged out
   const [email, setEmail] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null); // wraps the username button + dropdown
+  const [navOpen, setNavOpen] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null); // wraps the hamburger button + mobile menu
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -51,6 +65,18 @@ export default function App() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [menuOpen]);
 
+  // same click-outside behavior for the mobile nav dropdown
+  useEffect(() => {
+    if (!navOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setNavOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [navOpen]);
+
   async function handleLogout() {
     await logout();
     setEmail(null);
@@ -61,14 +87,38 @@ export default function App() {
   return (
     <>
       <nav className="nav">
+        {/* Mobile only (CSS hides it above 768px): hamburger + dropdown */}
+        <div className="nav-mobile" ref={navRef}>
+          <button
+            className="nav-hamburger"
+            onClick={() => setNavOpen((o) => !o)}
+            aria-label="Toggle navigation menu"
+          >
+            ☰
+          </button>
+          {navOpen && (
+            <div className="absolute left-0 z-50 mt-2 w-48 rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">
+              {navLinks.map((l) => (
+                <Link
+                  key={l.to}
+                  to={l.to}
+                  className="block w-full px-4 py-2 text-left text-sm text-white hover:bg-zinc-800"
+                  onClick={() => setNavOpen(false)}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop only (CSS hides it below 768px): the horizontal link row */}
         <div className="nav-left">
-          <Link to="/">Home</Link>
-          <Link to="/predictor">Predictor</Link>
-          <Link to="/fighters">Fighter Cards</Link>
-          <Link to="/prediction-game">Casual Checker</Link>
-          <Link to="/leaderboard">Leaderboard</Link>
-          <Link to="/rooms">Rooms</Link>
-          <Link to="/top-career">Top Career</Link>
+          {navLinks.map((l) => (
+            <Link key={l.to} to={l.to}>
+              {l.label}
+            </Link>
+          ))}
         </div>
         <div className="nav-right">
           {email ? (

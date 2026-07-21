@@ -12,6 +12,24 @@
   align-items: center;
 }
 
+/* The hamburger wrapper is hidden on desktop; position:relative anchors the
+   absolutely-positioned dropdown to it. The media query at the bottom of this
+   file flips .nav-left and .nav-mobile at the 768px phone breakpoint. */
+.nav-mobile {
+  display: none;
+  position: relative;
+}
+
+.nav-hamburger {
+  background: none;
+  border: none;
+  color: #e7e7ea;
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+
 .nav a {
   color: #e7e7ea;
   text-decoration: none;
@@ -456,4 +474,15 @@ h1 {
 
 .footer-legal p {
   margin: 0.25rem 0;
+}
+
+/* ---- Mobile nav breakpoint ------------------------------------------- */
+/* Below 768px: hide the horizontal link row, show the hamburger instead. */
+@media (max-width: 768px) {
+  .nav-left {
+    display: none;
+  }
+  .nav-mobile {
+    display: block;
+  }
 }
