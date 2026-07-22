@@ -54,49 +54,55 @@ export default function EventDetailPage() {
                     const pickedA = picks[fight.id] === fight.fighter_a;
                     const pickedB = picks[fight.id] === fight.fighter_b;
                     return (
+                    // Each fighter is a self-contained column (avatar, name, odds, its own
+                    // PICK button) with "vs" between them, so the two sides stay aligned at
+                    // any width instead of collapsing into one cramped flex row on a phone.
                     <li
                         key={fight.id}
-                        className="flex items-center justify-between gap-4 rounded-lg bg-zinc-800 p-4 text-white"
+                        className="grid grid-cols-[1fr_auto_1fr] items-start gap-2 rounded-lg bg-zinc-800 p-3 text-white sm:gap-4 sm:p-4"
                     >
                         {/* fighter a */}
-                        <div className="flex flex-1 items-center gap-3">
+                        <div className="flex min-w-0 flex-col items-center gap-2 sm:flex-row sm:items-center sm:gap-3">
                             {fight.img_a && (
-                                <img src={fight.img_a} alt={fight.fighter_a} className="h-16 w-16 rounded-full object-cover object-top" />
+                                // shrink-0 keeps the box square — without it flex squeezes the
+                                // width and object-cover crops a full-body sliver.
+                                <img src={fight.img_a} alt={fight.fighter_a} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
                             )}
-                            <div>
-                                <p className="font-semibold">{fight.fighter_a}</p>
+                            <div className="min-w-0 text-center sm:text-left">
+                                <p className="truncate text-sm font-semibold sm:text-base">{fight.fighter_a}</p>
                                 <p className="text-xs text-zinc-400">{fight.odds_a ?? "—"}</p>
                             </div>
                         </div>
 
-                        {/* pick A */}
+                        <span className="self-center text-zinc-500">vs</span>
+
+                        {/* fighter B */}
+                        <div className="flex min-w-0 flex-col items-center gap-2 sm:flex-row-reverse sm:items-center sm:gap-3">
+                            {fight.img_b && (
+                                <img src={fight.img_b} alt={fight.fighter_b} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
+                            )}
+                            <div className="min-w-0 text-center sm:text-right">
+                                <p className="truncate text-sm font-semibold sm:text-base">{fight.fighter_b}</p>
+                                <p className="text-xs text-zinc-400">{fight.odds_b ?? "—"}</p>
+                            </div>
+                        </div>
+
+                        {/* pick A / pick B sit under their own fighter */}
                         <button
                             onClick={() => handlePick(fight.id, fight.fighter_a)}
-                            className={`btn rounded px-3 py-1 text-sm font-display ${pickedA ? "bg-red-600" : "bg-zinc-700 hover:bg-red-600"}`}
+                            className={`btn w-full rounded px-3 py-1 text-sm font-display ${pickedA ? "bg-red-600" : "bg-zinc-700 hover:bg-red-600"}`}
                         >
                             {pickedA ? "PICKED" : "PICK"}
                         </button>
 
-                        <span className="text-zinc-500">vs</span>
+                        <span aria-hidden="true" />
 
-                        {/* pick B */}
                         <button
                             onClick={() => handlePick(fight.id, fight.fighter_b)}
-                            className={`btn rounded px-3 py-1 text-sm font-display ${pickedB ? "bg-blue-600" : "bg-zinc-700 hover:bg-blue-600"}`}
+                            className={`btn w-full rounded px-3 py-1 text-sm font-display ${pickedB ? "bg-blue-600" : "bg-zinc-700 hover:bg-blue-600"}`}
                         >
                             {pickedB ? "PICKED" : "PICK"}
                         </button>
-
-                        {/* fighter B */}
-                        <div className="flex flex-1 items-center justify-end gap-3 text-right">
-                            <div>
-                                <p className="font-semibold">{fight.fighter_b}</p>
-                                <p className="text-xs text-zinc-400">{fight.odds_b ?? "—"}</p>
-                            </div>
-                            {fight.img_b && (
-                                <img src={fight.img_b} alt={fight.fighter_b} className="h-16 w-16 rounded-full object-cover object-top" />
-                            )}
-                        </div>
                     </li>
                     );
                 })}
