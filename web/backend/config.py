@@ -24,6 +24,10 @@ newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
 UFC_API_KEY = os.getenv("UFC_API_KEY")
 client = ApifyClient(UFC_API_KEY)
 
+
+
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() in ("true", "1", "yes")
+
 # Admin / billing
 SETTLE_SECRET = os.getenv("SETTLE_SECRET")
 stripe.api_key = os.getenv("STRIPE_API_KEY")

@@ -22,6 +22,10 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
+#dummy hash to equalize timing
+DUMMY_HASH = pwd_context.hash("dummy_password_to_equalize_timing")
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
