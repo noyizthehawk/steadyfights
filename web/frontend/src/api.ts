@@ -154,8 +154,8 @@ export type TopCareer = {           // shape → export type
 };
 
 export type LoginResponse = { message: string };
-export type SignupResponse = { id: number; email: string };
-export type MeResponse = { id: number; email: string };
+export type SignupResponse = { message: string };
+export type MeResponse = { id: number; email: string; username: string };
 
 export async function getPublicRooms(q = "", page = 1): Promise<RoomPage> {
   const res = await fetch(
@@ -421,12 +421,12 @@ export async function login(email : string, password : string): Promise<LoginRes
   return res.json() as Promise<LoginResponse>;
   
 }
- export async function signup(email : string, password : string): Promise<SignupResponse> {
+ export async function signup(email : string, username : string, password : string): Promise<SignupResponse> {
   //fetch from backend, wait for response
   const res = await fetch(`${BASE_URL}/api/sign_up`, {
     method: "POST", //sending to backend server
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email, password: password }),
+    body: JSON.stringify({ email: email, username: username, password: password }),
   });
   if (!res.ok) {
     // FastAPI puts error text in `detail`.
@@ -499,7 +499,7 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
 }
 
 // ---- Friends ----
-export type Friend = { id: number; email: string };
+export type Friend = { id: number; username: string };
 export type PendingInvite = { invite_id: number; from: string };
 
 // invite by email (Friends page) or by user_id (from a card)

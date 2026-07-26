@@ -66,7 +66,7 @@ def create_group(body: GroupCreate, db: DBDep, user: User = Depends(get_curr_use
     return {"id": group.id, "name": group.name, "entry_fee": group.entry_fee,
             "owner_id": group.owner_id, "closes_at": group.closes_at,
             "is_public": group.is_public,
-            "owner_name": user.email.split("@")[0], "member_count": 0}
+            "owner_name": user.username, "member_count": 0}
 
 
 @router.get("/api/groups/{group_id}/leaderboard")
@@ -124,13 +124,13 @@ def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
 
     #active members, joined to users so we can show names (not full emails)
     rows = (
-        db.query(User.id, User.email)
+        db.query(User.id, User.username)
         .join(GroupMember, GroupMember.user_id == User.id)
         .filter(GroupMember.group_id == group_id,
                 GroupMember.status == "active")
         .all()
     )
-    members = [{"id": uid, "name": email.split("@")[0]} for uid, email in rows]
+    members = [{"id": uid, "name": username} for uid, username in rows]
     member_ids = {uid for uid, _ in rows}
 
     #pot = coins staked in this room. buy-ins are stored NEGATIVE, so negate the sum.
@@ -144,7 +144,7 @@ def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
 
     #owner display name for the "by ..." link (owner may not be a member yet)
     owner = db.get(User, group.owner_id)
-    owner_name = owner.email.split("@")[0] if owner else "unknown"
+    owner_name = owner.username if owner else "unknown"
 
     return {
         "id": group.id,
@@ -175,9 +175,9 @@ def _room_summaries(db, rooms: list) -> list[dict]:
         return []
 
     #owner display names, same rule as group_detail: the part before the @
-    owner_rows = db.query(User.id, User.email).filter(
+    owner_rows = db.query(User.id, User.username).filter(
         User.id.in_({r.owner_id for r in rooms})).all()
-    owner_names = {uid: email.split("@")[0] for uid, email in owner_rows}
+    owner_names = {uid: username for uid, username in owner_rows}
 
     #active-member counts, grouped per room in one query
     count_rows = (

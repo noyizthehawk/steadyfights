@@ -3,7 +3,7 @@ Database models. Each class here maps to one table.
 """
 from datetime import datetime, timezone
 import enum
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, UniqueConstraint, ForeignKey, JSON, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, UniqueConstraint, ForeignKey, JSON, Enum, Index, func
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -77,6 +77,9 @@ class User(Base):
     # The login identifier. unique=True means the DB itself forbids two users same adress
     email = Column(String, unique=True, index=True, nullable=False)
 
+    #public display name case insensitive
+    username = Column(String, nullable=False)
+
     # We store the bcrypt HASH of the password, never the password itself
     hashed_password = Column(String, nullable=False)
 
@@ -90,8 +93,15 @@ class User(Base):
     subscription_status = Column(String, nullable=True)
     free_predictions_used = Column(Integer, nullable=False, default=0)
 
+    __table_args__ = (
+        # Case-insensitive uniqueness: two rows can't share a username that
+        # differs only in case. A plain unique=True would treat "Mike"/"mike"
+        # as distinct; indexing lower(username) collapses them.
+        Index("uq_users_username_lower", func.lower(username), unique=True),
+    )
+
     def __repr__(self):
-        return f"<User id={self.id} email={self.email!r}>"
+        return f"<User id={self.id} email={self.email!r} username={self.username!r}>"
 class CoinReason(enum.Enum):
     purchase    = "purchase"      # + bought coins via Stripe
     room_buyin  = "room_buyin"    # − paid to join a room

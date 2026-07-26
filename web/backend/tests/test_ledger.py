@@ -21,7 +21,7 @@ def make_db():
     TestSession = sessionmaker(bind=engine)
     db = TestSession()
 
-    user = User(email="tester@example.com", hashed_password="x")  # stand-in user
+    user = User(email="tester@example.com", hashed_password="x", username="tester")  # stand-in user
     db.add(user)
     db.commit()
     db.refresh(user)                                # reload so user.id is filled in

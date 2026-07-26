@@ -113,7 +113,7 @@ def user_profile(user_id: int, db: DBDep, user: User = Depends(get_curr_user)):
 
     return {
         "id": target.id,                              # for the invite button on the profile
-        "name": target.email.split("@")[0],           # local part only
+        "name": target.username,                       # public display name
         "member_since": int(target.created_at.timestamp()) if target.created_at else None,
         "stats": summary,
         "world_rank": world_rank,

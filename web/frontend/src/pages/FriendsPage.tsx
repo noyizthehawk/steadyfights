@@ -104,7 +104,7 @@ export default function FriendsPage() {
         <ul className="space-y-2">
           {friends.map((f) => (
             <li key={f.id} className="rounded-lg bg-zinc-800 p-3 text-white">
-              {f.email}
+              {f.username}
             </li>
           ))}
         </ul>

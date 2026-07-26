@@ -5,7 +5,7 @@ export default function Footer() {
     <footer className="footer">
       <div className="footer-inner">
         <div className="footer-brand">
-          <span className="footer-logo">SteadyFights</span>
+          <span className="footer-logo">steadyfights</span>
           <p className="footer-tagline">
             UFC predictions, pick&apos;em battles, and bragging rights.
           </p>

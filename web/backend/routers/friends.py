@@ -97,7 +97,7 @@ def get_friends(db: DBDep, user: User = Depends(get_curr_user)):
         other_id = f.addressee_id if f.requester_id == user.id else f.requester_id
         other = db.get(User, other_id)
         if other:
-            friends.append({"id": other.id, "email": other.email})
+            friends.append({"id": other.id, "username": other.username})
     return {"friends": friends} #return dictionary
 
 
@@ -115,5 +115,5 @@ def get_pending(db: DBDep, user: User = Depends(get_curr_user)):
     for f in rows:
         requester = db.get(User, f.requester_id)
         if requester:
-            pending.append({"invite_id": f.id, "from": requester.email})
+            pending.append({"invite_id": f.id, "from": requester.username})
     return {"pending": pending}

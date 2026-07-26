@@ -61,7 +61,7 @@ def compute_leaderboard(db, user_ids=None, min_settled=3, group_id=None,
     q = (
         db.query(
             User.id,                                             # so cards can identify the user
-            User.email,                                          # user email
+            User.username,                                       # public display name
             func.count(Pick.id).label("total_picks"),            # all picks
             func.count(UFCFight.winner).label("settled"),        # non-null winners = settled
             # when picked == winner it's a correct pick, else 0
@@ -91,12 +91,12 @@ def compute_leaderboard(db, user_ids=None, min_settled=3, group_id=None,
     )
 
     board = []
-    for uid, email, total, settled, correct in rows:
+    for uid, username, total, settled, correct in rows:
         correct = correct or 0
         winrate = round(correct / settled * 100, 1) if settled else None
         board.append({
             "id": uid,                       # used to send a friend invite from a card
-            "name": email.split("@")[0],     # local part only 
+            "name": username,                # public display name
             "total_picks": total,
             "settled": settled,
             "correct": correct,

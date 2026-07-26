@@ -33,7 +33,7 @@ def make_db():
 
 
 def add_user(db, email="s@x.com", customer_id=None):
-    u = User(email=email, hashed_password="x", stripe_customer_id=customer_id)
+    u = User(email=email, hashed_password="x", username=email, stripe_customer_id=customer_id)
     db.add(u); db.commit(); db.refresh(u)
     return u
 

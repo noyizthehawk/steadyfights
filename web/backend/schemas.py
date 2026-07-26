@@ -1,16 +1,20 @@
 """Pydantic request models — the shapes the API accepts in request bodies."""
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, Field
 from datetime import datetime
+
 
 
 class PredictRequest(BaseModel):
     fighter_a: str
     fighter_b: str
 
-
-class SignUpRequest(BaseModel):
+class  LoginRequest(BaseModel):
     email: str
     password: str
+class SignUpRequest(LoginRequest):
+    email: str
+    password: str
+    username: str = Field(min_length=3, max_length=20, pattern=r"^[A-Za-z0-9_]+$")
 
 
 class PickRequest(BaseModel):

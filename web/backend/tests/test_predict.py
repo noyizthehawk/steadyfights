@@ -34,7 +34,7 @@ def make_db():
 
 
 def a_user(db, subscribed=False):
-    u = User(email="p@x.com", hashed_password="x",
+    u = User(email="p@x.com", hashed_password="x", username="p_user",
              subscription_status="active" if subscribed else None)
     db.add(u); db.commit(); db.refresh(u)
     return u

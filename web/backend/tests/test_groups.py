@@ -37,7 +37,7 @@ def make_db():
     Base.metadata.create_all(bind=engine)
     db = sessionmaker(bind=engine)()
 
-    user = User(email="tester@example.com", hashed_password="x")
+    user = User(email="tester@example.com", hashed_password="x", username="tester")
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -130,7 +130,7 @@ def test_cannot_join_closed_room():
 
 
 def _add_user(db, email, coins=1000):
-    u = User(email=email, hashed_password="x")
+    u = User(email=email, hashed_password="x", username=email.split("@")[0])
     db.add(u)
     db.commit()
     db.refresh(u)

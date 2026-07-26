@@ -5,8 +5,11 @@ import os
 import stripe
 from apify_client import ApifyClient
 from newsapi import NewsApiClient
+from dotenv import load_dotenv
 
-from . import PROJECT_ROOT  # noqa: F401  (re-exported; also ensures sys.path set)
+from . import PROJECT_ROOT
+  # noqa: F401  (re-exported; also ensures sys.path set)
+load_dotenv() 
 
 # Cache TTLs (seconds)
 LEADERBOARD_TTL = 60
@@ -16,6 +19,8 @@ NEWS_TTL = 600  # 10 minutes
 BASE = "https://www.ufc.com"
 headers = {"User-Agent": "Mozilla/5.0"}
 
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+
 # News API
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
@@ -24,7 +29,7 @@ newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
 UFC_API_KEY = os.getenv("UFC_API_KEY")
 client = ApifyClient(UFC_API_KEY)
 
-
+EMAIL_FROM = os.getenv("EMAIL_FROM")
 
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() in ("true", "1", "yes")
 

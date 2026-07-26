@@ -1,11 +1,12 @@
 """Auth + account endpoints: sign up, login, logout, and "who am I"."""
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import select
+from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 
 from ..config import COOKIE_SECURE
 from ..dependencies import DBDep, get_curr_user, rate_limit
 from ..models import User
-from ..schemas import SignUpRequest
+from ..schemas import SignUpRequest, LoginRequest
 from ..security import hash_password, verify_password, create_access_token, DUMMY_HASH
 
 router = APIRouter()
@@ -20,22 +21,33 @@ def sign_up(user: SignUpRequest, db: DBDep):
     # the same bcrypt work and take the same time (no timing enumeration).
     hashed = hash_password(user.password)
 
+    username_taken = db.execute(
+        select(User).where(func.lower(User.username) == user.username.lower())
+    ).scalar_one_or_none()
+    if username_taken:
+        raise HTTPException(status_code=409, detail="Username already taken")
+
     existing = db.execute(
         select(User).where(User.email == user.email)
     ).scalar_one_or_none()
     if existing:
-        # Don't reveal that the email is taken — return the generic response.
+        # Don't reveal that the email is taken return a generic response.
         return GENERIC_SIGNUP_MSG
 
-    new_user = User(email=user.email, hashed_password=hashed)
+    new_user = User(email=user.email, hashed_password=hashed, username=user.username)
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        #preventing race bug for concurrent sign ups at the same time
+        db.rollback()
+        return GENERIC_SIGNUP_MSG
 
     return GENERIC_SIGNUP_MSG
 
 
 @router.post("/api/login", dependencies=[Depends(rate_limit("login", limit=5, window=900))])
-def login(user: SignUpRequest, db: DBDep, response: Response):
+def login(user: LoginRequest, db: DBDep, response: Response):
     # verify an existing user: find by email, then check the password.
     db_user = db.execute(
         select(User).where(User.email == user.email)
@@ -69,4 +81,4 @@ def logout(response: Response):
 
 @router.get("/api/me")
 def get_me(user: User = Depends(get_curr_user)):
-    return {"id": user.id, "email": user.email}
+    return {"id": user.id, "email": user.email, "username": user.username}
