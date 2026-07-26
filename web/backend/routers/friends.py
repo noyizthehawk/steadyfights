@@ -5,12 +5,13 @@ from sqlalchemy import select, and_, or_
 from ..dependencies import DBDep, get_curr_user
 from ..models import User, Friendship
 from ..schemas import InviteRequest
+from ..email_sender import send_friend_request_email
 
 router = APIRouter()
 
 
 @router.post("/api/friends/invite")
-def send_invite(req: InviteRequest, db: DBDep, user: User = Depends(get_curr_user)):
+async def send_invite(req: InviteRequest, db: DBDep, user: User = Depends(get_curr_user)):
     """Invite another user (by email or user_id) to be friends -> a 'pending' row."""
     if req.user_id is not None:
         target = db.get(User, req.user_id)
@@ -44,6 +45,13 @@ def send_invite(req: InviteRequest, db: DBDep, user: User = Depends(get_curr_use
     invite = Friendship(requester_id=user.id, addressee_id=target.id, status="pending")
     db.add(invite)
     db.commit()
+    # Best-effort notification: the invite is already saved, so a failed email
+    # must not break the request. Log it (don't swallow silently) so failures
+    # are visible instead of vanishing.
+    try:
+        await send_friend_request_email(target.email, user.email)
+    except Exception as e:
+        print(f"[friend-invite email failed] to={target.email}: {e}")
     db.refresh(invite)
     return {"status": "pending", "invite_id": invite.id}
 
