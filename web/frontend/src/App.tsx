@@ -6,6 +6,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import FighterProfilePage from "./pages/FighterProfilePage";
 import FightersPage from "./pages/FightersPage";
+import { FighterSearch } from "./components/FighterSearch";
 import PredictionGamePage from "./pages/PredictionGamePage";
 import EventDetailPage from "./pages/EventDetailPage";
 import LeaderBoardPage from "./pages/LeaderBoardPage";
@@ -37,8 +38,8 @@ const navLinks = [
 ];
 
 export default function App() {
-  // the logged-in user's email, or null when logged out
-  const [email, setEmail] = useState<string | null>(null);
+  // the logged-in user's username, or null when logged out
+  const [username, setUsername] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null); // wraps the username button + dropdown
   const [navOpen, setNavOpen] = useState(false);
@@ -49,8 +50,8 @@ export default function App() {
   // re-check auth on every route change so the nav updates right after login
   useEffect(() => {
     me()
-      .then((u) => setEmail(u.email))
-      .catch(() => setEmail(null));
+      .then((u) => setUsername(u.username))
+      .catch(() => setUsername(null));
   }, [location.pathname]);
 
   // close the user dropdown when clicking anywhere outside it
@@ -79,7 +80,7 @@ export default function App() {
 
   async function handleLogout() {
     await logout();
-    setEmail(null);
+    setUsername(null);
     setMenuOpen(false);
     navigate("/");
   }
@@ -120,14 +121,18 @@ export default function App() {
             </Link>
           ))}
         </div>
+
+        {/* Global fighter search — available from every page */}
+        <FighterSearch />
+
         <div className="nav-right">
-          {email ? (
+          {username ? (
             <div className="relative" ref={menuRef}>
               <button
                 className="nav-email cursor-pointer"
                 onClick={() => setMenuOpen((o) => !o)}
               >
-                {email} ▾
+                {username} ▾
               </button>
               {menuOpen && (
                 <div className="absolute right-0 z-50 mt-2 w-40 rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">
