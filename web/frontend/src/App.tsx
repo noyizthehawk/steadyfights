@@ -6,7 +6,9 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import FighterProfilePage from "./pages/FighterProfilePage";
 import FightersPage from "./pages/FightersPage";
+import AccountPage from "./pages/AccountPage";
 import { FighterSearch } from "./components/FighterSearch";
+import { Avatar } from "./components/Avatar";
 import PredictionGamePage from "./pages/PredictionGamePage";
 import EventDetailPage from "./pages/EventDetailPage";
 import LeaderBoardPage from "./pages/LeaderBoardPage";
@@ -40,6 +42,7 @@ const navLinks = [
 export default function App() {
   // the logged-in user's username, or null when logged out
   const [username, setUsername] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null); // wraps the username button + dropdown
   const [navOpen, setNavOpen] = useState(false);
@@ -50,8 +53,14 @@ export default function App() {
   // re-check auth on every route change so the nav updates right after login
   useEffect(() => {
     me()
-      .then((u) => setUsername(u.username))
-      .catch(() => setUsername(null));
+      .then((u) => {
+        setUsername(u.username);
+        setAvatarUrl(u.avatar_url);
+      })
+      .catch(() => {
+        setUsername(null);
+        setAvatarUrl(null);
+      });
   }, [location.pathname]);
 
   // close the user dropdown when clicking anywhere outside it
@@ -81,6 +90,7 @@ export default function App() {
   async function handleLogout() {
     await logout();
     setUsername(null);
+    setAvatarUrl(null);
     setMenuOpen(false);
     navigate("/");
   }
@@ -129,13 +139,21 @@ export default function App() {
           {username ? (
             <div className="relative" ref={menuRef}>
               <button
-                className="nav-email cursor-pointer"
+                className="nav-email flex cursor-pointer items-center gap-2"
                 onClick={() => setMenuOpen((o) => !o)}
               >
+                <Avatar url={avatarUrl} name={username ?? "?"} size={28} />
                 {username} ▾
               </button>
               {menuOpen && (
                 <div className="absolute right-0 z-50 mt-2 w-40 rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">
+                  <Link
+                    to="/account"
+                    className="block w-full px-4 py-2 text-left text-sm text-white hover:bg-zinc-800"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Account
+                  </Link>
                   <Link
                     to="/friends"
                     className="block w-full px-4 py-2 text-left text-sm text-white hover:bg-zinc-800"
@@ -174,6 +192,7 @@ export default function App() {
         <Route path="/users/:userId/events" element={<UserPastEvents />} />
         <Route path="/users/:userId/events/:eventId" element={<UserEventDetailPage />} />
         <Route path="/friends" element={<FriendsPage />} />
+        <Route path="/account" element={<AccountPage />} />
         {/* /rooms/new is deliberately NOT in the nav — reached from the lobby button */}
         <Route path="/rooms" element={<RoomsPage />} />
         <Route path="/rooms/new" element={<CreateRoomPage />} />

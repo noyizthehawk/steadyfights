@@ -3,14 +3,39 @@ shows: identity, overall stats, world rank, friends/events counts, and a few
 highlights (recent form, current streak, best event)."""
 import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import func, and_, or_
 
 from ..dependencies import DBDep, get_curr_user
 from ..models import User, UFCEvent, UFCFight, Pick, Friendship
 from ..stats import compute_user_stats, compute_leaderboard
+from ..storage import upload_avatar, ALLOWED_IMAGE_TYPES, MAX_AVATAR_BYTES
 
 router = APIRouter()
+
+
+@router.post("/api/me/avatar")
+async def upload_my_avatar(db: DBDep, file: UploadFile = File(...),
+                           user: User = Depends(get_curr_user)):
+    """Upload the current user's avatar to R2 and save its URL on their account."""
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Avatar must be a JPEG, PNG, or WebP image")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=400, detail="Avatar must be 5 MB or smaller")
+
+    try:
+        url = upload_avatar(user.id, data, file.content_type)
+    except RuntimeError:
+        # R2 not configured (missing env vars) — don't 500, tell the client.
+        raise HTTPException(status_code=503, detail="Avatar uploads are not configured")
+
+    user.avatar_url = url
+    db.commit()
+    return {"avatar_url": url}
 
 
 @router.get("/api/users/{user_id}/profile")
@@ -114,6 +139,7 @@ def user_profile(user_id: int, db: DBDep, user: User = Depends(get_curr_user)):
     return {
         "id": target.id,                              # for the invite button on the profile
         "name": target.username,                       # public display name
+        "avatar_url": target.avatar_url,               # null → UI shows initials fallback
         "member_since": int(target.created_at.timestamp()) if target.created_at else None,
         "stats": summary,
         "world_rank": world_rank,

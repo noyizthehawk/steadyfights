@@ -31,6 +31,14 @@ client = ApifyClient(UFC_API_KEY)
 
 EMAIL_FROM = os.getenv("EMAIL_FROM")
 
+# Cloudflare R2 (S3-compatible) for avatar uploads. R2_PUBLIC_URL is the bucket's
+# public base (e.g. https://pub-xxxx.r2.dev) used to build the stored image URL.
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
+R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL")
+
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() in ("true", "1", "yes")
 
 # Admin / billing

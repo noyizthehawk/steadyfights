@@ -80,6 +80,10 @@ class User(Base):
     #public display name case insensitive
     username = Column(String, nullable=False)
 
+    # Public URL of the user's avatar in R2 object storage; null until they
+    # upload one (the UI falls back to an initials avatar).
+    avatar_url = Column(String, nullable=True)
+
     # We store the bcrypt HASH of the password, never the password itself
     hashed_password = Column(String, nullable=False)
 

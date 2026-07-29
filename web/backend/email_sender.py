@@ -16,6 +16,17 @@ async def send_email(to: str, subject: str, html: str) -> dict:
         "html": html,
     })
 
+async def send_welcome_email(to: str, username: str) -> dict:
+    subject = "Welcome to SteadyFights!"
+    html = (
+        f"<p>Hey {username}, welcome to SteadyFights!</p>"
+        f"<p>Make your picks for upcoming UFC events, climb the leaderboard, "
+        f"and compete with your friends.</p>"
+        f'<p><a href="{FRONTEND_URL}/prediction-game">Make your first picks →</a></p>'
+    )
+    return await send_email(to, subject, html)
+
+
 async def send_friend_request_email(to: str, from_email: str) -> dict:
     subject = f"{from_email} sent you a friend request on SteadyFights"
     html = (

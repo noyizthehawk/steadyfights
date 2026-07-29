@@ -8,6 +8,7 @@ from ..dependencies import DBDep, get_curr_user, rate_limit
 from ..models import User
 from ..schemas import SignUpRequest, LoginRequest
 from ..security import hash_password, verify_password, create_access_token, DUMMY_HASH
+from ..email_sender import send_welcome_email
 
 router = APIRouter()
 
@@ -16,7 +17,7 @@ GENERIC_SIGNUP_MSG = {"message": "Account created. Please log in."}
 
 
 @router.post("/api/sign_up", dependencies=[Depends(rate_limit("sign_up", limit=5, window=900))])
-def sign_up(user: SignUpRequest, db: DBDep):
+async def sign_up(user: SignUpRequest, db: DBDep):
     # Hash FIRST, unconditionally, so the existing-email and new-email paths do
     # the same bcrypt work and take the same time (no timing enumeration).
     hashed = hash_password(user.password)
@@ -42,6 +43,13 @@ def sign_up(user: SignUpRequest, db: DBDep):
         #preventing race bug for concurrent sign ups at the same time
         db.rollback()
         return GENERIC_SIGNUP_MSG
+
+    # Best-effort welcome email: the account is already saved, so a failed send
+    # must not break signup. Logged (not swallowed) so failures are visible.
+    try:
+        await send_welcome_email(new_user.email, new_user.username)
+    except Exception as e:
+        print(f"[welcome email failed] to={new_user.email}: {e}")
 
     return GENERIC_SIGNUP_MSG
 
@@ -81,4 +89,5 @@ def logout(response: Response):
 
 @router.get("/api/me")
 def get_me(user: User = Depends(get_curr_user)):
-    return {"id": user.id, "email": user.email, "username": user.username}
+    return {"id": user.id, "email": user.email, "username": user.username,
+            "avatar_url": user.avatar_url}

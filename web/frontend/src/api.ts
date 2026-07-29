@@ -155,7 +155,23 @@ export type TopCareer = {           // shape → export type
 
 export type LoginResponse = { message: string };
 export type SignupResponse = { message: string };
-export type MeResponse = { id: number; email: string; username: string };
+export type MeResponse = { id: number; email: string; username: string; avatar_url: string | null };
+
+// Upload the current user's avatar (multipart). Returns the new public URL.
+export async function uploadAvatar(file: File): Promise<{ avatar_url: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE_URL}/api/me/avatar`, {
+    method: "POST",
+    credentials: "include",
+    body: form, // no Content-Type header — the browser sets the multipart boundary
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})); //catch the error from the backend
+    throw new Error(err.detail || "Could not upload avatar"); //serve it if not defailt error message
+  }
+  return res.json() as Promise<{ avatar_url: string }>; // retirn it
+}
 
 export async function getPublicRooms(q = "", page = 1): Promise<RoomPage> {
   const res = await fetch(

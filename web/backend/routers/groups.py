@@ -30,8 +30,8 @@ def join_group(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
         if group.entry_fee > 0:
             record_movement(db, user.id, -group.entry_fee,
                             CoinReason.room_buyin, reference_id=group_id,
-                            commit=False)                      # no commit yet
-        db.add(GroupMember(group_id=group_id, user_id=user.id, status="active"))
+                            commit=False)                      # no commit yet to avoid a race
+        db.add(GroupMember(group_id=group_id, user_id=user.id, status="active")) #make sure user enter the room to commit
         db.commit()
     except ValueError:
         db.rollback()
