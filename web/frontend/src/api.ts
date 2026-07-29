@@ -85,8 +85,24 @@ export type UserEvents = {
 
 }
 
+export type TaleOfTheTape = {
+  str_acc: number | null;   // %
+  str_def: number | null;   // %
+  td_acc: number | null;    // %
+  td_def: number | null;    // %
+  slpm: number | null;      // sig strikes landed / min
+  sapm: number | null;      // sig strikes absorbed / min
+  td_avg: number | null;    // takedowns / 15 min
+  sub_avg: number | null;   // sub attempts / 15 min
+  height_cm: number | null;
+  reach_cm: number | null;
+  stance: string | null;
+};
+
 export type CareerSummary = {
   fighter: string;
+  image_url: string | null;   // scraped UFC standing headshot
+  tale_of_the_tape: TaleOfTheTape | null;
   total_fights: number;
   win_rate: number;       // percent
   avg_raw_perf: number;

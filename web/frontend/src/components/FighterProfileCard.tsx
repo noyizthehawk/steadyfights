@@ -1,37 +1,27 @@
 import type { CareerSummary, Phase } from "../api";
-import { getCareerSummary } from "../api";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { NewsList } from "./NewsList";
 
-
-export function FighterProfileCard({ fighter }: { fighter: string }) {
-    const [summary, setSummary] = useState<CareerSummary | null>(null);
-    const [error, setError] = useState<string>("");
+// Card 2: career statistics (performance IQ, form, phases, news). Receives the
+// already-fetched summary from the page so both cards share one request.
+export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
     const [tab, setTab] = useState<"career" | "news">("career");
     // which phase's floating panel (PiP) is open, or null when none
     const [activePhase, setActivePhase] = useState<{ title: string; phase: Phase } | null>(null);
 
-    //whenever fighter changes, fetch the summary
-    useEffect(() => {
-        setSummary(null);
-        setError("");
-        getCareerSummary(fighter) // 
-          .then(setSummary) 
-          .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
-      }, [fighter]);
-    
-      if (error) return <div className="card">{error}</div>;
-      if (!summary) return <div className="card">Loading…</div>;
-
-
-
-
     return (
-        <div className="border border-zinc-700 rounded-lg p-4">
+        <div className="relative border border-zinc-700 rounded-lg p-4">
+            {summary.image_url && (
+                <img
+                    src={summary.image_url}
+                    alt={summary.fighter}
+                    className="pointer-events-none absolute bottom-0 right-full mr-3 hidden w-44 drop-shadow-2xl lg:block"
+                />
+            )}
             <div className="profile-header">
                 <div className="flex flex-wrap items-baseline gap-x-2.5">
                     <h2 className="text-xl font-bold text-white sm:text-2xl">{summary.fighter}</h2>
-                    <span className="whitespace-nowrap text-xl font-bold tabular-nums text-red-500 sm:text-2xl">UFC record:{summary.record}</span>
+                    <span className="whitespace-nowrap text-xl font-bold tabular-nums text-red-500 sm:text-2xl">{summary.record}</span>
                 </div>
                 <span className="career-score" title="Career quality (0–100)">
                     {summary.career_score}

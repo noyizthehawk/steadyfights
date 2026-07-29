@@ -6,8 +6,16 @@ import os
 
 import numpy as np
 import pandas as pd
+from unidecode import unidecode
 
 from part_2.career_score import compute_career_score
+
+
+def normalize_name(s):
+    # Transliterate to ASCII + lowercase so names match across sources.
+    # unidecode (not just accent stripping) handles ł/ø/đ, which don't decompose
+    # into base+accent: 'Jan Błachowicz' -> 'jan blachowicz', 'Rakić' -> 'rakic'.
+    return " ".join(unidecode(str(s)).lower().split())
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 career_csv = os.path.join(script_dir, "../csv/fighter_opponent_strength_extra.csv")
@@ -37,6 +45,8 @@ def _load():
         right_on=["name", "fight_number"],
         how="left",
     )
+    # precompute a normalized name column once so lookups can match accent-free
+    career["Fighter_norm"] = career["Fighter"].map(normalize_name)
     _career_df = career
     return career
 
@@ -136,12 +146,63 @@ def _phase(sub):
         "opp_strength": round(float(sub["Opp Str"].mean()), 3),
         "bouts": bouts,
     }
+_fighter_level_df = None
+
+
+def _fighter_level():
+    """Load + cache the full fighter-level table. Unlike _load (which merges only
+    a couple of columns), this keeps every column — including the UFCStats career
+    aggregates (str_acc, td_def, reach, …)."""
+    global _fighter_level_df
+    if _fighter_level_df is None:
+        df = pd.read_csv(fighter_csv)
+        df["name_norm"] = df["name"].map(normalize_name)
+        _fighter_level_df = df
+    return _fighter_level_df
+
+
+def _clean(x):
+    """NaN -> None; round numbers; leave strings alone (JSON-safe)."""
+    if pd.isna(x):
+        return None
+    if isinstance(x, (float, int, np.floating, np.integer)):
+        return round(float(x), 2)
+    return x
+
+
+def get_fighter_stats(fighter):
+    """Return a JSON-serializable career stats for one fighter or None if not found"""
+    df = _fighter_level()
+    rows = df[df["name_norm"] == normalize_name(fighter)]
+    if rows.empty:
+        return None
+    # Some rows leave the aggregates blank (and the very last row can be dirty),
+    # so prefer the most recent row that actually has them populated.
+    good = rows[rows["str_acc"].notna()]
+    row = (good if not good.empty else rows).sort_values("fight_number").iloc[-1]
+
+    return {
+        "str_acc":  _clean(row.get("str_acc")),     # significant strike accuracy %
+        "str_def":  _clean(row.get("str_def")),     # significant strike defense %
+        "td_acc":   _clean(row.get("td_avg_acc")),  # takedown accuracy %
+        "td_def":   _clean(row.get("td_def")),      # takedown defense %
+        "slpm":     _clean(row.get("splm")),        # sig. strikes landed / min
+        "sapm":     _clean(row.get("sapm")),        # sig. strikes absorbed / min
+        "td_avg":   _clean(row.get("td_avg")),      # takedowns / 15 min
+        "sub_avg":  _clean(row.get("sub_avg")),     # submission attempts / 15 min
+        "height_cm": _clean(row.get("height")),
+        "reach_cm":  _clean(row.get("reach")),
+        "stance":   (str(row.get("stance")).title() if not pd.isna(row.get("stance")) else None),
+    }
+
+
 
 
 def career_summary_api(fighter):
     """Return n a JSON-serializable career rundown for one fighter or None if not found"""
     df = _load()
-    fights = df[df["Fighter"] == fighter.strip()].sort_values("fight_number")
+    # match on the normalized name so accented/scraped spellings resolve too
+    fights = df[df["Fighter_norm"] == normalize_name(fighter)].sort_values("fight_number")
     if fights.empty:
         return None
 
@@ -204,8 +265,11 @@ def career_summary_api(fighter):
     recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
     recent_record = f"{recent_wins} - {len(recent) - recent_wins}"
 
+    fighter_stats = get_fighter_stats(fighter)
+
     return {
         "fighter": fighter,
+        "tale_of_the_tape": fighter_stats,   # str_acc/td_def/reach/… or None
         "total_fights": int(len(fights)),
         "win_rate": round(float(fights["win(1)/loss(0)"].mean()) * 100, 1),
         "avg_raw_perf": _scale_to_100(float(fights["Raw Perf"].mean()), "raw_perf"),
