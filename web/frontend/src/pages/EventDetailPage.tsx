@@ -69,7 +69,7 @@ export default function EventDetailPage() {
                                 <img src={fight.img_a} alt={fight.fighter_a} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
                             )}
                             <div className="min-w-0 text-center sm:text-left">
-                                <p className="truncate text-sm font-semibold sm:text-base">{fight.fighter_a}</p>
+                                <Link to={`/fighters/${encodeURIComponent(fight.fighter_a)}/career`} className="block truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_a}</Link>
                                 <p className="text-xs text-zinc-400">{fight.odds_a ?? "—"}</p>
                             </div>
                         </div>
@@ -82,7 +82,7 @@ export default function EventDetailPage() {
                                 <img src={fight.img_b} alt={fight.fighter_b} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
                             )}
                             <div className="min-w-0 text-center sm:text-right">
-                                <p className="truncate text-sm font-semibold sm:text-base">{fight.fighter_b}</p>
+                                <Link to={`/fighters/${encodeURIComponent(fight.fighter_b)}/career`} className="block truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_b}</Link>
                                 <p className="text-xs text-zinc-400">{fight.odds_b ?? "—"}</p>
                             </div>
                         </div>

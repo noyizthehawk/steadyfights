@@ -29,7 +29,10 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
     return (
         <div className="border border-zinc-700 rounded-lg p-4">
             <div className="profile-header">
-                <h2>{summary.fighter}</h2>
+                <div className="flex flex-wrap items-baseline gap-x-2.5">
+                    <h2 className="text-xl font-bold text-white sm:text-2xl">{summary.fighter}</h2>
+                    <span className="whitespace-nowrap text-xl font-bold tabular-nums text-red-500 sm:text-2xl">UFC record:{summary.record}</span>
+                </div>
                 <span className="career-score" title="Career quality (0–100)">
                     {summary.career_score}
                 </span>
@@ -58,8 +61,8 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
                     <div className="career-stats">
                         <Stat label="Fights" value={summary.total_fights} />
                         <Stat label="Win rate" value={`${summary.win_rate}%`} />
-                        <Stat label="Avg adj. perf" value={summary.avg_adj_perf} hint={summary.perf_label} />
-                        <Stat label="Opp strength" value={summary.avg_opp_strength} hint={summary.opp_label} />
+                        <Stat label="SteadyPerformaceIQ" value={summary.avg_adj_perf} hint={summary.perf_label} />
+                        <Stat label="SteadyStrengthIQ" value={summary.avg_opp_strength} hint={summary.opp_label} />
                         <Stat label="Volatility" value={summary.volatility} hint={summary.volatility_label} />
                     </div>
 

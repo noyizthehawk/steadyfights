@@ -88,6 +88,23 @@ def _opp_label(avg_opp):
                    ["Lighter competition", "Average competition", "Tough competition", "Elite competition"])
 
 
+# Observed min/max of per-fighter career AVERAGES (fighters with >=3 fights),
+# used to min-max normalize each stat onto 0-100 for display: the weakest career
+# average maps to ~0, the strongest to ~100.
+_SCALE_BOUNDS = {
+    "raw_perf": (30.0, 70.0),
+    "adj_perf": (3.0, 65.0),
+    "opp_str":  (0.42, 0.63),
+}
+
+
+def _scale_to_100(value, kind):
+    """Min-max normalize a career-average stat onto 0-100, clamped to the ends."""
+    lo, hi = _SCALE_BOUNDS[kind]
+    scaled = (value - lo) / (hi - lo) * 100
+    return round(min(100.0, max(0.0, scaled)), 1)
+
+
 def _compute_career_score(fights, max_adj_perf):
     """Thin adapter over the shared scorer, passing career.py's column names."""
     return compute_career_score(
@@ -153,6 +170,8 @@ def career_summary_api(fighter):
         else:
             trajectory = "Deep in the trenches,  still showing up against the best in the game"
 
+
+
     score = _compute_career_score(fights, max_adj)
     if score >= 90:
         label = "All-time dominant UFC career"
@@ -172,15 +191,19 @@ def career_summary_api(fighter):
     avg_adj = float(fights["Adj Perf"].mean())
     avg_opp = float(fights["Opp Str"].mean())
 
+    wins = fights[fights["win(1)/loss(0)"] == 1]
+    losses = fights[fights["win(1)/loss(0)"] == 0]
+    record = f"{len(wins)} - {len(losses)}"
+
     return {
         "fighter": fighter,
         "total_fights": int(len(fights)),
         "win_rate": round(float(fights["win(1)/loss(0)"].mean()) * 100, 1),
-        "avg_raw_perf": round(float(fights["Raw Perf"].mean()), 1),
-        "avg_adj_perf": round(avg_adj, 1),
-        "perf_label": _perf_label(avg_adj),
-        "avg_opp_strength": round(avg_opp, 3),
-        "opp_label": _opp_label(avg_opp),
+        "avg_raw_perf": _scale_to_100(float(fights["Raw Perf"].mean()), "raw_perf"),
+        "avg_adj_perf": _scale_to_100(avg_adj, "adj_perf"),
+        "perf_label": _perf_label(avg_adj),          # label uses the RAW average
+        "avg_opp_strength": _scale_to_100(avg_opp, "opp_str"),
+        "opp_label": _opp_label(avg_opp),            # label uses the RAW average
         "volatility": volatility,
         "volatility_label": _volatility_label(vol),
         "career_score": round(float(score), 1),
@@ -191,6 +214,7 @@ def career_summary_api(fighter):
             "mid": _phase(mid),
             "late": _phase(late),
         },
+        "record": record
     }
 
 def top_careers(n = 10, min_fights = 8):

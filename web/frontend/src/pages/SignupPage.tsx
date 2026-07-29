@@ -70,7 +70,7 @@ export default function SignupPage(){
               </button>
             </form>
 
-            {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+            {error && <p className="mt-4 text-sm font-bold text-red-400">{error}</p>}
 
             <p className="mt-6 text-center text-sm text-zinc-400">
               Already have an account?{" "}

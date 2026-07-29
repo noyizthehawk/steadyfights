@@ -104,6 +104,7 @@ export type CareerSummary = {
     mid:   Phase | null;
     late:  Phase | null;
   };
+  record: string;
   
 };
 

@@ -32,8 +32,10 @@ async def sign_up(user: SignUpRequest, db: DBDep):
         select(User).where(User.email == user.email)
     ).scalar_one_or_none()
     if existing:
-        # Don't reveal that the email is taken return a generic response.
-        return GENERIC_SIGNUP_MSG
+        # Product choice: tell the user their email is already registered so they
+        # log in instead of being confused. (Trades away email enumeration
+        # protection — acceptable here; most consumer apps do the same.)
+        raise HTTPException(status_code=409, detail="You already have an account. Please log in.")
 
     new_user = User(email=user.email, hashed_password=hashed, username=user.username)
     db.add(new_user)
