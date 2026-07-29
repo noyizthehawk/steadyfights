@@ -195,6 +195,15 @@ def career_summary_api(fighter):
     losses = fights[fights["win(1)/loss(0)"] == 0]
     record = f"{len(wins)} - {len(losses)}"
 
+    # Recent form: the last (up to) 5 fights, scored on the SAME 0-100 scale as
+    # avg_adj_perf so it's directly comparable to the career number. This captures
+    # "how good are they RIGHT NOW" — a fighter who improved late (e.g. Oliveira)
+    # scores high here even if their career average is dragged down by early years.
+    recent = fights.tail(5)
+    recent_perf = _scale_to_100(float(recent["Adj Perf"].mean()), "adj_perf")
+    recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
+    recent_record = f"{recent_wins} - {len(recent) - recent_wins}"
+
     return {
         "fighter": fighter,
         "total_fights": int(len(fights)),
@@ -202,6 +211,8 @@ def career_summary_api(fighter):
         "avg_raw_perf": _scale_to_100(float(fights["Raw Perf"].mean()), "raw_perf"),
         "avg_adj_perf": _scale_to_100(avg_adj, "adj_perf"),
         "perf_label": _perf_label(avg_adj),          # label uses the RAW average
+        "recent_perf": recent_perf,                  # last-5 form, same 0-100 scale
+        "recent_record": recent_record,              # e.g. "4 - 1"
         "avg_opp_strength": _scale_to_100(avg_opp, "opp_str"),
         "opp_label": _opp_label(avg_opp),            # label uses the RAW average
         "volatility": volatility,

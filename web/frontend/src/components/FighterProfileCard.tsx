@@ -62,6 +62,7 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
                         <Stat label="Fights" value={summary.total_fights} />
                         <Stat label="Win rate" value={`${summary.win_rate}%`} />
                         <Stat label="SteadyPerformaceIQ" value={summary.avg_adj_perf} hint={summary.perf_label} />
+                        <Stat label="Recent Form (L5)" value={summary.recent_perf} hint={`${summary.recent_record} last 5`} hintClass="text-green-500" />
                         <Stat label="SteadyStrengthIQ" value={summary.avg_opp_strength} hint={summary.opp_label} />
                         <Stat label="Volatility" value={summary.volatility} hint={summary.volatility_label} />
                     </div>
@@ -110,12 +111,12 @@ export function FighterProfileCard({ fighter }: { fighter: string }) {
     );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function Stat({ label, value, hint, hintClass = "text-[#d33a2c]" }: { label: string; value: string | number; hint?: string; hintClass?: string }) {
     return (
         <div className="stat">
             <span className="stat-value">{value}</span>
             <span className="stat-label">{label}</span>
-            {hint && <span className="stat-hint text-xs text-[#d33a2c]">{hint}</span>}
+            {hint && <span className={`stat-hint text-xs ${hintClass}`}>{hint}</span>}
         </div>
     );
 }

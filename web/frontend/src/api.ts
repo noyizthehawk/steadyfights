@@ -92,6 +92,8 @@ export type CareerSummary = {
   avg_raw_perf: number;
   avg_adj_perf: number;
   perf_label: string;
+  recent_perf: number;       // last-5 form on the same 0–100 scale as avg_adj_perf
+  recent_record: string;     // e.g. "4 - 1"
   avg_opp_strength: number;
   opp_label: string;
   volatility: number;
