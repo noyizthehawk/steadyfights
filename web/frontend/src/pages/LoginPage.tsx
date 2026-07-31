@@ -8,8 +8,8 @@ const inputClass =
   "placeholder-zinc-500 focus:border-red-500 focus:outline-none";
 
 export default function LoginPage() {
-  // The backend identifies users by email
-  const [email, setEmail] = useState<string>("");
+  // Users log in with their username
+  const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
 
@@ -20,7 +20,7 @@ export default function LoginPage() {
     e.preventDefault(); // stop the browser's default full-page form submit
     setError("");
     try {
-      await login(email, password); // success sets the http cookie in the backend
+      await login(username, password); // success sets the http cookie in the backend
       navigate("/"); // ...then send them to the predictor page
     } catch (e: unknown) {
       setError(errorMessage(e));
@@ -35,10 +35,10 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             className={inputClass}
           />
           <input

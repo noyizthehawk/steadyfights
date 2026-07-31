@@ -7,7 +7,7 @@ from redis import RedisError
 
 from ..dependencies import DBDep
 from ..redis_client import redis_client
-from ..config import LEADERBOARD_TTL
+from ..config import LEADERBOARD_TTL # time to live basically time to refresh
 from ..stats import compute_leaderboard
 
 router = APIRouter()
@@ -20,13 +20,13 @@ def leaderboard(db: DBDep, limit: int = 50):
 
     if redis_client is not None:
         try:
-            cached = redis_client.get(cache_key)
+            cached = redis_client.get(cache_key) # is there a cached copy
             if cached is not None:
-                return {"leaderboard": json.loads(cached)}
-        except RedisError:
+                return {"leaderboard": json.loads(cached)} # json load it if it s cahxced
+        except RedisError: # if error swallow it
             pass
 
-    result = compute_leaderboard(db)[:limit]
+    result = compute_leaderboard(db)[:limit] 
 
     if redis_client is not None:
         try:

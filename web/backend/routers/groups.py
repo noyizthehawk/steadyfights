@@ -27,7 +27,12 @@ def join_group(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
     
     #pay and sit
     try: 
-        if group.entry_fee > 0:
+        """
+        set record movement commit to false and commmit 
+        later so that when something happens or fails at one stage
+        we dont commit fully at any stage
+        """
+        if group.entry_fee > 0: # if they room is not free we must use ledger to record a movement
             record_movement(db, user.id, -group.entry_fee,
                             CoinReason.room_buyin, reference_id=group_id,
                             commit=False)                      # no commit yet to avoid a race
@@ -41,7 +46,7 @@ def join_group(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
 
 @router.post("/api/groups")
 def create_group(body: GroupCreate, db: DBDep, user: User = Depends(get_curr_user)):
-    # --- validate ---
+    #make sure name is thwere and entree fee is not negative
     if not body.name.strip():
         raise HTTPException(400, "Name is required")
     if body.entry_fee < 0:
@@ -77,14 +82,16 @@ def group_leaderboard(group_id: int, db: DBDep, user: User = Depends(get_curr_us
         raise HTTPException(404, "Group not found")
 
     #active members of this room
-    member_ids = [m.user_id for m in db.query(GroupMember).filter_by(
-        group_id=group_id, status="active").all()]
+    rows = db.query(GroupMember).filter_by(group_id=group_id, status="active").all()
+    member_ids = []
+    for member in rows:
+        member_ids.append(member.user_id)
 
     #a private paid room's board is only for its members (owner counts too)
     if user.id != group.owner_id and user.id not in member_ids:
         raise HTTPException(403, "You are not in this room")
 
-    #no members yet -> empty board (also avoids an empty IN () query)
+    #no members yet, empty board (also avoids an empty IN () query)
     if not member_ids:
         return {"group_id": group_id, "leaderboard": []}
 
@@ -300,8 +307,8 @@ def settle_room(db: DBDep, group: Group):
 
     tie_groups = []
     prev = object()                             # sentinel so the first row starts a group
-    for row in board:
-        if row["points"] == prev and tie_groups:
+    for row in board: # for member in board
+        if row["points"] == prev and tie_groups: # track the previous and compare to current
             tie_groups[-1].append(row["id"])    # same points -> tie
         else:
             tie_groups.append([row["id"]])

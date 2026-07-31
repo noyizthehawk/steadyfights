@@ -440,12 +440,12 @@ export async function predict(
 
 // front end function that calls the backend, 
 //backend verifies password and creates token
-export async function login(email : string, password : string): Promise<LoginResponse> {
+export async function login(username : string, password : string): Promise<LoginResponse> {
   //fetch from backend, wait for response
   const res = await fetch(`${BASE_URL}/api/login`, {
     method: "POST", //sending to backend server
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email, password: password }),
+    body: JSON.stringify({ username: username, password: password }),
     credentials: "include", //  accept and   store the httpOnly cookie the server sets
   });
   if (!res.ok) {

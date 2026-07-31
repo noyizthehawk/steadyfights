@@ -8,10 +8,12 @@ class PredictRequest(BaseModel):
     fighter_a: str
     fighter_b: str
 
-class  LoginRequest(BaseModel):
-    email: str
+class LoginRequest(BaseModel):
+    username: str
     password: str
-class SignUpRequest(LoginRequest):
+
+
+class SignUpRequest(BaseModel):
     email: str
     password: str
     username: str = Field(min_length=3, max_length=20, pattern=r"^[A-Za-z0-9_]+$")
