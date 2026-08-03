@@ -1,155 +1,118 @@
-# 🥊 UFC Fighter Analytics
-> Data-driven analysis of UFC fighter performance and fight outcomes.
+# 🥊 SteadyFights
+
+> A full-stack UFC prediction & pick'em platform — make picks, compete on leaderboards, join coin-staked prize rooms, and explore fighter analytics powered by a calibrated machine-learning model.
+
+**Live:** [steadyfights.com](https://steadyfights.com)
 
 ---
 
-## About
+## What it is
 
-This project uses statistical analysis and machine learning to investigate what factors influence success in professional MMA. It combines exploratory data analysis, hypothesis testing, and predictive modeling to uncover patterns in fighter performance.
+SteadyFights is a deployed web app where users predict UFC fights, compete against friends and a global leaderboard, and stake a virtual coin currency in prize "rooms." Every fighter has an analytics page — career score, tale-of-the-tape, recent form, style profile — and matchups are backed by an ML model that outputs **calibrated** win probabilities, not just a pick.
 
-## Project Structure
+It's a single, real product that spans the stack: a machine-learning pipeline, a scraping/data pipeline, authentication, payments, a virtual economy, caching, object storage, transactional email, and database migrations — deployed on its own domain.
 
-| Part | Focus | Status |
-|------|-------|--------|
-| **Part 1** | Statistical analysis of common MMA beliefs | Complete |
-| **Part 2** | Career trajectory and fighter evolution modeling | Complete |
-| **Part 3** | Predictive modeling and matchup analysis | Complete |
-| **Part 4** | Fighter archetype clustering and profiling | Complete |
+## Tech stack
 
----
+| Layer | Tech |
+|---|---|
+| **Backend** | Python, FastAPI, SQLAlchemy, Alembic, Pydantic |
+| **Frontend** | React, TypeScript, Vite, Tailwind CSS |
+| **Database** | PostgreSQL (prod) · SQLite (dev) — env-driven |
+| **ML** | scikit-learn, XGBoost, pandas, NumPy |
+| **Infra / services** | Railway (hosting), Cloudflare (DNS + R2 object storage), Redis, Stripe (payments), Resend (email), GitHub Actions (cron) |
+| **Data pipeline** | Playwright + BeautifulSoup (scraping ufc.com) |
 
-## Key Findings
+## Features
 
-### 🔬 Part 2 — Fighter Prime Window Analysis
-
-![Prime Window Analysis](part_2/analysis_images_part_2/prime_window_analysis.png)
-
-**What the data shows:**
-
-The left chart plots the distribution of peak performance timing across fighters. The distribution is right-skewed with the mean and median both sitting at fight **#5**, meaning most fighters hit their statistical peak very early in their careers — often within their first handful of UFC bouts. A large spike at fights 1–2 followed by a secondary peak around fights 5–6 suggests two distinct groups: those who enter the UFC already at their ceiling, and those who develop rapidly over a short window.
-
-The right chart tells an equally striking story. Win rate declines monotonically across career stages — from **60.6%** in the Early phase (fights 1–5), down to **52.0%** in Mid (6–10), **50.2%** in Prime (11–15), and **44.2%** in the Late stage (16+). Contrary to the common narrative that fighters peak in their "experienced prime," the data suggests that survivorship bias and competition level adjustments make early career performance the strongest predictor. By the time fighters reach their late career, they are fighting against a tougher pool *and* may be in physical decline.
-
-> **Takeaway:** UFC fighters peak earlier than conventional wisdom suggests. Career longevity does not equal sustained performance — the prime window is short and front-loaded.
+- **ML fight predictions** with calibrated probabilities and a "tale of the tape" explaining the top factors
+- **Pick'em** — pick winners for upcoming cards; picks lock before the event
+- **Prize rooms** — create/join rooms with a coin buy-in; the pot is split among the top scorers
+- **Virtual coin economy** — buy coins via Stripe, staked in rooms, paid out on settlement
+- **Fighter analytics pages** — career score (0–100), recent form (last 5), tale-of-the-tape stats, career-phase breakdown, and a global fighter search
+- **Social** — friends, avatars (custom uploads), usernames, worldwide + per-room leaderboards
+- **Automated data pipeline** — weekly scrape of upcoming cards and auto-settling of finished events via scheduled jobs
 
 ---
 
-### 📊 Part 1 — Busting MMA Myths with Data
+## Notable engineering decisions
 
-#### Myth #1: Does Reach Advantage Predict Wins?
+The parts I'd actually talk about in an interview:
 
-![Myth 1 - Reach Advantage](analysis_images_part_1/myth1_reach_advantage.png)
+### Machine learning done honestly
+- **No data leakage.** The train/test split is **temporal** (train on the past, test on the most recent fights) — mirroring reality, where you only ever predict *future* fights. A random split would leak future information and inflate the score.
+- **Calibrated probabilities.** The ensemble (XGBoost + RandomForest + LogisticRegression, soft-voting) is wrapped in `CalibratedClassifierCV`, because the app *shows users a probability* — an uncalibrated "80%" that isn't really 80% is worse than useless. Calibration is verified with a reliability table.
+- **~62% accuracy on a temporal holdout** — modest by design. MMA is extremely high-variance; the betting market itself only picks winners ~65% straight-up. The value is an honest, leakage-free number with well-calibrated probabilities, not a vanity figure.
+- **Found and fixed a subgroup bias.** A suspicious prediction led to a holdout test that revealed the model was near coin-flip (53%) when *fading a finisher*. Traced it to `striking_differential` — a feature collinear with stats already in the model that unfairly penalized finishers (short brawls → negative differential). Removing it lifted the finisher-underdog bucket from 52.6% → 55.9% at **zero overall cost**.
 
-**Verdict: Partially TRUE — but only at the extremes.**
+### An append-only coin ledger
+Balances are never stored as a mutable number. Every coin movement is an **immutable row** in a ledger, and a balance is `SUM(amount)`. This is the double-entry-accounting approach: fully auditable, and impossible to corrupt with a lost update. Stripe webhooks credit coins **idempotently** via a unique `external_id`, so a webhook delivered twice (which Stripe does) can't double-credit.
 
-Across most reach difference brackets, the red fighter's win rate hovers between **51–62%**, only modestly above the 50% baseline. The effect is real but weak for differences under 15 cm. However, when the reach advantage exceeds **+20 cm**, win rate jumps sharply to **~73%** — a meaningful signal. At the negative extreme (reach disadvantage of 20+ cm), the win rate barely clears 50%.
+### Authentication with real tradeoffs
+JWT stored in an **httpOnly cookie** (so XSS can't read the token), bcrypt password hashing, a **constant-time login** (verifies against a dummy hash on the unknown-user path so response time can't reveal which accounts exist), account-enumeration-aware sign-up, an env-driven `Secure` cookie flag, and case-insensitive usernames enforced by a functional unique index.
 
-The relationship is **non-linear**: small reach differences barely matter, but extreme reach mismatches are a significant factor. Reach alone is not predictive at typical margins, but matchmakers and bettors should pay attention when the gap is large.
+### Rate limiting: fail open, admin gate: fail closed
+The Redis rate limiter **fails open** (Redis down → requests pass) to protect availability, while the admin/cron token gate **fails closed** (misconfigured → endpoint disabled) to protect privilege. Same codebase, opposite failure modes, chosen deliberately.
 
----
-
-#### Myth #2: Does Youth Beat Experience?
-
-![Myth 2 - Youth vs Experience](analysis_images_part_1/myth2_youth_vs_experience.png)
-
-**Verdict: FALSE — older fighters hold a consistent edge.**
-
-This chart measures the red fighter's win rate as a function of the age difference (red minus blue). When the red fighter is **younger** (negative values on the x-axis), win rates drop toward 51–58%. When the red fighter is **older**, win rates climb steadily — reaching **~66%** when they're 0–1 years older, **~68%** when 2–3 years older, and peaking at **~76%** when 5–10 years older.
-
-This seems counterintuitive, but it likely reflects that older fighters in the UFC at a similar record are still competing because they are elite — they've survived the selection pressure. Age in MMA appears to be a proxy for experience, durability, and mental composure rather than physical decline (within the competitive range of most UFC matchups).
-
-> **Takeaway:** Don't bet against the older fighter. In competitive MMA, age and experience correlate positively with winning, up to a point.
-
----
-
-#### Myth #3: Wrestlers Beat Strikers?
-
-![Myth 3 - Wrestlers vs Strikers](analysis_images_part_1/myth3_wrestlers_vs_strikers.png)
-
-**Verdict: TRUE — wrestling confers a significant style advantage.**
-
-In cross-style matchups (wrestler vs. striker), wrestlers win approximately **57.6%** of the time while strikers win just **~42.3%**. That's a ~15 percentage point gap against the 50% baseline — a large and practically meaningful edge.
-
-This aligns with the long-standing MMA principle that wrestling is the most effective base style because it allows the wrestler to **dictate where the fight takes place**. A striker cannot implement their gameplan on their back. The data confirms what coaches have argued for decades: wrestling is a structural advantage in MMA, not just a stylistic preference.
+### Other decisions
+- **Cache-aside with Redis** for the leaderboard and news (expensive queries cached with a TTL; every Redis call wrapped so a cache failure degrades to "slower," never "broken").
+- **Alembic migrations** — including a data-backfill migration (adding a required `username` to a table that already had live users).
+- **Name normalization** (`unidecode`) so scraped names with accents (`Rakić`, `Błachowicz`) match the ASCII names in the model's data.
+- **Single-service deploy** — FastAPI serves the built React app from one origin, so there's no CORS in prod and one thing to deploy.
 
 ---
 
-#### Myth #4: Does Size Impact Vary by Division?
+## The ML & data-analysis research
 
-![Myth 4 - Size by Division](analysis_images_part_1/myth4_size_by_division.png)
+Before the app, the project started as a data-science investigation into what actually predicts MMA outcomes. The predictive model is built on those findings.
 
-**Verdict: YES — and the pattern is striking.**
+- **Fighters peak early.** Win rate declines monotonically across career stages (60.6% in fights 1–5 → 44.2% by fight 16+) — career longevity ≠ sustained performance.
+- **Don't bet against the older fighter.** In competitive matchups, age correlates *positively* with winning (a proxy for experience/durability), up to a point.
+- **Wrestling is a structural edge.** Wrestlers beat strikers ~57.6% of the time in cross-style bouts.
+- **Reach matters only at the extremes** (>20 cm gap), and **size effects are division-dependent** (compact frames can win in flyweight; reach dominates at heavyweight).
 
-This chart shows the correlation between height/reach and winning, broken down by weight class. Several patterns emerge:
+Charts and full write-ups live in [`analysis_images_part_1/`](analysis_images_part_1/) and [`part_2/`](part_2/).
 
-- **Flyweight** is the outlier: both height and reach show *negative* correlations with winning (~-0.11 and ~-0.07), suggesting that in the smallest division, being compact and stocky may be advantageous.
-- **Light Heavyweight and Heavyweight** show the strongest positive correlations for reach (~0.15), confirming that size matters most when the weight cap is highest and body types are most variable.
-- **Women's Strawweight** also shows a notable *negative* reach correlation (~-0.13), echoing the Flyweight pattern — smaller divisions may reward compact frames.
-- **Women's Bantamweight** bucks this trend with positive correlations for both height (~0.14) and reach (~0.12), suggesting body type effects are not uniform across women's divisions.
-
-> **Takeaway:** Size isn't universally good or bad — its impact is highly division-dependent. In lighter divisions, being compact can be an advantage. In heavier divisions, longer reach is a genuine edge.
+The predictor (`part_2/Prediction_model.py`) engineers matchup features — Elo (with inactivity decay), rolling 3/5-fight form, opponent-strength-adjusted performance, KMeans style clusters, and physicals — as **fighter-difference** vectors, and augments training with mirrored rows so `predict(A, B) == 1 − predict(B, A)`.
 
 ---
 
-##  Part 2 & 3 — Improvement Velocity & Fight Prediction Model
+## Running locally
 
-This project contains two major computational pipelines:
+**Backend**
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+# optional: create a .env with JWT_SECRET (and Stripe/Resend/R2/Redis keys for those features)
+alembic upgrade head
+uvicorn web.backend.app:app --reload --reload-dir web/backend
+```
 
-###  `improvement_velocity.py`
+**Frontend**
+```bash
+cd web/frontend
+npm install
+npm run dev            # dev server on :5173, proxies API to :8000
+# npm run build        # production build (committed dist/ is what prod serves)
+```
 
-This script analyzes **fighter career trajectories**:
-
-- Computes per-fight performance metrics adjusted for **fight time, opponent strength, and style-weighted contributions**.  
-- Calculates **rolling performance averages** and **improvement velocity** to identify:
-  - Rapid risers  
-  - Plateaus  
-  - Declining fighters  
-  - Late bloomers  
-- Outputs a **fight-level CSV** with adjusted performance and opponent strength for downstream use in predictive models.
-
-> Core insight: Fighters do not improve linearly. Tracking momentum provides richer context than static averages.
-
----
-
-### Fight Predictor — Machine Learning Model
-
-Predicts UFC fight winners using **engineered fighter matchup features**:
-
-- **Input Features:**
-  - Elo ratings (before fight)  
-  - Rolling performance stats (3- and 5-fight windows)  
-  - Striking/takedown differentials  
-  - Opponent strength metrics  
-  - Style clusters (Striker / Grappler / Balanced)  
-  - Physical attributes (height, reach, age, weight)  
-  - Stance differences  
-
-- **Models Used:**
-  - `XGBClassifier` (XGBoost)  
-  - `RandomForestClassifier`  
-  - `LogisticRegression`  
-  - **Ensemble Voting Classifier** (soft voting)  
-  - Calibrated for probabilities using `CalibratedClassifierCV`
-
-- **Performance:**
-  -Test Accuracy: ~61.2%
-  -Training Accuracy: ~63.7%
-- **Interpretation:**  
-  Accuracy is modest but meaningful in MMA; fights have high variance and judging subjectivity. The model captures **real signal above chance**, while respecting inherent unpredictability.
-
-- **Interactive Use:**  
-  Users can query matchups via a command-line menu to see predicted win probabilities and confidence for each fighter.(Run Main.py)
-
-> Key takeaway: Combining style-aware metrics, opponent context, and rolling performance creates a **more realistic fighter evaluation**, beyond simple record or stat-based comparisons.
+The app runs without Redis, Stripe, R2, or Resend configured — those features degrade gracefully when their env vars are absent (no caching/rate-limiting, no payments, no uploads, no email).
 
 ---
 
-## Tech Stack
+## Roadmap
 
-- **Python** — pandas, numpy, scikit-learn, matplotlib, seaborn  
-- **Statistical Analysis** — hypothesis testing, correlation analysis, distribution modeling  
-- **Machine Learning** — classification models (XGBoost, Random Forest, Logistic Regression), ensemble learning, calibration, clustering  
+Planned:
+- **Multi-outcome picks** — pick not just the winner but the **method (KO/Sub/Decision) and round**, with tiered scoring
+- **Model-vs-market track record** — measure the model against closing betting odds (does it beat "always pick the favorite"?) and surface the results publicly
+- **Fight reminders** — email users before their picks lock
+- **Live fight night** — real-time leaderboard/pick updates via WebSockets
+
+Known and deliberately deferred (documented, not hidden):
+- Scraper hardening — a fight `status` to distinguish cancelled vs. pending and stop re-scraping settled events
+- Session revocation (`token_version`) for "log out everywhere"
+- A `SELECT ... FOR UPDATE` lock to close a low-probability coin-overdraft race under concurrent room joins
 
 ---
 
-*Educational research project — not intended for gambling or commercial use.*
+*Built as a portfolio project. Payments run in Stripe test mode; not intended for real-money gambling.*

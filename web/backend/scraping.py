@@ -4,7 +4,6 @@ the CLI scripts (settle.py, refresh_data.py) can call these directly."""
 import sys
 import subprocess
 import time
-import unicodedata
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,12 +13,7 @@ from . import PROJECT_ROOT
 from .config import BASE, headers
 from .models import UFCEvent, UFCFight
 from part_2 import Prediction_model as model
-
-
-def _norm_name(s):
-    """Lowercase + strip accents so 'Jiří Procházka' matches 'Jiri Prochazka'."""
-    s = unicodedata.normalize("NFKD", str(s))
-    return "".join(c for c in s if not unicodedata.combining(c)).lower().strip()
+from part_2.career import normalize_name  # unidecode-based; handles ł/ø/đ too
 
 
 def apply_event_details(event: UFCEvent, an_event: dict):
@@ -132,15 +126,32 @@ def scrape_winners(event_url):
 
 
 def settle_event(db, event):
-    # match in db and get winner
-    winners = scrape_winners(event.event_link) #get he winnser from the playwrigtht scrape
-    results = {w["matchup"]: w["winner"] for w in winners}
+    winners = scrape_winners(event.event_link)
+    results = {}
+    for w in winners:
+        if not w["winner"]:
+            continue
+        key = frozenset({normalize_name(w["fighter_a"]), normalize_name(w["fighter_b"])})
+        results[key] = normalize_name(w["winner"])
+
     settled = 0
     for fight in event.fights:
-        winner = results.get(fight.matchup)
-        if winner and fight.winner is None:
-            fight.winner = winner
-            settled += 1
+        if fight.winner is not None:
+            continue
+        key = frozenset({normalize_name(fight.fighter_a), normalize_name(fight.fighter_b)})
+        win_norm = results.get(key)
+        if not win_norm:
+            continue
+        # Store the winner as the fight's OWN fighter name (not the scraped,
+        # possibly-accented spelling) so scoring — Pick.picked == fight.winner —
+        # matches the names users actually picked.
+        if normalize_name(fight.fighter_a) == win_norm:
+            fight.winner = fight.fighter_a
+        elif normalize_name(fight.fighter_b) == win_norm:
+            fight.winner = fight.fighter_b
+        else:
+            continue
+        settled += 1
     db.commit()
 
     return settled
