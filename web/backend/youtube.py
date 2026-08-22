@@ -1,23 +1,21 @@
-"""YouTube Data API service: fetch a channel's uploads and keep only the
-prediction videos. Pure domain logic — no HTTP layer and no caching (the router
-owns those). Playback happens via YouTube's official embed on the frontend."""
+
 import html
 
 import requests
 
-from .config import YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID
+from .config import YOUTUBE_API_KEY, YOUTUBE_CHANNEL_IDS
 
 _API = "https://www.googleapis.com/youtube/v3/playlistItems"
 
 # A channel's uploads playlist = its id with the "UC" prefix swapped to "UU".
-UPLOADS_PLAYLIST = "UU" + YOUTUBE_CHANNEL_ID[2:] if YOUTUBE_CHANNEL_ID else None
+UPLOADS_PLAYLISTS = ["UU" + c[2:] for c in YOUTUBE_CHANNEL_IDS if c]
 
 # Titles we treat as prediction content (substring, case-insensitive).
 PREDICTION_KEYWORDS = ["prediction", "vs"]
 
 
 def is_configured() -> bool:
-    return bool(YOUTUBE_API_KEY and UPLOADS_PLAYLIST)
+    return bool(YOUTUBE_API_KEY and UPLOADS_PLAYLISTS)
 
 
 def _parse(item: dict):
@@ -33,6 +31,7 @@ def _parse(item: dict):
         # YouTube returns titles HTML-escaped (&amp;, &#39;); decode for display
         "title": html.unescape(sn.get("title") or ""),
         "thumbnail": thumb,
+        "channel_title": sn.get("videoOwnerChannelTitle") or sn.get("channelTitle"),
         "published_at": sn.get("publishedAt"),
     }
 
@@ -42,19 +41,35 @@ def _is_prediction(title: str) -> bool:
     return any(k in t for k in PREDICTION_KEYWORDS)
 
 
-def fetch_prediction_videos(limit: int = 10) -> list[dict]:
-    """Latest prediction videos from the channel's uploads. Over-fetches (50, the
-    API max) then filters by title, so we can still return up to `limit` even
-    though not every upload is a prediction. Raises requests exceptions on API
-    failure — the caller maps those to an HTTP error."""
+def _fetch_playlist(playlist_id: str) -> list[dict]:
     resp = requests.get(_API, params={
         "part": "snippet",
-        "playlistId": UPLOADS_PLAYLIST,
+        "playlistId": playlist_id,
         "maxResults": 50,
         "key": YOUTUBE_API_KEY,
     }, timeout=10)
     resp.raise_for_status()
+    return resp.json().get("items", [])
 
-    videos = (v for it in resp.json().get("items", []) if (v := _parse(it)))
-    predictions = [v for v in videos if _is_prediction(v["title"])]
-    return predictions[: max(1, limit)]
+
+def fetch_prediction_videos(limit: int = 12) -> list[dict]:
+    # fetch all playlistItems, filter to prediction videos
+    collected: list[dict] = []
+    any_ok = False
+    for playlist_id in UPLOADS_PLAYLISTS:
+        try:
+            items = _fetch_playlist(playlist_id)
+            any_ok = True
+        except Exception:
+            continue  # skip this channel, keep the others
+        for it in items:
+            v = _parse(it)
+            if v and _is_prediction(v["title"]):
+                collected.append(v)
+
+    if not any_ok:
+        raise RuntimeError("all video channels failed")
+
+    # newest first across channels — ISO 8601 timestamps sort lexically
+    collected.sort(key=lambda v: v["published_at"] or "", reverse=True)
+    return collected[: max(1, limit)]

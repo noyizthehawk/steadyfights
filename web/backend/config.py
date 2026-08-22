@@ -28,8 +28,17 @@ newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
 # YouTube
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
-# LucasTracyMMA1. Uploads playlist = channel id with "UC" -> "UU".
-YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "UC7LzaJA-R2E52qzd5GW-kpg")
+
+YOUTUBE_CHANNEL_IDS = [
+    c.strip() for c in os.getenv(
+        "YOUTUBE_CHANNEL_IDS",
+        ",".join([
+            "UC7LzaJA-R2E52qzd5GW-kpg",  # LucasTracyMMA1
+            "UCQAMRRo7fPbQMzlJWOexlZg",  # Bedtime MMA
+            "UCIhQvpinmS8Eq6PrQ021DKQ",  # THE MMA GURU (@the-mma-guru)
+        ]),
+    ).split(",") if c.strip()
+]
 VIDEOS_TTL = 1800  # 30 minutes
 
 # FUTURE FIGHTS API

@@ -330,6 +330,22 @@ export async function getNews(q: string): Promise<NewsArticle[]> {
   return data.articles;
 }
 
+export type Video = {
+  video_id: string;
+  title: string;
+  thumbnail: string | null;
+  channel_title: string | null;
+  published_at: string | null;
+};
+
+// Prediction videos from the YouTube channel (already filtered + cached backend).
+export async function getVideos(): Promise<Video[]> {
+  const res = await fetch(`${BASE_URL}/api/videos`);
+  if (!res.ok) return []; // tile just stays empty if unconfigured/unavailable
+  const data: { videos: Video[] } = await res.json();
+  return data.videos;
+}
+
 // Fetch the list of fighter names for the dropdowns.
 export async function getFighters(): Promise<string[]> {
   const res = await fetch(`${BASE_URL}/api/fighters`);
@@ -533,7 +549,7 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   return data.leaderboard;
 }
 
-// ---- Friends ----
+
 export type Friend = { id: number; username: string };
 export type PendingInvite = { invite_id: number; from: string };
 

@@ -8,18 +8,18 @@ from fastapi import APIRouter, HTTPException
 from redis import RedisError
 
 from ..redis_client import redis_client
-from ..config import YOUTUBE_CHANNEL_ID, VIDEOS_TTL
+from ..config import VIDEOS_TTL
 from .. import youtube
 
 router = APIRouter()
 
 
 @router.get("/api/videos")
-def get_videos(limit: int = 10):
+def get_videos(limit: int = 12):
     if not youtube.is_configured():
         raise HTTPException(status_code=503, detail="Videos not configured (set YOUTUBE_API_KEY).")
 
-    cache_key = f"videos:{YOUTUBE_CHANNEL_ID}:{limit}"
+    cache_key = f"videos:{limit}"
 
     # serve cached on hit; fall through on miss OR Redis outage
     if redis_client is not None:
@@ -35,7 +35,7 @@ def get_videos(limit: int = 10):
     except Exception:
         raise HTTPException(status_code=502, detail="Video provider unavailable.")
 
-    payload = {"channel_id": YOUTUBE_CHANNEL_ID, "videos": videos}
+    payload = {"videos": videos}
 
     # cache the SAME (filtered) payload we return, so hits and misses match
     if redis_client is not None:

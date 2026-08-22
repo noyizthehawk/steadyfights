@@ -5,13 +5,16 @@ import {
   getUpcomingEvents,
   getLeaderboard,
   getNews,
+  getVideos,
   type MeResponse,
   type UFCEvent,
   type LeaderboardRow,
   type NewsArticle,
+  type Video,
 } from "../api";
 import { EventTileMini } from "../components/EventTileMini";
 import { NewsTile } from "../components/NewsTile";
+import { VideoTile } from "../components/VideoTile";
 
 // Each card on the feature grid. `to` links straight into that feature so a
 // visitor can try it before signing up.
@@ -44,6 +47,7 @@ export default function LandingPage() {
   const [events, setEvents] = useState<UFCEvent[]>([]);
   const [board, setBoard] = useState<LeaderboardRow[]>([]);
   const [news, setNews] = useState<NewsArticle[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
 
   useEffect(() => {
     me().then(setUser).catch(() => setUser(null));
@@ -51,6 +55,7 @@ export default function LandingPage() {
     getUpcomingEvents().then(setEvents).catch(() => {});
     getLeaderboard().then((b) => setBoard(b.slice(0, 5))).catch(() => {});
     getNews("UFC").then(setNews).catch(() => {});
+    getVideos().then(setVideos).catch(() => {});
   }, []);
 
   return (
@@ -108,18 +113,33 @@ export default function LandingPage() {
           )}
         </aside>
 
-        {/* Center — the 4 category tiles (unchanged) */}
-        <div className="grid flex-1 content-start gap-4 sm:grid-cols-2">
-          {FEATURES.map((f) => (
-            <Link
-              key={f.title}
-              to={f.to}
-              className="rounded-lg bg-zinc-800 p-6 transition-transform hover:scale-[1.02] hover:bg-zinc-700"
-            >
-              <h2 className="mb-2 text-xl font-bold text-white">{f.title}</h2>
-              <p className="text-sm text-zinc-400">{f.blurb}</p>
-            </Link>
-          ))}
+        {/* Center — the 4 category tiles, with the prediction-videos tile
+            directly under them (spans the grid width). */}
+        <div className="flex flex-1 flex-col gap-6">
+          <div className="grid content-start gap-4 sm:grid-cols-2">
+            {FEATURES.map((f) => (
+              <Link
+                key={f.title}
+                to={f.to}
+                className="rounded-lg bg-zinc-800 p-6 transition-transform hover:scale-[1.02] hover:bg-zinc-700"
+              >
+                <h2 className="mb-2 text-xl font-bold text-white">{f.title}</h2>
+                <p className="text-sm text-zinc-400">{f.blurb}</p>
+              </Link>
+            ))}
+          </div>
+
+          {/* Prediction videos — wide 16:9 carousel under the feature grid */}
+          {videos.length > 0 && (
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
+                  Prediction Videos
+                </h2>
+              </div>
+              <VideoTile videos={videos} />
+            </div>
+          )}
         </div>
 
         {/* Right — top-5 leaderboard snapshot + scrollable news tile */}
