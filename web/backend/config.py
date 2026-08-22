@@ -25,6 +25,13 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
 
+# YouTube
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+# LucasTracyMMA1. Uploads playlist = channel id with "UC" -> "UU".
+YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "UC7LzaJA-R2E52qzd5GW-kpg")
+VIDEOS_TTL = 1800  # 30 minutes
+
 # FUTURE FIGHTS API
 UFC_API_KEY = os.getenv("UFC_API_KEY")
 client = ApifyClient(UFC_API_KEY)

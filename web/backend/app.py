@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from part_2 import Prediction_model as model
 from .database import Base, engine
-from .routers import auth, predict, picks, events, friends, leaderboard, news, admin, profile, coins, groups
+from .routers import auth, predict, picks, events, friends, leaderboard, news, admin, profile, coins, groups, videos
 
 
 @asynccontextmanager
@@ -56,6 +56,7 @@ app.include_router(admin.router)
 app.include_router(profile.router)
 app.include_router(coins.router)
 app.include_router(groups.router)
+app.include_router(videos.router)
 
 
 

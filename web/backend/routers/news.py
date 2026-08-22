@@ -40,19 +40,28 @@ def get_news(q: str = "UFC"):
         # Don't leak provider internals; just report it's unavailable.
         raise HTTPException(status_code=502, detail="News provider unavailable.")
 
-    payload = {
-        "query": q,
-        "articles": [
-            {
-                "title": a.get("title"),
-                "url": a.get("url"),
-                "source": (a.get("source") or {}).get("name"),
-                "published_at": a.get("publishedAt"),
-                "image": a.get("urlToImage"),
-            }
-            for a in result.get("articles", [])
-        ],
-    }
+    
+    seen_urls = set()
+    seen_titles = set()
+    articles = []
+    for a in result.get("articles", []):
+        url = a.get("url")
+        title = a.get("title")
+        title_key = (title or "").strip().lower()
+        if url in seen_urls or title_key in seen_titles:
+            continue
+        seen_urls.add(url)
+        if title_key:
+            seen_titles.add(title_key)
+        articles.append({
+            "title": title,
+            "url": url,
+            "source": (a.get("source") or {}).get("name"),
+            "published_at": a.get("publishedAt"),
+            "image": a.get("urlToImage"),
+        })
+
+    payload = {"query": q, "articles": articles}
 
     # cache only successful responses (the 502/503 paths above never reach here)
     if redis_client is not None:
