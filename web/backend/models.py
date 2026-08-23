@@ -52,6 +52,20 @@ class Pick(Base):
     __table_args__ = (UniqueConstraint("user_id", "fight_id", name="uq_user_fight"),) # a user can't pick twice
 
 
+class NotableExtraction(Base):
+    
+    __tablename__ = "notable_extractions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    event_id = Column(Integer, ForeignKey("ufc_events.id"), nullable=False, index=True)
+    video_id = Column(String, nullable=False)   # the YouTube video id the picks came from
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # one extraction record per pundit per event
+    __table_args__ = (UniqueConstraint("user_id", "event_id", name="uq_notable_extraction"),)
+
+
 class Friendship(Base):
     """A friend relationship between two users. One row covers the whole
     lifecycle: 'pending' when invited, 'accepted' once accepted. Declining just

@@ -8,7 +8,7 @@ from youtube_transcript_api import YouTubeTranscriptApi
 
 from .youtube import fetch_channel_uploads
 from .config import GEMINI_API_KEY
-from .models import Pick
+from .models import Pick, NotableExtraction
 from part_2.career import normalize_name
 
 def get_transcript(video_id: str) -> str | None:
@@ -192,7 +192,7 @@ def _save_picks(db, user_id: int, event, extracted: list[dict]) -> dict:
         else:
             unmatched += 1   # LLM returned a name that's neither corner
             continue
-
+        # indempontency guard
         existing = db.query(Pick).filter_by(user_id=user_id, fight_id=fight.id).first()
         if existing:
             if existing.picked != picked:
@@ -203,6 +203,14 @@ def _save_picks(db, user_id: int, event, extracted: list[dict]) -> dict:
             created += 1
 
     return {"created": created, "updated": updated, "no_pick": no_pick, "unmatched": unmatched}
+
+
+def _save_source_video(db, user_id: int, event_id: int, video_id: str) -> None:
+    existing = db.query(NotableExtraction).filter_by(user_id=user_id, event_id=event_id).first()
+    if existing:
+        existing.video_id = video_id
+    else:
+        db.add(NotableExtraction(user_id=user_id, event_id=event_id, video_id=video_id))
 
 
 def run_extraction(db, user, event, video_id: str | None = None) -> dict:
@@ -230,5 +238,6 @@ def run_extraction(db, user, event, video_id: str | None = None) -> dict:
         return {"ok": False, "reason": f"extraction failed: {type(e).__name__}", "video_id": vid}
 
     summary = _save_picks(db, user.id, event, extracted)
+    _save_source_video(db, user.id, event.id, vid)
     db.commit()
     return {"ok": True, "video_id": vid, **summary}
