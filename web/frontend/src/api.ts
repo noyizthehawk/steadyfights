@@ -416,6 +416,58 @@ export async function getUserEventStats(
   return res.json() as Promise<UserEventStats>;
 }
 
+export type NotableUserPicks = {
+  id: number;
+  matchup: string;
+  fighter_a: string;
+  fighter_b: string;
+  img_a: string | null;
+  img_b: string | null;
+  odds_a: string | null;
+  odds_b: string | null;
+  picked: string | null;        // null = pundit made no pick for this fight
+  winner: string | null;        // null until the fight is settled
+  settled: boolean;
+  correct: boolean | null;      // null when unsettled or no pick was made
+};
+
+export type EventCard = {
+  user: {
+    id: number;
+    username: string;
+    avatar_url: string | null;
+    have_youtube: boolean;
+    youtube_channel_id: string | null;
+  };
+  event: {
+    id: number;
+    title: string;
+    date: number;               // unix seconds
+    venue: string | null;
+    poster: string | null;
+  };
+  source_video: { video_id: string; url: string } | null;
+  summary: {
+    picks_made: number;
+    fights_settled: number;
+    correct: number;
+    winrate: number | null;     // null until at least one fight settles
+  };
+  fights: NotableUserPicks[];
+};
+
+export async function getUserEventCard(
+  userId: number,
+  eventId: number,
+): Promise<EventCard> {
+  const res = await fetch(
+    `${BASE_URL}/api/users/${userId}/events/${eventId}/card`,
+    { credentials: "include" }, // endpoint requires the auth cookie
+  );
+  if (!res.ok) throw new Error("Could not load event card");
+  return res.json() as Promise<EventCard>;
+}
+
 // A user's full profile — identity, overall stats, world rank, and highlights.
 export type UserProfile = {
   id: number;
@@ -430,7 +482,7 @@ export type UserProfile = {
   world_rank: { rank: number; total_ranked: number } | null;  // null if unranked
   friends_count: number;
   events_count: number;
-  recent_form: string[];                // ["W","W","L",...] most recent first
+  recent_form: string[];               
   current_streak: { type: "win" | "loss"; count: number } | null;
   best_event: {
     event_id: number;

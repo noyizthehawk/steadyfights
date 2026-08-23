@@ -91,7 +91,7 @@ def user_event_card(user_id: int, event_id: int, db: DBDep,
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    # this user's pick per fight on this event: fight_id -> picked name
+    
     picked_by_fight = dict(
         db.query(Pick.fight_id, Pick.picked)
         .join(UFCFight, UFCFight.id == Pick.fight_id)

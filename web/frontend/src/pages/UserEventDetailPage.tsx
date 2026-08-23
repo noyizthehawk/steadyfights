@@ -1,22 +1,25 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getUserEventStats, type UserEventStats } from "../api";
+import { getUserEventCard, type EventCard } from "../api";
 
 export default function UserEventDetailPage() {
     const { userId, eventId } = useParams<{ userId: string; eventId: string }>();
     const navigate = useNavigate();
-    const [stats, setStats] = useState<UserEventStats | null>(null);
+    const [card, setCard] = useState<EventCard | null>(null);
     const [error, setError] = useState<string>("");
 
     useEffect(() => {
         if (!userId || !eventId) return;
-        getUserEventStats(Number(userId), Number(eventId))
-            .then(setStats)
+        getUserEventCard(Number(userId), Number(eventId))
+            .then(setCard)
             .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"));
     }, [userId, eventId]);
 
     if (error) return <p className="error">{error}</p>;
-    if (!stats) return <p>Loading…</p>;
+    if (!card) return <p>Loading…</p>;
+
+    const { user, event, source_video, summary, fights } = card;
+    const awaiting = summary.picks_made - summary.fights_settled;
 
     return (
         <div className="event-detail w-full px-6 py-8">
@@ -24,30 +27,54 @@ export default function UserEventDetailPage() {
                 ← Back
             </button>
 
-            {/* summary card */}
-            <div className="mb-6 mt-2 flex flex-wrap items-baseline gap-6">
+            {/* event header */}
+            <div className="mt-2 flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-white">{event.title}</h1>
+                {user.have_youtube && (
+                    <span className="rounded bg-[#d33a2c] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                        YT
+                    </span>
+                )}
+            </div>
+            <p className="text-sm text-zinc-400">{user.username}'s predicted card</p>
+
+            {/* source video the picks were extracted from */}
+            {source_video && (
+                <a
+                    href={source_video.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-zinc-800 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+                >
+                    ▶ Watch the breakdown on YouTube
+                </a>
+            )}
+
+            {/* summary */}
+            <div className="mb-6 mt-4 flex flex-wrap items-baseline gap-6">
                 <div>
                     <div className="text-3xl font-bold text-white">
-                        {stats.winrate === null ? "—" : `${stats.winrate}%`}
+                        {summary.winrate === null ? "—" : `${summary.winrate}%`}
                     </div>
                     <div className="text-xs text-zinc-400">win rate</div>
                 </div>
                 <div className="text-sm text-zinc-400">
-                    {stats.correct} of {stats.fights_settled} correct
-                    {stats.picks_made > stats.fights_settled &&
-                        ` · ${stats.picks_made - stats.fights_settled} awaiting results`}
+                    {summary.correct} of {summary.fights_settled} correct
+                    {awaiting > 0 && ` · ${awaiting} awaiting results`}
                 </div>
             </div>
 
             <ul className="space-y-3">
-                {stats.fights.map((fight) => {
+                {fights.map((fight) => {
                     const pickedA = fight.picked === fight.fighter_a;
                     const pickedB = fight.picked === fight.fighter_b;
-                    const settled = fight.winner !== null;
+                    const noPick = fight.picked === null;
                     return (
                         <li
-                            key={fight.matchup}
-                            className="flex items-center justify-between gap-4 rounded-lg bg-zinc-800 p-4 text-white"
+                            key={fight.id}
+                            className={`flex items-center justify-between gap-4 rounded-lg p-4 text-white ${
+                                noPick ? "bg-zinc-800/40" : "bg-zinc-800"
+                            }`}
                         >
                             {/* fighter A */}
                             <div className="flex flex-1 items-center gap-3">
@@ -59,7 +86,7 @@ export default function UserEventDetailPage() {
                                         {fight.fighter_a}
                                         {pickedA && <span className="ml-2 text-xs text-zinc-500">(picked)</span>}
                                     </p>
-                                    {settled && fight.winner === fight.fighter_a && (
+                                    {fight.settled && fight.winner === fight.fighter_a && (
                                         <p className="text-xs font-bold text-green-500">WINNER</p>
                                     )}
                                 </div>
@@ -67,7 +94,9 @@ export default function UserEventDetailPage() {
 
                             {/* result badge */}
                             <span className="text-sm font-bold">
-                                {!settled ? (
+                                {noPick ? (
+                                    <span className="text-zinc-600">no pick</span>
+                                ) : !fight.settled ? (
                                     <span className="text-zinc-500">PENDING</span>
                                 ) : fight.correct ? (
                                     <span className="text-green-500">✓</span>
@@ -83,7 +112,7 @@ export default function UserEventDetailPage() {
                                         {fight.fighter_b}
                                         {pickedB && <span className="ml-2 text-xs text-zinc-500">(picked)</span>}
                                     </p>
-                                    {settled && fight.winner === fight.fighter_b && (
+                                    {fight.settled && fight.winner === fight.fighter_b && (
                                         <p className="text-xs font-bold text-green-500">WINNER</p>
                                     )}
                                 </div>
@@ -96,8 +125,8 @@ export default function UserEventDetailPage() {
                 })}
             </ul>
 
-            {stats.fights.length === 0 && (
-                <p className="text-zinc-500">No picks for this event.</p>
+            {fights.length === 0 && (
+                <p className="text-zinc-500">No fights for this event.</p>
             )}
         </div>
     );
