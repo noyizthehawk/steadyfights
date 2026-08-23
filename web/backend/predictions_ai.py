@@ -1,5 +1,6 @@
 
 import re
+import time
 from datetime import datetime
 
 from google import genai
@@ -8,7 +9,7 @@ from youtube_transcript_api import YouTubeTranscriptApi
 
 from .youtube import fetch_channel_uploads
 from .config import GEMINI_API_KEY
-from .models import Pick, NotableExtraction
+from .models import Pick, NotableExtraction, User, UFCEvent
 from part_2.career import normalize_name
 
 def get_transcript(video_id: str) -> str | None:
@@ -59,14 +60,19 @@ def find_prediction_video(channel_id: str, event) -> dict | None:
 
     fights = list(event.fights)
     ev_num = _event_number(f"{event.title} {event.event_link}")
-    all_lastnames = _last_names([f.fighter_a for f in fights] + [f.fighter_b for f in fights])
-    main_lastnames = _last_names([fights[0].fighter_a, fights[0].fighter_b]) if fights else set()
-    distinctive_words_set = distinctive_words(event.title, event.venue)
-    ev_date = event.date  
+
+    # Headliners come from the event TITLE ("Main1 vs Main2"), which is reliable —
+    # the fights relationship isn't ordered main-event-first.
+    main_ln = {ln for ln in _last_names(re.split(r"\bvs\.?\b", event.title)) if len(ln) >= 3}
+    all_ln = {ln for ln in _last_names([f.fighter_a for f in fights] + [f.fighter_b for f in fights]) if len(ln) >= 3}
+    other_ln = all_ln - main_ln                                    # non-headliner card surnames
+    venue_words = {w for w in distinctive_words(event.venue) if len(w) >= 4}
+    ev_date = event.date
 
     best, best_total = None, 0
     for video in uploads:
         title = normalize_name(video["title"])
+        title_words = set(title.split())   # WHOLE words — so 'ce' can't match 'chance'
 
         # date sanity: prediction videos come out shortly before the event.
         days_before = None
@@ -79,19 +85,27 @@ def find_prediction_video(channel_id: str, event) -> dict | None:
             if days_before is not None and (days_before < -14 or days_before > 120): # no farther than 120 days
                 continue  # far outside the plausible window — skip
 
-        # EVENT-SPECIFIC signals (required)
+        # WHICH event is this about? (required). Whole-word matches only.
         specific = 0
         if ev_num and re.search(rf"ufc\s*{ev_num}\b", title):
-            specific += 5
-        specific += 2 * sum(1 for ln in all_lastnames if ln and ln in title)
-        specific += 2 * sum(1 for ln in main_lastnames if ln and ln in title)  # main event weighted
-        specific += sum(1 for c in distinctive_words_set if c in title)
+            specific += 6                                  # exact event number = strongest, unambiguous id
+        specific += 2 * len(main_ln & title_words)         # headliner surname
+        specific += 1 * len(other_ln & title_words)        # other card surname
+        specific += 1 * len(venue_words & title_words)     # distinctive venue word
         if specific == 0:
             continue  # not about this event
 
-        # tie-break bonuses
+        # Is it a FULL-CARD PREDICTION video, or a reaction/rant that merely
+        # name-drops the headliners? These channels title breakdowns consistently,
+        # so genre language is the real discriminator — weight it above name-drops.
         total = specific
-        if "prediction" in title:
+        if "full card" in title:
+            total += 4
+        if "breakdown" in title:
+            total += 3
+        if "predictions" in title:      # plural = the whole card
+            total += 3
+        elif "prediction" in title:     # singular = often just one fight
             total += 2
         if days_before is not None and -3 <= days_before <= 21:
             total += 2
@@ -241,3 +255,55 @@ def run_extraction(db, user, event, video_id: str | None = None) -> dict:
     _save_source_video(db, user.id, event.id, vid)
     db.commit()
     return {"ok": True, "video_id": vid, **summary}
+
+
+def run_extraction_sweep(db, within_days: int = 10, reextract: bool = False) -> dict:
+    """Cron entrypoint: run the AI pipeline across ALL upcoming events (within
+    `within_days`) x all notable pundits. Idempotent and self-healing, so a
+    scheduler can safely hit this daily. `reextract=True` forces already-done
+    pairs to be redone."""
+    now = int(time.time())
+    horizon = now + within_days * 86400
+    events = (
+        db.query(UFCEvent)
+        .filter(UFCEvent.date > now, UFCEvent.date <= horizon)
+        .order_by(UFCEvent.date)
+        .all()
+    )
+    pundits = (
+        db.query(User)
+        .filter(User.is_notable.is_(True), User.youtube_channel_id.isnot(None))
+        .all()
+    )
+
+    tally = {"events": len(events), "pundits": len(pundits),
+             "extracted": 0, "skipped": 0, "no_video": 0, "failed": 0}
+    details = []
+    for event in events:
+        for user in pundits:
+            # skip pairs we've already extracted (unless forced)
+            if not reextract:
+                already = (
+                    db.query(NotableExtraction)
+                    .filter_by(user_id=user.id, event_id=event.id)
+                    .first()
+                )
+                if already:
+                    tally["skipped"] += 1
+                    continue
+
+            try:
+                res = run_extraction(db, user, event)
+            except Exception as e:
+                db.rollback()   # keep the session usable for the next pundit
+                res = {"ok": False, "reason": f"crashed: {type(e).__name__}"}
+
+            if res.get("ok"):
+                tally["extracted"] += 1
+            elif "no matching prediction video" in res.get("reason", ""):
+                tally["no_video"] += 1
+            else:
+                tally["failed"] += 1
+            details.append({"user": user.username, "event": event.title, **res})
+
+    return {**tally, "details": details}

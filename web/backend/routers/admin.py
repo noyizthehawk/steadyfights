@@ -122,3 +122,12 @@ def extract_predictions(body: ExtractRequest, db: DBDep):
         for u in users
     }
     return {"event": event.title, "results": results}
+
+
+@router.post("/api/admin/extract-predictions/sweep", dependencies=[Depends(verify_admin_token)])
+def extract_predictions_sweep(db: DBDep, within_days: int = 10, reextract: bool = False):
+    """Cron entrypoint: run the AI pipeline across ALL upcoming events (within
+    `within_days`) x all notable pundits. Idempotent and self-healing, so a
+    scheduler can safely hit this daily. `reextract=True` forces already-done
+    pairs to be redone."""
+    return predictions_ai.run_extraction_sweep(db, within_days=within_days, reextract=reextract)
