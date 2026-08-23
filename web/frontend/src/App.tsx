@@ -31,7 +31,7 @@ import Footer from "./components/Footer";
 // desktop row and the mobile hamburger dropdown. Editing this array updates both.
 const navLinks = [
   { to: "/", label: "Home" },
-  { to: "/predictor", label: "Predictor" },
+  { to: "/predictor", label: "Bout Brain" },
   { to: "/fighters", label: "Fighter Cards" },
   { to: "/prediction-game", label: "Casual Checker" },
   { to: "/leaderboard", label: "Leaderboard" },

@@ -6,21 +6,24 @@ import {
   getLeaderboard,
   getNews,
   getVideos,
+  getNotable,
   type MeResponse,
   type UFCEvent,
   type LeaderboardRow,
   type NewsArticle,
   type Video,
+  type NotableUser,
 } from "../api";
 import { EventTileMini } from "../components/EventTileMini";
 import { NewsTile } from "../components/NewsTile";
 import { VideoTile } from "../components/VideoTile";
+import { NotableUsers } from "../components/NotableUsers";
 
 // Each card on the feature grid. `to` links straight into that feature so a
 // visitor can try it before signing up.
 const FEATURES: { title: string; blurb: string; to: string }[] = [
   {
-    title: "Fight Predictor",
+    title: "Bout Brain",
     blurb: "Pick two fighters and get ML-driven win probabilities, styles, and the edges that decide it.",
     to: "/predictor",
   },
@@ -48,6 +51,7 @@ export default function LandingPage() {
   const [board, setBoard] = useState<LeaderboardRow[]>([]);
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [notable, setNotable] = useState<NotableUser[]>([]);
 
   useEffect(() => {
     me().then(setUser).catch(() => setUser(null));
@@ -56,6 +60,7 @@ export default function LandingPage() {
     getLeaderboard().then((b) => setBoard(b.slice(0, 5))).catch(() => {});
     getNews("UFC").then(setNews).catch(() => {});
     getVideos().then(setVideos).catch(() => {});
+    getNotable().then(setNotable).catch(() => {});
   }, []);
 
   return (
@@ -75,7 +80,6 @@ export default function LandingPage() {
               Predict the fights. <span className="text-[#d33a2c]">Are you a casual?</span>
             </h1>
             <p className="mx-auto mb-8 max-w-xl text-lg text-zinc-400">
-              A data-driven UFC playground with the best model on earth.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <Link
@@ -88,7 +92,7 @@ export default function LandingPage() {
                 to="/predictor"
                 className="rounded-lg border border-zinc-700 px-6 py-3 font-semibold text-white transition-colors hover:bg-zinc-800"
               >
-                Try the predictor
+                Try Bout Brain
               </Link>
             </div>
           </>
@@ -176,6 +180,9 @@ export default function LandingPage() {
               </ol>
             )}
           </div>
+
+          {/* Notable users — curated showcase (e.g. MMA YouTubers) */}
+          <NotableUsers users={notable} />
 
           {/* News — scroll through like IG posts */}
           <div>

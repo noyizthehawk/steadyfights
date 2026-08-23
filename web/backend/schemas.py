@@ -19,6 +19,17 @@ class SignUpRequest(BaseModel):
     username: str = Field(min_length=3, max_length=20, pattern=r"^[A-Za-z0-9_]+$")
 
 
+class NotableRequest(BaseModel):
+    youtube_channel_id: str | None = None
+    youtube_handle: str | None = None
+
+
+class ExtractRequest(BaseModel):
+    event_link: str            # which event to extract predictions for
+    username: str | None = None  # limit to one notable user (default: all)
+    video_id: str | None = None  # manual override; requires username
+
+
 class PickRequest(BaseModel):
     fight_id: int
     picked: str

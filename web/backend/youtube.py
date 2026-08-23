@@ -1,5 +1,6 @@
 
 import html
+import re
 
 import requests
 
@@ -52,6 +53,27 @@ def _fetch_playlist(playlist_id: str) -> list[dict]:
     return resp.json().get("items", [])
 
 
+def fetch_channel_uploads(channel_id: str, limit: int = 30) -> list[dict]:
+    """Recent uploads (parsed, unfiltered) for ONE channel, newest first — used
+    to match a prediction video to an event. Raises on API failure."""
+    uploads_playlist_id = "UU" + channel_id[2:]
+    items = _fetch_playlist(uploads_playlist_id)
+
+    # parse each raw item, skipping any that fail to parse
+    videos = []
+    for item in items:
+        parsed = _parse(item)
+        if parsed:
+            videos.append(parsed)
+
+    # sort newest first
+    def get_published_date(video):
+        return video["published_at"] or ""
+    videos.sort(key=get_published_date, reverse=True)
+
+    return videos[:limit]
+
+
 def fetch_prediction_videos(limit: int = 12) -> list[dict]:
     # fetch all playlistItems, filter to prediction videos
     collected: list[dict] = []
@@ -73,3 +95,15 @@ def fetch_prediction_videos(limit: int = 12) -> list[dict]:
     # newest first across channels — ISO 8601 timestamps sort lexically
     collected.sort(key=lambda v: v["published_at"] or "", reverse=True)
     return collected[: max(1, limit)]
+
+
+def resolve_channel_id(handle: str) -> str | None:
+    """get channel id from a string"""
+    h = handle.strip().lstrip("@")
+    try:
+        r = requests.get(f"https://www.youtube.com/@{h}", timeout=10)
+        r.raise_for_status()
+        m = re.search(r'"externalId":"(UC[A-Za-z0-9_-]{22})"', r.text)
+        return m.group(1) if m else None
+    except Exception:
+        return None

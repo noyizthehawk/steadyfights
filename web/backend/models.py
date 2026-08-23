@@ -90,12 +90,13 @@ class User(Base):
     # When the account was created.
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    # Stripe billing — both start empty; filled once the user subscribes.
-    # stripe_customer_id links this user to Stripe's Customer (looked up in webhooks).
     stripe_customer_id = Column(String, nullable=True, index=True)
-    # Mirror of Stripe's subscription state: "active" / "canceled" / None.
+
     subscription_status = Column(String, nullable=True)
     free_predictions_used = Column(Integer, nullable=False, default=0)
+
+    is_notable = Column(Boolean, nullable=False, default=False)
+    youtube_channel_id = Column(String, nullable=True)
 
     __table_args__ = (
         # Case-insensitive uniqueness: two rows can't share a username that

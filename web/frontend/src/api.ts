@@ -346,6 +346,24 @@ export async function getVideos(): Promise<Video[]> {
   return data.videos;
 }
 
+export type NotableUser = {
+  id: number;
+  username: string;
+  avatar_url: string | null;
+  winrate: number | null;      // % over settled picks, or null
+  fights_settled: number;
+  picks_made: number;
+  have_youtube: boolean;
+  youtube_channel_id: string | null;
+};
+
+export async function getNotable(): Promise<NotableUser[]> {
+  const res = await fetch(`${BASE_URL}/api/notable`);
+  if (!res.ok) return [];
+  const data: { notable: NotableUser[] } = await res.json();
+  return data.notable;
+}
+
 // Fetch the list of fighter names for the dropdowns.
 export async function getFighters(): Promise<string[]> {
   const res = await fetch(`${BASE_URL}/api/fighters`);

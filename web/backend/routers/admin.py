@@ -1,11 +1,82 @@
-"""Admin / cron endpoints: scrape upcoming events and settle finished ones.
-Both gated by verify_admin_token (shared secret). The CLI scripts bypass HTTP."""
-from fastapi import APIRouter, Depends
+"""Admin / cron endpoints: scrape upcoming events, settle finished ones, and
+manage notable users. All gated by verify_admin_token (shared secret). The CLI
+scripts bypass HTTP."""
+import secrets
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 
 from ..dependencies import DBDep, verify_admin_token
+from ..models import User, UFCEvent
+from ..schemas import NotableRequest, ExtractRequest
+from ..security import hash_password
 from ..scraping import run_settle, scrape_and_save
+from .. import youtube, predictions_ai
 
 router = APIRouter()
+
+
+def _find_user(db, username: str):
+    """Case-insensitive username lookup, matching the lower(username) index."""
+    return db.execute(
+        select(User).where(func.lower(User.username) == username.lower())
+    ).scalar_one_or_none()
+
+
+@router.post("/api/admin/notable/{username}", dependencies=[Depends(verify_admin_token)])
+def add_notable(username: str, db: DBDep, body: NotableRequest | None = None):
+    body = body or NotableRequest()
+
+    #if there is no channel is specified, try getting it or resolving it from the handle
+    channel_id = body.youtube_channel_id
+    if not channel_id and body.youtube_handle:
+        channel_id = youtube.resolve_channel_id(body.youtube_handle)
+        if not channel_id:
+            raise HTTPException(status_code=400, detail="Could not resolve YouTube handle to a channel id")
+
+    user = _find_user(db, username)
+    created = False
+    if user is None:
+        user = User(
+            username=username,
+            email=f"{username.lower()}@notable.steadyfights.local",
+            hashed_password=hash_password(secrets.token_urlsafe(32)),  # unusable
+            is_notable=True,
+            youtube_channel_id=channel_id,
+        )
+        db.add(user)
+        created = True
+    else:
+        user.is_notable = True
+        if channel_id:
+            user.youtube_channel_id = channel_id
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Username or email already exists")
+    db.refresh(user)
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "is_notable": user.is_notable,
+        "youtube_channel_id": user.youtube_channel_id,
+        "have_youtube": user.youtube_channel_id is not None,
+        "created": created,
+    }
+
+
+@router.delete("/api/admin/notable/{username}", dependencies=[Depends(verify_admin_token)])
+def remove_notable(username: str, db: DBDep):                   
+    user = _find_user(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_notable = False
+    db.commit()
+    return {"id": user.id, "username": user.username, "is_notable": user.is_notable}
 
 
 @router.post("/api/settle-events", dependencies=[Depends(verify_admin_token)])
@@ -19,3 +90,35 @@ def scrape_events_endpoint(db: DBDep):
    # cron later; gated by verify_admin_token so the live ufc.com scrape isn't public
     results = scrape_and_save(db)
     return {"count": len(results), "saved": True}
+
+
+@router.post("/api/admin/extract-predictions", dependencies=[Depends(verify_admin_token)])
+def extract_predictions(body: ExtractRequest, db: DBDep):
+    """Run the AI pipeline: pull each notable YouTuber's prediction video for this
+    event, extract their picks, and save them. Returns a per-user summary to
+    review. Pass `username` to run one user, and `video_id` to override the
+    auto-matched video (requires `username`)."""
+    if body.video_id and not body.username:
+        raise HTTPException(status_code=400, detail="video_id override requires a username")
+
+    event = db.execute(
+        select(UFCEvent).where(UFCEvent.event_link == body.event_link)
+    ).scalar_one_or_none()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    if body.username:
+        user = _find_user(db, body.username)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        users = [user]
+    else:
+        users = db.execute(
+            select(User).where(User.is_notable.is_(True), User.youtube_channel_id.isnot(None))
+        ).scalars().all()
+
+    results = {
+        u.username: predictions_ai.run_extraction(db, u, event, video_id=body.video_id)
+        for u in users
+    }
+    return {"event": event.title, "results": results}
