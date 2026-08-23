@@ -2,12 +2,12 @@
 import re
 from datetime import datetime
 
-import anthropic
+from google import genai
 from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi
 
 from .youtube import fetch_channel_uploads
-from .config import ANTHROPIC_API_KEY
+from .config import GEMINI_API_KEY
 from .models import Pick
 from part_2.career import normalize_name
 
@@ -105,15 +105,15 @@ def find_prediction_video(channel_id: str, event) -> dict | None:
 _client = None
 
 
-def _anthropic():
+def _gemini():
     global _client
     if _client is None:
-        _client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+        _client = genai.Client(api_key=GEMINI_API_KEY)
     return _client
 
 
 def is_configured() -> bool:
-    return bool(ANTHROPIC_API_KEY)
+    return bool(GEMINI_API_KEY)
 
 
 # One extracted pick per fight. fighter_a/fighter_b are echoed back so we can
@@ -149,15 +149,17 @@ def extract_picks(transcript: str, fights: list[dict]) -> list[dict]:
         f"TRANSCRIPT:\n{transcript}"
     )
 
-    resp = _anthropic().messages.parse(
-        model="claude-opus-4-8",
-        max_tokens=8000,
-        thinking={"type": "adaptive"},
-        system=_SYSTEM,
-        messages=[{"role": "user", "content": user}],
-        output_format=_Predictions,
+    resp = _gemini().models.generate_content(
+        model="gemini-3.6-flash",
+        contents=user,
+        config={
+            "system_instruction": _SYSTEM,
+            "response_mime_type": "application/json",
+            "response_schema": _Predictions,
+        },
     )
-    return [p.model_dump() for p in resp.parsed_output.picks]
+    parsed: _Predictions = resp.parsed
+    return [p.model_dump() for p in parsed.picks]
 
 
 # ── Stage 4: save picks — match names -> fights, upsert Picks ─────────────────
@@ -206,7 +208,7 @@ def _save_picks(db, user_id: int, event, extracted: list[dict]) -> dict:
 def run_extraction(db, user, event, video_id: str | None = None) -> dict:
   
     if not is_configured():
-        return {"ok": False, "reason": "ANTHROPIC_API_KEY not configured"}
+        return {"ok": False, "reason": "GEMINI_API_KEY not configured"}
     if not video_id and not user.youtube_channel_id:
         return {"ok": False, "reason": "user has no linked YouTube channel"}
 

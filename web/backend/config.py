@@ -23,6 +23,8 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
 # News API
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
