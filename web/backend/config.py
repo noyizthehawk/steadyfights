@@ -32,6 +32,14 @@ newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None
 # YouTube
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
+# Transcript fetching: YouTube blocks the transcript endpoint from datacenter IPs
+# (Railway), so in prod we route youtube-transcript-api through a residential
+# proxy. Unset locally -> direct fetch. Webshare is the library's first-class
+# integration; YT_PROXY_URL is a generic http/https proxy fallback.
+WEBSHARE_PROXY_USERNAME = os.getenv("WEBSHARE_PROXY_USERNAME")
+WEBSHARE_PROXY_PASSWORD = os.getenv("WEBSHARE_PROXY_PASSWORD")
+YT_PROXY_URL = os.getenv("YT_PROXY_URL")
+
 
 YOUTUBE_CHANNEL_IDS = [
     c.strip() for c in os.getenv(

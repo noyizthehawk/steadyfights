@@ -6,15 +6,35 @@ from datetime import datetime
 from google import genai
 from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig, GenericProxyConfig
 
 from .youtube import fetch_channel_uploads
-from .config import GEMINI_API_KEY
+from .config import (
+    GEMINI_API_KEY,
+    WEBSHARE_PROXY_USERNAME, WEBSHARE_PROXY_PASSWORD, YT_PROXY_URL,
+)
 from .models import Pick, NotableExtraction, User, UFCEvent
 from part_2.career import normalize_name
 
+
+def _yt_api() -> YouTubeTranscriptApi:
+    """YouTubeTranscriptApi, routed through a residential proxy when one is
+    configured"""
+    if WEBSHARE_PROXY_USERNAME and WEBSHARE_PROXY_PASSWORD:
+        return YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
+            proxy_username=WEBSHARE_PROXY_USERNAME,
+            proxy_password=WEBSHARE_PROXY_PASSWORD,
+        ))
+    if YT_PROXY_URL:
+        return YouTubeTranscriptApi(proxy_config=GenericProxyConfig(
+            http_url=YT_PROXY_URL, https_url=YT_PROXY_URL,
+        ))
+    return YouTubeTranscriptApi()
+
+
 def get_transcript(video_id: str) -> str | None:
     try:
-        fetched = YouTubeTranscriptApi().fetch(video_id)
+        fetched = _yt_api().fetch(video_id)
         text = " ".join(snippet.text for snippet in fetched).strip()
         return text or None
     except Exception:
@@ -142,7 +162,7 @@ class _Predictions(BaseModel):
     picks: list[_FightPick]
 
 
-_SYSTEM = (
+_PROMPT = (
     "You extract a UFC pundit's fight predictions from a video transcript. "
     "You are given the fight card and the transcript. For EACH fight on the card, "
     "decide which fighter the speaker predicted to WIN. Rules:\n"
@@ -167,7 +187,7 @@ def extract_picks(transcript: str, fights: list[dict]) -> list[dict]:
         model="gemini-3.6-flash",
         contents=user,
         config={
-            "system_instruction": _SYSTEM,
+            "system_instruction": _PROMPT,
             "response_mime_type": "application/json",
             "response_schema": _Predictions,
         },
