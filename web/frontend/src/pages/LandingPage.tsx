@@ -138,7 +138,7 @@ export default function LandingPage() {
             <div>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
-                  Prediction Videos
+                  Prediction/Reaction Videos
                 </h2>
               </div>
               <VideoTile videos={videos} />

@@ -176,7 +176,7 @@ def extract_picks(transcript: str, fights: list[dict]) -> list[dict]:
     return [p.model_dump() for p in parsed.picks]
 
 
-# ── Stage 4: save picks — match names -> fights, upsert Picks ─────────────────
+# save picks — match names  fights, upsert Picks 
 def _save_picks(db, user_id: int, event, extracted: list[dict]) -> dict:
     """Turn extracted {fighter_a, fighter_b, predicted_winner} into Pick rows for
     user_id. Matches each pick back to a real fight by normalized fighter pair
@@ -189,6 +189,7 @@ def _save_picks(db, user_id: int, event, extracted: list[dict]) -> dict:
     }
 
     created = updated = no_pick = unmatched = 0
+    handled = set()   # fight ids already processed this batch
     for p in extracted:
         winner = p.get("predicted_winner")
         if not winner:
@@ -198,6 +199,10 @@ def _save_picks(db, user_id: int, event, extracted: list[dict]) -> dict:
         if fight is None:
             unmatched += 1
             continue
+       
+        if fight.id in handled:
+            continue
+        handled.add(fight.id)
         winners_name = normalize_name(winner)
         if winners_name == normalize_name(fight.fighter_a):
             picked = fight.fighter_a
