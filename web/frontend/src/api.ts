@@ -82,7 +82,7 @@ export type UserEvents = {
   title: string;
   date: number;
   poster: string | null;
-
+  upcoming: boolean;   // true = event hasn't happened yet (predictions, pre-results)
 }
 
 export type TaleOfTheTape = {

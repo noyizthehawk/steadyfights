@@ -44,7 +44,7 @@ def user_profile(user_id: int, db: DBDep, user: User = Depends(get_curr_user)):
     if target is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # --- overall stats (reuse the shared helper; event_id=None = overall) ---
+    #overall stats
     stats = compute_user_stats(db, user_id)
     summary = {
         "total_picks": stats["picks_made"],
@@ -61,7 +61,7 @@ def user_profile(user_id: int, db: DBDep, user: User = Depends(get_curr_user)):
             world_rank = {"rank": i + 1, "total_ranked": len(board)}
             break
 
-    # --- friends count (accepted, either direction) ---
+    # friends count
     friends_count = (
         db.query(func.count(Friendship.id))
         .filter(
@@ -81,7 +81,7 @@ def user_profile(user_id: int, db: DBDep, user: User = Depends(get_curr_user)):
         .scalar()
     )
 
-    # --- one query feeds recent_form + streak + best_event ---
+    #  one query feeds recent_form + streak + best_event
     # the user's SETTLED picks, most recent first: (event_id, title, was_correct)
     rows = (
         db.query(UFCEvent.id, UFCEvent.title, UFCFight.winner, Pick.picked)

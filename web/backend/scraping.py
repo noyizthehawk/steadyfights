@@ -1,6 +1,4 @@
-"""Scraping + settling logic — everything that talks to ufc.com or mutates the
-DB from scraped data. Kept out of the routers so the HTTP layer stays thin and
-the CLI scripts (settle.py, refresh_data.py) can call these directly."""
+
 import sys
 import subprocess
 import time

@@ -44,11 +44,8 @@ def _r2():
 
 
 def upload_avatar(user_id: int, data: bytes, content_type: str) -> str:
-    """Store an avatar image in R2 and return its public URL.
-
-    A fresh UUID key per upload means each new avatar gets a new URL, so browsers
-    never show a stale cached image. (Old objects are left behind — cheap, and a
-    cleanup pass can prune them later.)
+    """
+    Upload an avatar to R2 and return its public URL.
     """
     ext = ALLOWED_IMAGE_TYPES[content_type]
     key = f"avatars/{user_id}/{uuid.uuid4().hex}.{ext}"

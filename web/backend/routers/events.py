@@ -61,21 +61,27 @@ def user_stats(user_id: int, db: DBDep, user: User = Depends(get_curr_user), eve
 
 @router.get("/api/users/{user_id}/events")
 def user_events(user_id: int, db: DBDep, user: User = Depends(get_curr_user)):
-    """Past events this user made picks in, newest first. Each one is clickable
-    to see the picks made."""
+    """Every event this user has picks in — BOTH upcoming (their predictions,
+    pre-results) and past (their track record). Each event carries an `upcoming`
+    flag so the frontend can split them into two sections. Newest first."""
     now = int(time.time())
     rows = (
         db.query(UFCEvent.id, UFCEvent.title, UFCEvent.date, UFCEvent.poster)
         .join(UFCFight, UFCFight.event_id == UFCEvent.id)
         .join(Pick, and_(Pick.fight_id == UFCFight.id, Pick.user_id == user_id))
-        .filter(UFCEvent.date < now)   # past events only
         .distinct()
         .order_by(UFCEvent.date.desc())
         .all()
     )
     return {
         "events": [
-            {"event_id": r.id, "title": r.title, "date": r.date, "poster": r.poster}
+            {
+                "event_id": r.id,
+                "title": r.title,
+                "date": r.date,
+                "poster": r.poster,
+                "upcoming": r.date is not None and r.date > now,
+            }
             for r in rows
         ]
     }

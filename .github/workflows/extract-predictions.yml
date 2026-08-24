@@ -1,0 +1,24 @@
+name: Extract pundit predictions (daily sweep)
+
+# Runs the AI pipeline across all UPCOMING events x notable pundits.
+# Idempotent + self-healing, so a daily hit is safe: it fills in each pundit's
+# picks as their prediction videos appear, and skips pairs already extracted.
+
+on:
+  schedule:
+    - cron: "0 12 * * *"   # every day at 12:00 UTC (bump frequency if videos drop earlier)
+  workflow_dispatch: {}      # lets you run it manually from the Actions tab to test
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger extraction sweep
+        run: |
+          code=$(curl -sS --max-time 600 -o /tmp/resp -w "%{http_code}" -X POST \
+            "${{ secrets.APP_BASE_URL }}/api/admin/extract-predictions/sweep" \
+            -H "X-Settle-Token: ${{ secrets.SETTLE_SECRET }}")
+          echo "HTTP $code"
+          cat /tmp/resp
+          echo
+          test "$code" = "200"

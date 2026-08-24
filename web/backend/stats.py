@@ -5,24 +5,22 @@ from .models import User, UFCFight, Pick, GroupMember
 
 
 def compute_user_stats(db, user_id, event_id=None):
-    """A user's pick stats, optionally narrowed to one event. Returns the summary
-    numbers PLUS the per-fight breakdown.
-      ---- the stats endpoint uses the whole thing
-      ---- the profile uses just the overall summary (event_id=None)
     """
-    q = (
+    Stats for a specific user, optionally filtered to a specific event.
+    """
+    user_picks= (
         db.query(UFCFight, Pick.picked)
         .join(Pick, and_(Pick.fight_id == UFCFight.id, Pick.user_id == user_id))
     )
     # only narrow to one event when the caller asks for it; otherwise it's overall
     if event_id is not None:
-        q = q.filter(UFCFight.event_id == event_id)
+        user_picks = user_picks.filter(UFCFight.event_id == event_id)
 
-    rows = q.all()
+    user_picks_data = user_picks.all()
 
     fights = []
     correct = settled = 0 # starts at 0
-    for fight, picked in rows:
+    for fight, picked in user_picks_data:
         is_settled = fight.winner is not None
         is_correct = is_settled and picked == fight.winner
         if is_settled:
@@ -58,7 +56,7 @@ def compute_leaderboard(db, user_ids=None, min_settled=3, group_id=None,
                         rank_by="winrate"):
     """A list of users with pick stats, ranked either by winrate or by points.
     """
-    q = (
+    leaderboard_query = (
         db.query(
             User.id,                                             # so cards can identify the user
             User.username,                                       # public display name
@@ -72,26 +70,26 @@ def compute_leaderboard(db, user_ids=None, min_settled=3, group_id=None,
     )
     # room-scoped boards narrow to the given members; the global board passes nothing
     if user_ids is not None:
-        q = q.filter(User.id.in_(user_ids))
+        leaderboard_query = leaderboard_query.filter(User.id.in_(user_ids))
 
     # reset-on-entry: within a room, count only picks made AFTER the member joined.
     # The join to GroupMember (unique per group+user, so no fan-out) gives each row
     # that member's own join time as the cutoff.
     if group_id is not None:
-        q = (
-            q.join(GroupMember, and_(GroupMember.user_id == User.id,
+        leaderboard_query = (
+            leaderboard_query.join(GroupMember, and_(GroupMember.user_id == User.id,
                                      GroupMember.group_id == group_id))
              .filter(Pick.created_at >= GroupMember.created_at)
         )
 
-    rows = (
-        q.group_by(User.id)
+    users_leaderboard_data = (
+        leaderboard_query.group_by(User.id)
         .having(func.count(UFCFight.winner) >= min_settled)     # min settled picks to qualify
         .all()
     )
 
     board = []
-    for uid, username, total, settled, correct in rows:
+    for uid, username, total, settled, correct in users_leaderboard_data:
         correct = correct or 0
         winrate = round(correct / settled * 100, 1) if settled else None
         board.append({
