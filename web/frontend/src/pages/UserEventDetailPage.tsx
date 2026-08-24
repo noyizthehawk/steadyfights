@@ -72,17 +72,17 @@ export default function UserEventDetailPage() {
                     return (
                         <li
                             key={fight.id}
-                            className={`flex items-center justify-between gap-4 rounded-lg p-4 text-white ${
+                            className={`flex items-center justify-between gap-2 rounded-lg p-3 text-white sm:gap-4 sm:p-4 ${
                                 noPick ? "bg-zinc-800/40" : "bg-zinc-800"
                             }`}
                         >
                             {/* fighter A */}
-                            <div className="flex flex-1 items-center gap-3">
+                            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                                 {fight.img_a && (
-                                    <img src={fight.img_a} alt={fight.fighter_a} className="h-16 w-16 rounded-full object-cover object-top" />
+                                    <img src={fight.img_a} alt={fight.fighter_a} className="h-11 w-11 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
                                 )}
-                                <div>
-                                    <p className={`font-semibold ${pickedA ? "text-white" : "text-zinc-400"}`}>
+                                <div className="min-w-0">
+                                    <p className={`break-words text-sm font-semibold sm:text-base ${pickedA ? "text-white" : "text-zinc-400"}`}>
                                         {fight.fighter_a}
                                         {pickedA && <span className="ml-2 text-xs text-zinc-500">(picked)</span>}
                                     </p>
@@ -93,7 +93,7 @@ export default function UserEventDetailPage() {
                             </div>
 
                             {/* result badge */}
-                            <span className="text-sm font-bold">
+                            <span className="shrink-0 text-sm font-bold">
                                 {noPick ? (
                                     <span className="text-zinc-600">no pick</span>
                                 ) : !fight.settled ? (
@@ -106,9 +106,9 @@ export default function UserEventDetailPage() {
                             </span>
 
                             {/* fighter B */}
-                            <div className="flex flex-1 items-center justify-end gap-3 text-right">
-                                <div>
-                                    <p className={`font-semibold ${pickedB ? "text-white" : "text-zinc-400"}`}>
+                            <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-right sm:gap-3">
+                                <div className="min-w-0">
+                                    <p className={`break-words text-sm font-semibold sm:text-base ${pickedB ? "text-white" : "text-zinc-400"}`}>
                                         {fight.fighter_b}
                                         {pickedB && <span className="ml-2 text-xs text-zinc-500">(picked)</span>}
                                     </p>
@@ -117,7 +117,7 @@ export default function UserEventDetailPage() {
                                     )}
                                 </div>
                                 {fight.img_b && (
-                                    <img src={fight.img_b} alt={fight.fighter_b} className="h-16 w-16 rounded-full object-cover object-top" />
+                                    <img src={fight.img_b} alt={fight.fighter_b} className="h-11 w-11 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
                                 )}
                             </div>
                         </li>
