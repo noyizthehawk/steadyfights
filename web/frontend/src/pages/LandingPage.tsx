@@ -19,8 +19,7 @@ import { NewsTile } from "../components/NewsTile";
 import { VideoTile } from "../components/VideoTile";
 import { NotableUsers } from "../components/NotableUsers";
 
-// Each card on the feature grid. `to` links straight into that feature so a
-// visitor can try it before signing up.
+
 const FEATURES: { title: string; blurb: string; to: string }[] = [
   {
     title: "Bout Brain",

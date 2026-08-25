@@ -10,7 +10,7 @@ export function NotableUsers({ users }: { users: NotableUser[] }) {
   return (
     <div>
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">
-        YT/Notable picks
+        pundit picks
       </h2>
       <ul className="space-y-2">
         {users.map((u) => (
