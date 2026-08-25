@@ -628,6 +628,19 @@ export async function makePick(fightId: number, picked: string): Promise<void> {
   }
 }
 
+// Un-pick: remove the current user's pick for a fight. Needs the auth cookie.
+export async function clearPick(fightId: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/picks/${fightId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not clear pick");
+  }
+}
+
 // The current user's picks as { fight_id: picked }. Returns {} when logged out.
 export async function getMyPicks(): Promise<Record<number, string>> {
   const res = await fetch(`${BASE_URL}/api/picks/me`, { credentials: "include" });

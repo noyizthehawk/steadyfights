@@ -30,7 +30,7 @@ export function NotableUsers({ users }: { users: NotableUser[] }) {
                   )}
                 </p>
                 <p className="text-xs text-zinc-500">
-                  {u.fights_settled > 0 ? `${u.fights_settled} settled` : "no picks yet"}
+                  {u.fights_settled > 0 ? `${u.fights_settled} settled` : "no settled picks yet"}
                 </p>
               </div>
               <span className="shrink-0 font-bold tabular-nums text-[#d33a2c]">

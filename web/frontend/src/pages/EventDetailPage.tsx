@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { getUpcomingEvents, getMyPicks, makePick, AuthError, type UFCEvent } from "../api";
+import { getUpcomingEvents, getMyPicks, makePick, clearPick, AuthError, type UFCEvent } from "../api";
 
 export default function EventDetailPage() {
    //slug from route
@@ -27,11 +27,22 @@ export default function EventDetailPage() {
         getMyPicks().then(setPicks);
     }, [slug]);
 
-    // Save a pick. Logged-out users get sent to login.
+    // Click a fighter: pick them, or — if they're already your pick — un-pick
+    // entirely (toggle off). Logged-out users get sent to login.
     async function handlePick(fightId: number, fighter: string) {
+        const isCurrent = picks[fightId] === fighter;
         try {
-            await makePick(fightId, fighter);
-            setPicks((prev) => ({ ...prev, [fightId]: fighter }));
+            if (isCurrent) {
+                await clearPick(fightId);
+                setPicks((prev) => {
+                    const next = { ...prev };
+                    delete next[fightId];
+                    return next;
+                });
+            } else {
+                await makePick(fightId, fighter);
+                setPicks((prev) => ({ ...prev, [fightId]: fighter }));
+            }
         } catch (e) {
             if (e instanceof AuthError) navigate("/login");
             else setError(e instanceof Error ? e.message : "Could not save pick");
@@ -90,6 +101,7 @@ export default function EventDetailPage() {
                         {/* pick A / pick B sit under their own fighter */}
                         <button
                             onClick={() => handlePick(fight.id, fight.fighter_a)}
+                            title={pickedA ? "Tap to remove your pick" : `Pick ${fight.fighter_a}`}
                             className={`btn w-full rounded px-3 py-1 text-sm font-display ${pickedA ? "bg-red-600" : "bg-zinc-700 hover:bg-red-600"}`}
                         >
                             {pickedA ? "PICKED" : "PICK"}
@@ -99,6 +111,7 @@ export default function EventDetailPage() {
 
                         <button
                             onClick={() => handlePick(fight.id, fight.fighter_b)}
+                            title={pickedB ? "Tap to remove your pick" : `Pick ${fight.fighter_b}`}
                             className={`btn w-full rounded px-3 py-1 text-sm font-display ${pickedB ? "bg-blue-600" : "bg-zinc-700 hover:bg-blue-600"}`}
                         >
                             {pickedB ? "PICKED" : "PICK"}

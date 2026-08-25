@@ -25,7 +25,7 @@ def make_pick(req: PickRequest, db: DBDep, user: User = Depends(get_curr_user)):
         raise HTTPException(status_code=400, detail="Picked fighter is not in this fight")
 
     # Picks lock EARLY_START_BUFFER before the listed main-card time, since
-    # prelims (and thus real fights) start hours before UFC's advertised time.
+    # prelims can start hours before UFC's advertised time.
     if fight.event and fight.event.date and (fight.event.date - EARLY_START_BUFFER) <= int(time.time()):
         raise HTTPException(status_code=403, detail="Picks are locked for this event")
 
@@ -40,6 +40,24 @@ def make_pick(req: PickRequest, db: DBDep, user: User = Depends(get_curr_user)):
         db.add(pick)
     db.commit()
     return {"fight_id": req.fight_id, "picked": req.picked}
+
+
+@router.delete("/api/picks/{fight_id}")
+def clear_pick(fight_id: int, db: DBDep, user: User = Depends(get_curr_user)):
+    """Un-pick"""
+    fight = db.get(UFCFight, fight_id)
+    if fight is None:
+        raise HTTPException(status_code=404, detail="Fight not found")
+    if fight.event and fight.event.date and (fight.event.date - EARLY_START_BUFFER) <= int(time.time()):
+        raise HTTPException(status_code=403, detail="Picks are locked for this event")
+
+    pick = db.execute(
+        select(Pick).where(Pick.user_id == user.id, Pick.fight_id == fight_id)
+    ).scalar_one_or_none()
+    if pick:
+        db.delete(pick)
+        db.commit()
+    return {"fight_id": fight_id, "picked": None}
 
 
 @router.get("/api/picks/me")

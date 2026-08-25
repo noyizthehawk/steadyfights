@@ -18,7 +18,7 @@ export default function Footer() {
         </nav>
 
         {/* right */}
-        <span>© {new Date().getFullYear()} STEADYCORPORATIONS</span>
+        <span>© {new Date().getFullYear()} STEADYCORPORATION</span>
       </div>
 
       {/* legal — kept, but subtle so the footer stays seamless */}
