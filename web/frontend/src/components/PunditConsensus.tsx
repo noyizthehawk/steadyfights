@@ -17,9 +17,9 @@ export function PunditConsensus({ data }: { data: NextConsensus | null }) {
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[#d33a2c]">
-            Pundit consensus
+            Pundit consensus for next main event
           </p>
-          <h2 className="truncate text-sm font-semibold text-white">{event.title}</h2>
+          <h2 className="break-words text-sm font-semibold text-white">{event.title}</h2>
         </div>
         <span className="shrink-0 text-xs text-zinc-500">
           {new Date(event.date * 1000).toLocaleDateString(undefined, {
@@ -41,7 +41,7 @@ export function PunditConsensus({ data }: { data: NextConsensus | null }) {
             />
           )}
           <div className="min-w-0">
-            <p className={`truncate text-sm font-semibold ${leansA ? "text-white" : "text-zinc-400"}`}>
+            <p className={`break-words text-sm font-semibold ${leansA ? "text-white" : "text-zinc-400"}`}>
               {fight.fighter_a}
             </p>
             {fight.odds_a && <p className="text-xs text-zinc-500">{fight.odds_a}</p>}
@@ -53,7 +53,7 @@ export function PunditConsensus({ data }: { data: NextConsensus | null }) {
         {/* B */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-right">
           <div className="min-w-0">
-            <p className={`truncate text-sm font-semibold ${leansB ? "text-white" : "text-zinc-400"}`}>
+            <p className={`break-words text-sm font-semibold ${leansB ? "text-white" : "text-zinc-400"}`}>
               {fight.fighter_b}
             </p>
             {fight.odds_b && <p className="text-xs text-zinc-500">{fight.odds_b}</p>}
