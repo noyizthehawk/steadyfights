@@ -20,7 +20,7 @@ export function EventTileMini({ event }: { event: UFCEvent }) {
                 )}
             </div>
             <p
-                className="mt-2 truncate text-center text-[9px] leading-relaxed text-zinc-400"
+                className="mt-2 break-words text-center text-[9px] leading-tight text-zinc-400"
                 style={{ fontFamily: "var(--font-display)" }}
             >
                 {event.title}

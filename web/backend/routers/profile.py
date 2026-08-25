@@ -38,8 +38,8 @@ async def upload_my_avatar(db: DBDep, file: UploadFile = File(...),
     return {"avatar_url": url}
 
 
-@router.get("/api/users/{user_id}/profile")
-def user_profile(user_id: int, db: DBDep, user: User = Depends(get_curr_user)):
+@router.get("/api/users/{user_id}/profile")   # public 
+def user_profile(user_id: int, db: DBDep):
     target = db.get(User, user_id)
     if target is None:
         raise HTTPException(status_code=404, detail="User not found")

@@ -85,7 +85,7 @@ def decline_invite(id: int, db: DBDep, user: User = Depends(get_curr_user)):
 def get_friends(db: DBDep, user: User = Depends(get_curr_user)):
     """All my friends (accepted invites)."""
     # get all accepted friendships for a user
-    rows = db.execute(
+    accepted_friendships = db.execute(
         select(Friendship).where(
             Friendship.status == "accepted",
             or_(Friendship.requester_id == user.id, Friendship.addressee_id == user.id),
@@ -93,8 +93,8 @@ def get_friends(db: DBDep, user: User = Depends(get_curr_user)):
     ).scalars().all()
 
     friends = []
-    for f in rows:
-        other_id = f.addressee_id if f.requester_id == user.id else f.requester_id
+    for friend in accepted_friendships:
+        other_id = friend.addressee_id if friend.requester_id == user.id else friend.requester_id
         other = db.get(User, other_id)
         if other:
             friends.append({"id": other.id, "username": other.username})

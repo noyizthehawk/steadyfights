@@ -33,10 +33,10 @@ export default function UserPastEvents() {
             {upcoming.length > 0 && (
                 <section className="mb-10">
                     <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[#d33a2c]">
-                        Upcoming predictions
+                        Upcoming Fights
                     </h2>
                     <p className="mb-4 text-sm text-zinc-400">
-                        Their picks for events that haven't happened yet.
+        
                     </p>
                     <div className={GRID}>
                         {upcoming.map((e) => (
@@ -52,7 +52,7 @@ export default function UserPastEvents() {
                     Past events
                 </h2>
                 <p className="mb-4 text-sm text-zinc-400">
-                    How their picks turned out — click one to see the results.
+                    
                 </p>
                 {past.length > 0 ? (
                     <div className={GRID}>

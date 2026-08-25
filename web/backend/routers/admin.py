@@ -37,6 +37,7 @@ def add_notable(username: str, db: DBDep, body: NotableRequest | None = None):
 
     user = _find_user(db, username)
     created = False
+    #if there is no user, create one (good for popular figures that dont have an account yet)
     if user is None:
         user = User(
             username=username,
@@ -70,7 +71,8 @@ def add_notable(username: str, db: DBDep, body: NotableRequest | None = None):
 
 
 @router.delete("/api/admin/notable/{username}", dependencies=[Depends(verify_admin_token)])
-def remove_notable(username: str, db: DBDep):                   
+def remove_notable(username: str, db: DBDep): 
+    #remov e the notable flag                  
     user = _find_user(db, username)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")

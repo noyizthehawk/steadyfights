@@ -103,12 +103,9 @@ class User(Base):
 
     # When the account was created.
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
     stripe_customer_id = Column(String, nullable=True, index=True)
-
     subscription_status = Column(String, nullable=True)
     free_predictions_used = Column(Integer, nullable=False, default=0)
-
     is_notable = Column(Boolean, nullable=False, default=False)
     youtube_channel_id = Column(String, nullable=True)
 

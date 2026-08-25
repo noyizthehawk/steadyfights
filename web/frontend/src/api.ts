@@ -472,6 +472,7 @@ export async function getUserEventCard(
 export type UserProfile = {
   id: number;
   name: string;
+  avatar_url: string | null;            // null → Avatar shows initials fallback
   member_since: number | null;          // unix seconds
   stats: {
     total_picks: number;

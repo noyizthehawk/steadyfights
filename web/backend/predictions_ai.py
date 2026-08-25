@@ -79,10 +79,9 @@ def find_prediction_video(channel_id: str, event) -> dict | None:
         return None
 
     fights = list(event.fights)
-    ev_num = _event_number(f"{event.title} {event.event_link}")
+    ev_num = _event_number(f"{event.title} {event.event_link}") #exctract numbers
 
-    # Headliners come from the event TITLE ("Main1 vs Main2"), which is reliable —
-    # the fights relationship isn't ordered main-event-first.
+   
     main_ln = {ln for ln in _last_names(re.split(r"\bvs\.?\b", event.title)) if len(ln) >= 3}
     all_ln = {ln for ln in _last_names([f.fighter_a for f in fights] + [f.fighter_b for f in fights]) if len(ln) >= 3}
     other_ln = all_ln - main_ln                                    # non-headliner card surnames
@@ -115,9 +114,7 @@ def find_prediction_video(channel_id: str, event) -> dict | None:
         if specific == 0:
             continue  # not about this event
 
-        # Is it a FULL-CARD PREDICTION video, or a reaction/rant that merely
-        # name-drops the headliners? These channels title breakdowns consistently,
-        # so genre language is the real discriminator — weight it above name-drops.
+        #is it a full card predciton video? sometimes youtubers make rant vids
         total = specific
         if "full card" in title:
             total += 4
@@ -176,7 +173,7 @@ _PROMPT = (
 
 def extract_picks(transcript: str, fights: list[dict]) -> list[dict]:
     card_lines = "\n".join(
-        f"{i+1}. {f['fighter_a']} vs {f['fighter_b']}" for i, f in enumerate(fights)
+        f"{i+1}. {fight['fighter_a']} vs {fight['fighter_b']}" for i, fight in enumerate(fights)
     )
     user = (
         f"FIGHT CARD:\n{card_lines}\n\n"
@@ -204,18 +201,18 @@ def _save_picks(db, user_id: int, event, extracted: list[dict]) -> dict:
     re-running updates rather than duplicates. Returns a review summary."""
     # normalized fighter-pair -> the real fight
     pair_map = {
-        frozenset({normalize_name(f.fighter_a), normalize_name(f.fighter_b)}): f
-        for f in event.fights
+        frozenset({normalize_name(fight.fighter_a), normalize_name(fight.fighter_b)}): fight
+        for fight in event.fights
     }
 
     created = updated = no_pick = unmatched = 0
     handled = set()   # fight ids already processed this batch
-    for p in extracted:
-        winner = p.get("predicted_winner")
+    for extracted_fight in extracted:
+        winner = extracted_fight.get("predicted_winner")
         if not winner:
             no_pick += 1
             continue
-        fight = pair_map.get(frozenset({normalize_name(p["fighter_a"]), normalize_name(p["fighter_b"])}))
+        fight = pair_map.get(frozenset({normalize_name(extracted_fight["fighter_a"]), normalize_name(extracted_fight["fighter_b"])}))
         if fight is None:
             unmatched += 1
             continue

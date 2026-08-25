@@ -2,10 +2,10 @@
 per-event stats and their list of past events."""
 import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import and_
 
-from ..dependencies import DBDep, get_curr_user
+from ..dependencies import DBDep
 from ..models import User, UFCEvent, UFCFight, Pick, NotableExtraction
 from ..stats import compute_user_stats
 
@@ -51,16 +51,17 @@ def get_upcoming_events(db: DBDep):
 
 
 @router.get("/api/users/{user_id}/stats")
-def user_stats(user_id: int, db: DBDep, user: User = Depends(get_curr_user), event_id: int | None = None):
+def user_stats(user_id: int, db: DBDep, event_id: int | None = None):
     """
-    Stats for a specific user, optionally filtered to a specific event. Returns settled picks, correct picks, and winrate.
-    The actual computation lives in stats.compute_user_stats (shared with the profile endpoint).
+    Public: stats for a specific user, optionally filtered to a specific event.
+    Returns settled picks, correct picks, and winrate. The actual computation
+    lives in stats.compute_user_stats (shared with the profile endpoint).
     """
     return compute_user_stats(db, user_id, event_id)
 
 
 @router.get("/api/users/{user_id}/events")
-def user_events(user_id: int, db: DBDep, user: User = Depends(get_curr_user)):
+def user_events(user_id: int, db: DBDep):
     """Every event this user has picks in — BOTH upcoming (their predictions,
     pre-results) and past (their track record). Each event carries an `upcoming`
     flag so the frontend can split them into two sections. Newest first."""
@@ -88,8 +89,7 @@ def user_events(user_id: int, db: DBDep, user: User = Depends(get_curr_user)):
 
 
 @router.get("/api/users/{user_id}/events/{event_id}/card")
-def user_event_card(user_id: int, event_id: int, db: DBDep,
-                    user: User = Depends(get_curr_user)):
+def user_event_card(user_id: int, event_id: int, db: DBDep):
     target = db.get(User, user_id)
     if target is None:
         raise HTTPException(status_code=404, detail="User not found")

@@ -32,9 +32,7 @@ async def sign_up(user: SignUpRequest, db: DBDep):
         select(User).where(User.email == user.email)
     ).scalar_one_or_none()
     if existing:
-        # Product choice: tell the user their email is already registered so they
-        # log in instead of being confused. (Trades away email enumeration
-        # protection — acceptable here; most consumer apps do the same.)
+       
         raise HTTPException(status_code=409, detail="You already have an account. Please log in.")
 
     new_user = User(email=user.email, hashed_password=hashed, username=user.username)
@@ -84,8 +82,7 @@ def login(user: LoginRequest, db: DBDep, response: Response):
 
 @router.post("/api/logout")
 def logout(response: Response):
-    # The token cookie is httpOnly, so JS can't clear it — the server must.
-    # Attributes must match the ones set at login or some browsers won't clear it.
+    # Clear the auth cookie.
     response.delete_cookie("token", samesite="lax", secure=COOKIE_SECURE)
     return {"message": "Logged out"}
 

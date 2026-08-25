@@ -24,8 +24,10 @@ export function EventTile({ event }: { event: UFCEvent }) {
             )}
 
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-3 text-left">
-                <h2 className="text-sm font-semibold text-white">{event.title}</h2>
-                <p className="text-xs text-zinc-300 font-bold">
+                <h2 className="break-words text-[11px] font-semibold leading-tight text-white sm:text-xs">
+                    {event.title}
+                </h2>
+                <p className="mt-0.5 text-xs font-bold text-zinc-300">
                     {new Date(event.date * 1000).toLocaleDateString()}
                 </p>
             </div>
