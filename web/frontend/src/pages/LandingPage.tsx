@@ -7,17 +7,20 @@ import {
   getNews,
   getVideos,
   getNotable,
+  getNextConsensus,
   type MeResponse,
   type UFCEvent,
   type LeaderboardRow,
   type NewsArticle,
   type Video,
   type NotableUser,
+  type NextConsensus,
 } from "../api";
 import { EventTileMini } from "../components/EventTileMini";
 import { NewsTile } from "../components/NewsTile";
 import { VideoTile } from "../components/VideoTile";
 import { NotableUsers } from "../components/NotableUsers";
+import { PunditConsensus } from "../components/PunditConsensus";
 
 
 const FEATURES: { title: string; blurb: string; to: string }[] = [
@@ -51,6 +54,7 @@ export default function LandingPage() {
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [notable, setNotable] = useState<NotableUser[]>([]);
+  const [consensus, setConsensus] = useState<NextConsensus | null>(null);
 
   useEffect(() => {
     me().then(setUser).catch(() => setUser(null));
@@ -60,6 +64,7 @@ export default function LandingPage() {
     getNews("UFC").then(setNews).catch(() => {});
     getVideos().then(setVideos).catch(() => {});
     getNotable().then(setNotable).catch(() => {});
+    getNextConsensus().then(setConsensus).catch(() => {});
   }, []);
 
   return (
@@ -109,16 +114,20 @@ export default function LandingPage() {
             <p className="text-sm text-zinc-500">No upcoming events.</p>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              {events.map((ev) => (
-                <EventTileMini key={ev.event_link} event={ev} />
+              {/* events come sorted soonest-first, so index 0 is the immediate
+                  next event — the only one that gets the pulsing glow. */}
+              {events.map((ev, idx) => (
+                <EventTileMini key={ev.event_link} event={ev} highlight={idx === 0} />
               ))}
             </div>
           )}
         </aside>
 
-        {/* Center — the 4 category tiles, with the prediction-videos tile
-            directly under them (spans the grid width). */}
+        {/* Center — pundit consensus, the 4 category tiles, then prediction videos */}
         <div className="flex flex-1 flex-col gap-6">
+          {/* Pundit consensus for the next main event (hides itself if unavailable) */}
+          <PunditConsensus data={consensus} />
+
           <div className="grid content-start gap-4 sm:grid-cols-2">
             {FEATURES.map((f) => (
               <Link

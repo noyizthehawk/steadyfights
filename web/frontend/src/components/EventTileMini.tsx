@@ -2,11 +2,16 @@ import { Link } from "react-router-dom";
 import { UFCEvent } from "../api";
 
 
-export function EventTileMini({ event }: { event: UFCEvent }) {
+// `highlight` = this is the immediate next event → pulsing red glow.
+export function EventTileMini({ event, highlight = false }: { event: UFCEvent; highlight?: boolean }) {
     const slug = event.event_link.split("/").filter(Boolean).pop();
     return (
         <Link to={`/events/${slug}`} className="group block">
-            <div className="aspect-[3/4] w-full overflow-hidden rounded-xl shadow-lg transition-transform duration-200 group-hover:scale-105">
+            <div
+                className={`aspect-[3/4] w-full overflow-hidden rounded-xl transition-transform duration-200 group-hover:scale-105 ${
+                    highlight ? "upcoming-glow" : "shadow-lg"
+                }`}
+            >
                 {event.poster ? (
                     <img
                         src={event.poster}

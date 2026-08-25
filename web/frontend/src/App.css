@@ -432,3 +432,24 @@ h1 {
     display: block;
   }
 }
+
+/* Pulsing red glow for upcoming-event tiles (EventTileMini). The first shadow
+   layer is a solid red "border" ring; the second is a blurred glow that blinks. */
+@keyframes upcomingGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 1.5px rgba(211, 58, 44, 0.9), 0 0 6px 1px rgba(211, 58, 44, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 1.5px rgba(211, 58, 44, 1), 0 0 16px 4px rgba(211, 58, 44, 0.8);
+  }
+}
+.upcoming-glow {
+  animation: upcomingGlow 1.8s ease-in-out infinite;
+}
+/* Respect reduced-motion: keep a static red glow, drop the blink. */
+@media (prefers-reduced-motion: reduce) {
+  .upcoming-glow {
+    animation: none;
+    box-shadow: 0 0 0 1.5px rgba(211, 58, 44, 0.9), 0 0 8px 1px rgba(211, 58, 44, 0.5);
+  }
+}

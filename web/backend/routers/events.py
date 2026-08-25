@@ -1,5 +1,6 @@
 """Event endpoints: upcoming events for the pick'em game, plus a user's
 per-event stats and their list of past events."""
+import re
 import time
 
 from fastapi import APIRouter, HTTPException
@@ -8,6 +9,7 @@ from sqlalchemy import and_
 from ..dependencies import DBDep
 from ..models import User, UFCEvent, UFCFight, Pick, NotableExtraction
 from ..stats import compute_user_stats
+from part_2.career import normalize_name
 
 router = APIRouter()
 
@@ -54,8 +56,7 @@ def get_upcoming_events(db: DBDep):
 def user_stats(user_id: int, db: DBDep, event_id: int | None = None):
     """
     Public: stats for a specific user, optionally filtered to a specific event.
-    Returns settled picks, correct picks, and winrate. The actual computation
-    lives in stats.compute_user_stats (shared with the profile endpoint).
+    Returns settled picks, correct picks, and winrate
     """
     return compute_user_stats(db, user_id, event_id)
 
@@ -169,4 +170,100 @@ def user_event_card(user_id: int, event_id: int, db: DBDep):
             "winrate": stats["winrate"],
         },
         "fights": fight_rows,
+    }
+
+
+def _main_fight(event) -> UFCFight | None:
+    """The main-event fight """
+    removed_vs = re.sub(r"\bvs\.?\b", " ", event.title or "", flags=re.IGNORECASE)
+    title_tokens = {name for name in normalize_name(removed_vs).split() if len(name) >= 2}
+    if not title_tokens: # no headliners return none
+        return None
+    for fight in event.fights:
+        names = set(normalize_name(fight.fighter_a).split()) | set(normalize_name(fight.fighter_b).split())
+        if title_tokens <= names:          # every headliner token appears in this bout
+            return fight
+    return None
+
+
+@router.get("/api/consensus/next")
+def next_event_consensus(db: DBDep):
+    """Public: notable-pundit consensus for the NEXT event's MAIN EVENT. Aggregates
+    the notable users' picks for that one fight into a vote split, with the count of
+    how many of the tracked pundits have weighed in so far (fills through fight week)."""
+    now = int(time.time())
+    event = (
+        db.query(UFCEvent)
+        .filter(UFCEvent.date > now)
+        .order_by(UFCEvent.date)
+        .first()
+    )
+    if event is None:
+        return {"event": None, "fight": None, "consensus": None}
+
+    fight = _main_fight(event)
+    event_out = {"id": event.id, "title": event.title, "date": event.date, "poster": event.poster}
+    if fight is None:
+        return {"event": event_out, "fight": None, "consensus": None}
+
+    # roster = notable pundits we actually track (have a linked channel)
+    roster = (
+        db.query(User)
+        .filter(User.is_notable.is_(True), User.youtube_channel_id.isnot(None))
+        .count()
+    )
+    # their picks on this one fight
+    picks = (
+        db.query(Pick.picked, User.username, User.avatar_url)
+        .join(User, User.id == Pick.user_id)
+        .filter(
+            Pick.fight_id == fight.id,
+            User.is_notable.is_(True),
+            User.youtube_channel_id.isnot(None),
+        )
+        .all()
+    )
+
+    a_norm, b_norm = normalize_name(fight.fighter_a), normalize_name(fight.fighter_b)
+    a_votes = b_votes = 0
+    voters = []
+    for picked, username, avatar_url in picks:
+        pn = normalize_name(picked)
+        side = fight.fighter_a if pn == a_norm else fight.fighter_b if pn == b_norm else None
+        if side is None:
+            continue                        # a pick that isn't either corner (shouldn't happen)
+        if side == fight.fighter_a:
+            a_votes += 1
+        else:
+            b_votes += 1
+        voters.append({"username": username, "avatar_url": avatar_url, "picked": side})
+
+    voted = a_votes + b_votes
+    lean = None
+    if a_votes > b_votes:
+        lean = fight.fighter_a
+    elif b_votes > a_votes:
+        lean = fight.fighter_b
+
+    return {
+        "event": event_out,
+        "fight": {
+            "id": fight.id,
+            "fighter_a": fight.fighter_a,
+            "fighter_b": fight.fighter_b,
+            "img_a": fight.img_a,
+            "img_b": fight.img_b,
+            "odds_a": fight.odds_a,
+            "odds_b": fight.odds_b,
+        },
+        "consensus": {
+            "roster": roster,              
+            "voted": voted,                 
+            "a_votes": a_votes,
+            "b_votes": b_votes,
+            "a_pct": round(a_votes / voted * 100) if voted else 0,
+            "b_pct": round(b_votes / voted * 100) if voted else 0,
+            "lean": lean,                   # majority pick, null on tie / no votes
+            "voters": voters,               # who picked whom (for avatars)
+        },
     }

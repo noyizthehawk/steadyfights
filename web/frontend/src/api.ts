@@ -364,6 +364,45 @@ export async function getNotable(): Promise<NotableUser[]> {
   return data.notable;
 }
 
+// ── Pundit consensus for the next event's MAIN EVENT ────────────────────────
+// Backed by GET /api/consensus/next (public). Any of the three can be null:
+// event null = no upcoming card; fight null = main event couldn't be matched;
+// consensus.voted 0 = no pundits have posted yet ("picks coming in").
+export type ConsensusVoter = {
+  username: string;
+  avatar_url: string | null;
+  picked: string;          // the corner they picked (fighter_a or fighter_b)
+};
+
+export type NextConsensus = {
+  event: { id: number; title: string; date: number; poster: string | null } | null;
+  fight: {
+    id: number;
+    fighter_a: string;
+    fighter_b: string;
+    img_a: string | null;
+    img_b: string | null;
+    odds_a: string | null;
+    odds_b: string | null;
+  } | null;
+  consensus: {
+    roster: number;        
+    voted: number;        
+    a_votes: number;
+    b_votes: number;
+    a_pct: number;         
+    b_pct: number;
+    lean: string | null;   
+    voters: ConsensusVoter[];
+  } | null;
+};
+
+export async function getNextConsensus(): Promise<NextConsensus> {
+  const res = await fetch(`${BASE_URL}/api/consensus/next`);
+  if (!res.ok) throw new Error("Could not load consensus");
+  return res.json() as Promise<NextConsensus>;
+}
+
 // Fetch the list of fighter names for the dropdowns.
 export async function getFighters(): Promise<string[]> {
   const res = await fetch(`${BASE_URL}/api/fighters`);
