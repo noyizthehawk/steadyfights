@@ -35,6 +35,9 @@ def add_notable(username: str, db: DBDep, body: NotableRequest | None = None):
         if not channel_id:
             raise HTTPException(status_code=400, detail="Could not resolve YouTube handle to a channel id")
 
+    # pull the channel's profile picture (hotlinked) so the pundit has a real avatar
+    avatar = youtube.fetch_channel_avatar(channel_id) if channel_id else None
+
     user = _find_user(db, username)
     created = False
     #if there is no user, create one (good for popular figures that dont have an account yet)
@@ -45,6 +48,7 @@ def add_notable(username: str, db: DBDep, body: NotableRequest | None = None):
             hashed_password=hash_password(secrets.token_urlsafe(32)),  # unusable
             is_notable=True,
             youtube_channel_id=channel_id,
+            avatar_url=avatar,
         )
         db.add(user)
         created = True
@@ -52,6 +56,8 @@ def add_notable(username: str, db: DBDep, body: NotableRequest | None = None):
         user.is_notable = True
         if channel_id:
             user.youtube_channel_id = channel_id
+        if avatar:
+            user.avatar_url = avatar
 
     try:
         db.commit()
@@ -98,8 +104,7 @@ def scrape_events_endpoint(db: DBDep):
 def extract_predictions(body: ExtractRequest, db: DBDep):
     """Run the AI pipeline: pull each notable YouTuber's prediction video for this
     event, extract their picks, and save them. Returns a per-user summary to
-    review. Pass `username` to run one user, and `video_id` to override the
-    auto-matched video (requires `username`)."""
+    review. """
     if body.video_id and not body.username:
         raise HTTPException(status_code=400, detail="video_id override requires a username")
 

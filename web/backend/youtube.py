@@ -50,6 +50,30 @@ def _fetch_playlist(playlist_id: str) -> list[dict]:
     return resp.json().get("items", [])
 
 
+_CHANNELS_API = "https://www.googleapis.com/youtube/v3/channels"
+
+
+def fetch_channel_avatar(channel_id: str) -> str | None:
+    """The channel's profile-picture URL (highest size available) or none"""
+    if not (YOUTUBE_API_KEY and channel_id):
+        return None
+    try:
+        resp = requests.get(_CHANNELS_API, params={
+            "part": "snippet",
+            "id": channel_id,
+            "key": YOUTUBE_API_KEY,
+        }, timeout=10)
+        resp.raise_for_status()
+        items = resp.json().get("items", [])
+        if not items:
+            return None
+        thumbs = (items[0].get("snippet") or {}).get("thumbnails") or {}
+        best = thumbs.get("high") or thumbs.get("medium") or thumbs.get("default") or {}
+        return best.get("url")
+    except Exception:
+        return None
+
+
 def fetch_channel_uploads(channel_id: str, limit: int = 30) -> list[dict]:
     """Recent uploads (parsed, unfiltered) for ONE channel, newest first — used
     to match a prediction video to an event. Raises on API failure."""
@@ -60,7 +84,7 @@ def fetch_channel_uploads(channel_id: str, limit: int = 30) -> list[dict]:
     videos = []
     for video in all_videos:
         video_data = _video_metadata(video) #meta data for each video
-        if video:
+        if video_data:
             videos.append(video_data)
 
     # sort newest first
