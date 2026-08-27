@@ -14,7 +14,12 @@ from part_2.career import normalize_name
 router = APIRouter()
 
 
-NOT_MINOR_CARD = ~func.coalesce(UFCEvent.title, "").ilike("%road to ufc%")
+# "Road to UFC" is a regional developmental series casual users don't follow and
+# pundits never make videos for, so it only ever surfaces as an empty consensus.
+# Its display TITLE is just the fighter names ("Maheshate vs Flowers"), but the
+# URL slug always keeps the marker (…/event/road-to-ufc-season-5-…), so filter on
+# event_link. coalesce keeps null-link rows (they don't match) instead of dropping.
+NOT_MINOR_CARD = ~func.coalesce(UFCEvent.event_link, "").ilike("%road-to-ufc%")
 
 
 @router.get("/api/events/upcoming")
