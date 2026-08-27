@@ -11,8 +11,9 @@ export default function PredictionGamePage() {
 
     useEffect(() => {
         getUpcomingEvents()
-        // only events that actually have fights to pick belong in the checker
-        .then((evs) => setEvents(evs.filter((e) => e.fights.length > 0)))
+        // only events with a venue (real, dated cards) and actual fights to pick
+        // belong in the checker  venue-less far-out events are noise.
+        .then((evs) => setEvents(evs.filter((e) => e.venue && e.fights.length > 0)))
         .catch((e) => setError(e instanceof Error ? e.message : "Failed to load events"));
         // who's logged in (for the past-events link); null when logged out
         me().then((u) => setUserId(u.id)).catch(() => setUserId(null));

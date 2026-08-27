@@ -110,17 +110,21 @@ export default function LandingPage() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">
             Upcoming Events
           </h2>
-          {events.length === 0 ? (
-            <p className="text-sm text-zinc-500">No upcoming events.</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {/* events come sorted soonest-first, so index 0 is the immediate
-                  next event — the only one that gets the pulsing glow. */}
-              {events.map((ev, idx) => (
-                <EventTileMini key={ev.event_link} event={ev} highlight={idx === 0} />
-              ))}
-            </div>
-          )}
+          {(() => {
+            
+            const visible = events.filter((ev) => ev.venue);
+            return visible.length === 0 ? (
+              <p className="text-sm text-zinc-500">No upcoming events.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {/* sorted soonest-first, so index 0 is the immediate next event —
+                    the only one that gets the pulsing glow. */}
+                {visible.map((ev, idx) => (
+                  <EventTileMini key={ev.event_link} event={ev} highlight={idx === 0} />
+                ))}
+              </div>
+            );
+          })()}
         </aside>
 
         {/* Center — pundit consensus, the 4 category tiles, then prediction videos */}

@@ -230,9 +230,11 @@ def scrape_events():
         timestamp = date_div.get("data-main-card-timestamp") if date_div else None
         if timestamp and int(timestamp) < time.time():
             continue
-         # Venue
+         # Venue — the location div can exist while its <h5> is still absent for
+        # far-out events with a TBA venue, so guard the <h5> lookup too, not just the div.
         location = article.find("div", class_="c-card-event--result__location")
-        venue = location.find("h5").text.strip() if location else None
+        venue_el = location.find("h5") if location else None
+        venue = venue_el.text.strip() if venue_el else None
 
         # The bouts (names + odds) come from the event's detail page, where
         poster, fights = scrape_event_details(event_link) if event_link else (None, []) # get event details and fights 
