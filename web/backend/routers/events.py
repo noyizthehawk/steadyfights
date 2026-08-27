@@ -4,7 +4,7 @@ import re
 import time
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 
 from ..dependencies import DBDep
 from ..models import User, UFCEvent, UFCFight, Pick, NotableExtraction
@@ -14,6 +14,9 @@ from part_2.career import normalize_name
 router = APIRouter()
 
 
+NOT_MINOR_CARD = ~func.coalesce(UFCEvent.title, "").ilike("%road to ufc%")
+
+
 @router.get("/api/events/upcoming")
 def get_upcoming_events(db: DBDep):
     #front end call this
@@ -21,7 +24,7 @@ def get_upcoming_events(db: DBDep):
     #filter by date
     events = (
         db.query(UFCEvent)
-        .filter(UFCEvent.date > now)
+        .filter(UFCEvent.date > now, NOT_MINOR_CARD)
         .order_by(UFCEvent.date)
         .all()
     )
@@ -194,7 +197,7 @@ def next_event_consensus(db: DBDep):
     now = int(time.time())
     event = (
         db.query(UFCEvent)
-        .filter(UFCEvent.date > now)
+        .filter(UFCEvent.date > now, NOT_MINOR_CARD)
         .order_by(UFCEvent.date)
         .first()
     )

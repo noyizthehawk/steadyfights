@@ -292,6 +292,8 @@ def run_extraction_sweep(db, within_days: int = 10, reextract: bool = False) -> 
         .order_by(UFCEvent.date)
         .all()
     )
+    # Skip "Road to UFC" events
+    events = [e for e in events if "road to ufc" not in (e.title or "").lower()]
     pundits = (
         db.query(User)
         .filter(User.is_notable.is_(True), User.youtube_channel_id.isnot(None))
