@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { type NextConsensus } from "../api";
 import { Avatar } from "./Avatar";
 
 //homepage widget
 export function PunditConsensus({ data }: { data: NextConsensus | null }) {
+  // expandable "who picked who" breakdown, collapsed by default
+  const [open, setOpen] = useState(false);
+
   // hide entirely if there's no upcoming card or we couldn't match the main event
   if (!data || !data.event || !data.fight || !data.consensus) return null;
 
@@ -10,6 +14,11 @@ export function PunditConsensus({ data }: { data: NextConsensus | null }) {
   const { a_pct, b_pct, voted, roster, lean, voters } = consensus;
   const leansA = lean === fight.fighter_a;
   const leansB = lean === fight.fighter_b;
+
+  // split the voters by the corner they picked, so the breakdown can mirror the
+  // fighters row above: A-pickers on the left, B-pickers on the right.
+  const aVoters = voters.filter((v) => v.picked === fight.fighter_a);
+  const bVoters = voters.filter((v) => v.picked === fight.fighter_b);
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6">
@@ -86,25 +95,74 @@ export function PunditConsensus({ data }: { data: NextConsensus | null }) {
         </div>
       )}
 
-      {/* footer: n-of-m + voter avatars */}
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="text-xs text-zinc-500">
+      {/* footer: n-of-m + a collapsed avatar preview; the whole row toggles the
+          full "who picked who" breakdown when there are voters. */}
+      {voters.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="mt-3 flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left transition-colors hover:bg-zinc-800/60"
+        >
+          <span className="text-xs text-zinc-500">
+            {voted} of {roster} pundit{roster === 1 ? "" : "s"} in
+          </span>
+          <span className="flex items-center gap-2">
+            {/* collapsed preview stack, hidden once expanded */}
+            {!open && (
+              <span className="flex -space-x-2">
+                {voters.slice(0, 6).map((v) => (
+                  <span key={v.username} className="rounded-full ring-2 ring-zinc-900">
+                    <Avatar url={v.avatar_url} name={v.username} size={22} />
+                  </span>
+                ))}
+              </span>
+            )}
+            <svg
+              viewBox="0 0 20 20"
+              className={`h-4 w-4 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+            </svg>
+          </span>
+        </button>
+      ) : (
+        <div className="mt-3 text-xs text-zinc-500">
           {voted} of {roster} pundit{roster === 1 ? "" : "s"} in
-        </span>
-        {voters.length > 0 && (
-          <div className="flex -space-x-2">
-            {voters.slice(0, 6).map((v) => (
-              <div
-                key={v.username}
-                title={`${v.username} → ${v.picked}`}
-                className="rounded-full ring-2 ring-zinc-900"
-              >
-                <Avatar url={v.avatar_url} name={v.username} size={22} />
-              </div>
-            ))}
+        </div>
+      )}
+
+      {/* expanded breakdown: A-pickers (left) vs B-pickers (right) */}
+      {open && voters.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-zinc-800 pt-3">
+          <div className="min-w-0 space-y-2">
+            {aVoters.length === 0 ? (
+              <p className="text-xs text-zinc-600">—</p>
+            ) : (
+              aVoters.map((v) => (
+                <div key={v.username} className="flex min-w-0 items-center gap-2">
+                  <Avatar url={v.avatar_url} name={v.username} size={20} />
+                  <span className="truncate text-xs text-zinc-300">{v.username}</span>
+                </div>
+              ))
+            )}
           </div>
-        )}
-      </div>
+          <div className="min-w-0 space-y-2">
+            {bVoters.length === 0 ? (
+              <p className="text-right text-xs text-zinc-600">—</p>
+            ) : (
+              bVoters.map((v) => (
+                <div key={v.username} className="flex min-w-0 items-center justify-end gap-2 text-right">
+                  <span className="truncate text-xs text-zinc-300">{v.username}</span>
+                  <Avatar url={v.avatar_url} name={v.username} size={20} />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
