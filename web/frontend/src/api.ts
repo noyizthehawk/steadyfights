@@ -658,6 +658,7 @@ export async function logout(): Promise<void> {
 export type LeaderboardRow = {
   id: number;          // user id — used to send a friend invite from a card
   name: string;
+  avatar_url: string | null;   // null → Avatar shows initials fallback
   total_picks: number;
   settled: number;
   correct: number;

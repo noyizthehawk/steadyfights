@@ -16,6 +16,7 @@ import {
   type NotableUser,
   type NextConsensus,
 } from "../api";
+import { Avatar } from "../components/Avatar";
 import { EventTileMini } from "../components/EventTileMini";
 import { NewsTile } from "../components/NewsTile";
 import { VideoTile } from "../components/VideoTile";
@@ -178,8 +179,9 @@ export default function LandingPage() {
                     key={row.id}
                     className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-zinc-800"
                   >
-                    <span className="flex items-center gap-2 truncate">
+                    <span className="flex min-w-0 items-center gap-2 truncate">
                       <span className="w-4 shrink-0 text-right font-bold text-zinc-500">{i + 1}</span>
+                      <Avatar url={row.avatar_url} name={row.name} size={22} />
                       <Link to={`/users/${row.id}`} className="truncate text-white hover:underline">
                         {row.name}
                       </Link>

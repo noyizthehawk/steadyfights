@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getLeaderboard, type LeaderboardRow } from "../api";
 import { useNavigate } from "react-router-dom";
 import { rankColor } from "../lib/rankColor";
+import { Avatar } from "../components/Avatar";
 
 export default function LeaderboardPage() {
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
@@ -33,7 +34,9 @@ export default function LeaderboardPage() {
               {i + 1}
             </span>
 
-            <span className="flex-1 font-semibold text-white">{row.name}</span>
+            <Avatar url={row.avatar_url} name={row.name} size={36} />
+
+            <span className="min-w-0 flex-1 truncate font-semibold text-white">{row.name}</span>
 
             <div className="text-right">
               <div className="font-bold text-[#d33a2c]">

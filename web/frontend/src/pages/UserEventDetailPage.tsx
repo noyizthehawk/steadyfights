@@ -2,6 +2,21 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getUserEventCard, type EventCard } from "../api";
 
+// Ring around a fighter's avatar that encodes the pundit's pick + the outcome.
+// Position already shows WHICH corner they picked, so color is spent on state:
+//   white  = their pick, fight hasn't happened yet
+//   green  = the actual winner (also = a correct pick, since they coincide)
+//   red    = their pick, but it lost
+const RING_OFFSET = "ring-offset-2 ring-offset-zinc-800";
+function ringClass(isPicked: boolean, isWinner: boolean, settled: boolean): string {
+    if (settled) {
+        if (isWinner) return `ring-2 ring-green-500 ${RING_OFFSET}`;
+        if (isPicked) return `ring-2 ring-red-500 ${RING_OFFSET}`;
+        return "";
+    }
+    return isPicked ? `ring-2 ring-white/70 ${RING_OFFSET}` : "";
+}
+
 export default function UserEventDetailPage() {
     const { userId, eventId } = useParams<{ userId: string; eventId: string }>();
     const navigate = useNavigate();
@@ -69,6 +84,8 @@ export default function UserEventDetailPage() {
                     const pickedA = fight.picked === fight.fighter_a;
                     const pickedB = fight.picked === fight.fighter_b;
                     const noPick = fight.picked === null;
+                    const ringA = ringClass(pickedA, fight.settled && fight.winner === fight.fighter_a, fight.settled);
+                    const ringB = ringClass(pickedB, fight.settled && fight.winner === fight.fighter_b, fight.settled);
                     return (
                         <li
                             key={fight.id}
@@ -79,16 +96,12 @@ export default function UserEventDetailPage() {
                             {/* fighter A */}
                             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                                 {fight.img_a && (
-                                    <img src={fight.img_a} alt={fight.fighter_a} className="h-11 w-11 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
+                                    <img src={fight.img_a} alt={fight.fighter_a} className={`h-11 w-11 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16 ${ringA}`} />
                                 )}
                                 <div className="min-w-0">
                                     <p className={`break-words text-sm font-semibold sm:text-base ${pickedA ? "text-white" : "text-zinc-400"}`}>
                                         {fight.fighter_a}
-                                        {pickedA && <span className="ml-2 text-xs text-zinc-500">(picked)</span>}
                                     </p>
-                                    {fight.settled && fight.winner === fight.fighter_a && (
-                                        <p className="text-xs font-bold text-green-500">WINNER</p>
-                                    )}
                                 </div>
                             </div>
 
@@ -110,14 +123,10 @@ export default function UserEventDetailPage() {
                                 <div className="min-w-0">
                                     <p className={`break-words text-sm font-semibold sm:text-base ${pickedB ? "text-white" : "text-zinc-400"}`}>
                                         {fight.fighter_b}
-                                        {pickedB && <span className="ml-2 text-xs text-zinc-500">(picked)</span>}
                                     </p>
-                                    {fight.settled && fight.winner === fight.fighter_b && (
-                                        <p className="text-xs font-bold text-green-500">WINNER</p>
-                                    )}
                                 </div>
                                 {fight.img_b && (
-                                    <img src={fight.img_b} alt={fight.fighter_b} className="h-11 w-11 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
+                                    <img src={fight.img_b} alt={fight.fighter_b} className={`h-11 w-11 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16 ${ringB}`} />
                                 )}
                             </div>
                         </li>
