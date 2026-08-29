@@ -10,7 +10,7 @@ from ..schemas import PickRequest
 
 router = APIRouter()
 
-EARLY_START_BUFFER = 5 * 3600  # seconds; picks lock this long before UFC's listed time
+EARLY_START_BUFFER = 3 * 3600  # seconds; picks lock this long before UFC's listed time
 
 
 @router.post("/api/picks")

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getUpcomingEvents, getMyPicks, makePick, clearPick, AuthError, type UFCEvent } from "../api";
+import { picksLocked } from "../lib/lock";
 
 export default function EventDetailPage() {
    //slug from route
@@ -23,13 +24,15 @@ export default function EventDetailPage() {
                 else setEvent(match);
             })
             .catch((e) => setError(e instanceof Error ? e.message : "Failed to load event"));
-        // pre-fill any picks this user already made (returns {} when logged out)
+        
         getMyPicks().then(setPicks);
     }, [slug]);
 
     // Click a fighter: pick them, or — if they're already your pick — un-pick
     // entirely (toggle off). Logged-out users get sent to login.
     async function handlePick(fightId: number, fighter: string) {
+        // mirror the backend lock so a locked click never even fires (it'd 403)
+        if (picksLocked(event?.date)) return;
         const isCurrent = picks[fightId] === fighter;
         try {
             if (isCurrent) {
@@ -52,13 +55,21 @@ export default function EventDetailPage() {
     if (error) return <p className="error">{error}</p>;
     if (!event) return <p>Loading…</p>;
 
+    const locked = picksLocked(event.date);
+
     return (
         <div className="event-detail w-full px-6 py-8">
             <Link to="/prediction-game" className="text-sm text-zinc-400">← Back</Link>
             <h1 className="mb-1 text-2xl font-bold text-white">{event.title}</h1>
-            <p className="mb-6 text-sm text-zinc-400">
+            <p className="mb-2 text-sm text-zinc-400">
                 {new Date(event.date * 1000).toLocaleDateString()} · {event.venue ?? "TBA"}
             </p>
+            {locked && (
+                <p className="mb-6 inline-flex items-center gap-1.5 rounded-md bg-zinc-800 px-3 py-1.5 text-sm font-semibold text-amber-400">
+                    Picks are locked for this event
+                </p>
+            )}
+            {!locked && <div className="mb-6" />}
 
             <ul className="space-y-3">
                 {event.fights.map((fight) => {
@@ -101,8 +112,13 @@ export default function EventDetailPage() {
                         {/* pick A / pick B sit under their own fighter */}
                         <button
                             onClick={() => handlePick(fight.id, fight.fighter_a)}
-                            title={pickedA ? "Tap to remove your pick" : `Pick ${fight.fighter_a}`}
-                            className={`btn w-full rounded px-3 py-1 text-sm font-display ${pickedA ? "bg-red-600" : "bg-zinc-700 hover:bg-red-600"}`}
+                            disabled={locked}
+                            title={locked ? "Picks are locked" : pickedA ? "Tap to remove your pick" : `Pick ${fight.fighter_a}`}
+                            className={`btn w-full rounded px-3 py-1 text-sm font-display ${
+                                locked
+                                    ? `cursor-not-allowed ${pickedA ? "bg-red-600/60" : "bg-zinc-800 text-zinc-600"}`
+                                    : pickedA ? "bg-red-600" : "bg-zinc-700 hover:bg-red-600"
+                            }`}
                         >
                             {pickedA ? "PICKED" : "PICK"}
                         </button>
@@ -111,8 +127,13 @@ export default function EventDetailPage() {
 
                         <button
                             onClick={() => handlePick(fight.id, fight.fighter_b)}
-                            title={pickedB ? "Tap to remove your pick" : `Pick ${fight.fighter_b}`}
-                            className={`btn w-full rounded px-3 py-1 text-sm font-display ${pickedB ? "bg-blue-600" : "bg-zinc-700 hover:bg-blue-600"}`}
+                            disabled={locked}
+                            title={locked ? "Picks are locked" : pickedB ? "Tap to remove your pick" : `Pick ${fight.fighter_b}`}
+                            className={`btn w-full rounded px-3 py-1 text-sm font-display ${
+                                locked
+                                    ? `cursor-not-allowed ${pickedB ? "bg-blue-600/60" : "bg-zinc-800 text-zinc-600"}`
+                                    : pickedB ? "bg-blue-600" : "bg-zinc-700 hover:bg-blue-600"
+                            }`}
                         >
                             {pickedB ? "PICKED" : "PICK"}
                         </button>
