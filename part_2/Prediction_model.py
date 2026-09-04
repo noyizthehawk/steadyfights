@@ -74,6 +74,7 @@ def expected_score(elo_a, elo_b):
 
 
 def update_elo(elo_a, elo_b, actual_score_a, k=K_FACTOR):
+    """Update Elo ratings after a fight."""
     expected_a = expected_score(elo_a, elo_b)
     new_elo_a = elo_a + k * (actual_score_a - expected_a)
     new_elo_b = elo_b + k * ((1 - actual_score_a) - (1 - expected_a))
@@ -86,16 +87,16 @@ def _fighter_snapshot(name):
 
     """
     rows = fighters_df[fighters_df["name"] == name].sort_values("date")
-    last = rows.iloc[-1]
+    last = rows.iloc[-1] # get last fight
     snap = last.copy()
     today = pd.Timestamp.now()
     snap["elo_before_fight"] = elo_ratings.get(name, INITIAL_ELO)
     snap["days_since_last_fight"] = (today - last["date"]).days
 
     # Inactivity decay:
-    idle_years = max(0.0, (snap["days_since_last_fight"] - 365) / 365.25)
+    idle_years = max(0.0, (snap["days_since_last_fight"] - 365) / 365.25) # idle years
     if idle_years > 0:
-        gap = snap["elo_before_fight"] - INITIAL_ELO
+        gap = snap["elo_before_fight"] - INITIAL_ELO # gap between base elo and current
         snap["elo_before_fight"] = INITIAL_ELO + gap * (ELO_INACTIVITY_DECAY ** idle_years)
 
     if pd.notna(last["dob"]):
