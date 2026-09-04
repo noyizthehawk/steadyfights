@@ -149,8 +149,17 @@ def transform_to_ufc_clean_format(raw_df):
             winner = row.get('Winner', 'Unknown')
             fighter_1_id = row.get('Fighter_1_Id', None)
             fighter_2_id = row.get('Fighter_2_Id', None)
-            fighter_1_name = row.get('Fighter_1', '')
-            fighter_2_name = row.get('Fighter_2', '')
+            # Fighter_1/Fighter_2 come from the event listing, which is ordered
+            # winner-first; Fighter_1_Name/_2_Name come from the fight detail page,
+            # the same place as the ids and the physicals. Prefer the detail-page
+            # names so r_name always belongs to r_id (raw files scraped before the
+            # scraper fix only have the listing order, hence the fallback).
+            def _detail_name(detail_col, listing_col):
+                v = row.get(detail_col)
+                return v if pd.notna(v) and str(v).strip() else row.get(listing_col, '')
+
+            fighter_1_name = _detail_name('Fighter_1_Name', 'Fighter_1')
+            fighter_2_name = _detail_name('Fighter_2_Name', 'Fighter_2')
 
             # Determine winner_id
             if winner == fighter_1_name:
@@ -180,7 +189,7 @@ def transform_to_ufc_clean_format(raw_df):
                 'referee': row['Referee'] if pd.notna(row['Referee']) else '',
 
                 # RED
-                'r_name': row['Fighter_1'], 'r_id': row.get('Fighter_1_Id', None),
+                'r_name': fighter_1_name, 'r_id': fighter_1_id,
                 'r_kd': r_kd, 'r_sig_str_landed': r_sig_landed, 'r_sig_str_atmpted': r_sig_atmpted,
                 'r_sig_str_acc': r_sig_acc,
                 'r_total_str_landed': r_total_landed, 'r_total_str_atmpted': r_total_atmpted,
@@ -210,7 +219,7 @@ def transform_to_ufc_clean_format(raw_df):
                 'r_td_def': row.get('Fighter_1_td_def', None), 'r_sub_avg': row.get('Fighter_1_sub_avg', None),
 
                 # BLUE
-                'b_name': row['Fighter_2'], 'b_id': row.get('Fighter_2_Id', None),
+                'b_name': fighter_2_name, 'b_id': fighter_2_id,
                 'b_kd': b_kd, 'b_sig_str_landed': b_sig_landed, 'b_sig_str_atmpted': b_sig_atmpted,
                 'b_sig_str_acc': b_sig_acc,
                 'b_total_str_landed': b_total_landed, 'b_total_str_atmpted': b_total_atmpted,

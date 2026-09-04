@@ -348,6 +348,17 @@ def scrape_new_fights(csv_path, output_path=None):
                 for header, value in zip(basic_headers, fight_info):
                     fight_dict[header] = value
 
+                # The event listing (fight_info) lists the WINNER first, but every
+                # other field on this row -- the ids, the profile physicals, and the
+                # totals/sig-str tables from parse_fight_details -- is in CORNER
+                # order. Keeping the listing names would pin fighter 1's name to
+                # fighter 2's id/height/reach on every blue-corner win. The detail
+                # page names come from the same divs as the ids, so they are the
+                # ones that line up.
+                if fight_dict.get('Fighter_1_Name') and fight_dict.get('Fighter_2_Name'):
+                    fight_dict['Fighter_1'] = fight_dict['Fighter_1_Name']
+                    fight_dict['Fighter_2'] = fight_dict['Fighter_2_Name']
+
                 fighter_1_id = fight_dict.get('Fighter_1_Id')
                 fighter_2_id = fight_dict.get('Fighter_2_Id')
 

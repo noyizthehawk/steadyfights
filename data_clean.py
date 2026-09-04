@@ -33,6 +33,14 @@ def clean_ufc():
         if c in df.columns:
             df[c] = pd.to_datetime(df[c], errors="coerce")
 
+    # ufcstats serves stance lower-cased on some fighter pages ("southpaw"), and
+    # the model one-hot encodes this column. Left as-is, "southpaw" becomes a
+    # SEPARATE dummy from "Southpaw", so every fighter with a lower-cased row
+    # reads 0 on all three stance features and stance drops out of the prediction.
+    for c in ["r_stance", "b_stance"]:
+        if c in df.columns:
+            df[c] = df[c].str.title()
+
     return df
 
 
