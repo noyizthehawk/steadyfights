@@ -2,7 +2,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
   padding: 1rem 1.5rem;
+  /* Without these the nav is free to grow past the viewport and drag a
+     horizontal scrollbar (plus a strip of dead space) onto every page. */
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .nav-left,
@@ -10,6 +15,9 @@
   display: flex;
   gap: 1.25rem;
   align-items: center;
+  /* Flex items default to min-width:auto, i.e. they refuse to shrink below
+     their content. That is what let a long username push the nav wide. */
+  min-width: 0;
 }
 
 /* The hamburger wrapper is hidden on desktop; position:relative anchors the
@@ -43,6 +51,20 @@
   color: #e7e7ea;
   text-decoration: none;
   font-weight: 600;
+  min-width: 0; /* lets .nav-username actually truncate inside this flex row */
+}
+
+/* Desktop: cap the username and ellipsis it rather than letting it set the
+   nav's width. Mobile hides it entirely (see the 768px block below). */
+.nav-username {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-caret {
+  flex-shrink: 0;
 }
 
 .page {
@@ -74,12 +96,19 @@ h1 {
   flex-direction: column;
   gap: 0.35rem;
   flex: 1;
+  /* A <select> is intrinsically as wide as its longest option, and a flex item
+     defaults to min-width:auto (refuses to shrink past that). With ~2600 fighter
+     names in the list that widened the whole row on phones. */
+  min-width: 0;
   font-size: 0.85rem;
   color: #9a9aa2;
 }
 
 .field select,
 .field input {
+  /* pair with .field's min-width:0 so the control fills its column and no more */
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.5rem;
   border-radius: 8px;
   background: #111;
@@ -113,107 +142,6 @@ h1 {
 .error {
   color: #ff7a6b;
   margin-top: 1rem;
-}
-
-.result {
-  margin-top: 2rem;
-  padding: 1.25rem;
-  border-radius: 12px;
-  background: #000;
-}
-
-.matchup {
-  margin-bottom: 1rem;
-  font-weight: 600;
-}
-
-.matchup small {
-  color: #9a9aa2;
-  font-weight: 400;
-}
-
-.prob-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0.5rem 0;
-}
-
-.prob-name {
-  width: 150px;
-  font-size: 0.9rem;
-}
-
-.prob-track {
-  flex: 1;
-  height: 14px;
-  background: #2a2a31;
-  border-radius: 7px;
-  overflow: hidden;
-}
-
-.prob-fill {
-  height: 100%;
-  background: #d33a2c;
-  transition: width 0.4s ease;
-}
-
-.prob-pct {
-  width: 56px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.pick {
-  margin-top: 1rem;
-  padding-top: 1rem;
-}
-
-.tale-of-the-tape {
-  margin-top: 1rem;
-  padding-top: 1rem;
-}
-
-.tale-of-the-tape h3 {
-  margin: 0 0 0.75rem;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #9a9aa2;
-}
-
-.tape-row {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-}
-
-.tape-val {
-  font-variant-numeric: tabular-nums;
-  color: #9a9aa2;
-}
-
-/* fighter A hugs the left edge, fighter B hugs the right edge, label stays centered */
-.tape-row .tape-val:first-child {
-  text-align: left;
-}
-
-.tape-row .tape-val:last-child {
-  text-align: right;
-}
-
-.tape-val.winner {
-  color: #d33a2c;
-  font-weight: 700;
-}
-
-.tape-label {
-  font-size: 0.85rem;
-  color: #c8c8d0;
-  text-align: center;
-  white-space: nowrap;
 }
 
 /* ---- Card base (used by FighterProfileCard + its loading/error states) ---- */
@@ -430,6 +358,16 @@ h1 {
   }
   .nav-mobile {
     display: block;
+  }
+  /* Phone: avatar only. The name is still reachable via the dropdown and the
+     button's aria-label, and dropping it keeps the nav inside the viewport
+     no matter how long the username is. */
+  .nav-username,
+  .nav-caret {
+    display: none;
+  }
+  .nav {
+    padding: 0.75rem 1rem;
   }
 }
 

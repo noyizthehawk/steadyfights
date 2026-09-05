@@ -138,12 +138,18 @@ export default function App() {
         <div className="nav-right">
           {username ? (
             <div className="relative" ref={menuRef}>
+              {/* Below 768px only the avatar shows (CSS hides .nav-username /
+                  .nav-caret) — a long username otherwise widened the whole nav
+                  past the viewport. aria-label keeps the button named when the
+                  text is hidden. */}
               <button
                 className="nav-email flex cursor-pointer items-center gap-2"
                 onClick={() => setMenuOpen((o) => !o)}
+                aria-label={`Account menu for ${username}`}
               >
                 <Avatar url={avatarUrl} name={username ?? "?"} size={28} />
-                {username} ▾
+                <span className="nav-username">{username}</span>
+                <span className="nav-caret" aria-hidden="true">▾</span>
               </button>
               {menuOpen && (
                 <div className="absolute right-0 z-50 mt-2 w-40 rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">

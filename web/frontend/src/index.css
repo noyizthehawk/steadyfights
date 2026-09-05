@@ -50,6 +50,18 @@ body {
   margin: 0;
 }
 
+/* Safety net, not the fix: the nav overflow that prompted this is solved at
+   source in App.css. This stops any *other* unbreakable string (a long
+   username, fighter name or event title) from widening the document and
+   parking a strip of dead space next to every page. `clip` rather than
+   `hidden` so it never becomes a scroll container — nothing here is
+   position:sticky today, and this keeps it that way if something is added. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 #root {
   width: 100%;
   max-width: 100%;
@@ -74,7 +86,11 @@ h1 {
   letter-spacing: -1.68px;
   margin: 32px 0;
   @media (max-width: 1024px) {
-    font-size: 36px;
+    /* Press Start 2P is monospaced at ~1em per glyph, so a one-word title like
+       STEADYFIGHTS is 12em wide and cannot wrap. A flat 36px needed ~444px of
+       room and pushed phones into a horizontal scroll. Scaling with the
+       viewport holds 36px down to ~720px, then shrinks only as far as needed. */
+    font-size: clamp(1.25rem, 5vw, 36px);
     margin: 20px 0;
   }
 }
