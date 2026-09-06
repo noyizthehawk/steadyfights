@@ -68,6 +68,13 @@
 }
 
 .page {
+  /* #root is a column flex container, and `margin: … auto` on the cross axis
+     suppresses stretch — which left .page shrink-to-fit, i.e. sized to its own
+     MIN-CONTENT. On a 320px phone that came out at 486px (driven by the widest
+     <select> option), and every child then measured w-full against 486 instead
+     of 320, so the page ran off the screen. A definite width pins it to the
+     viewport and lets percentage widths inside actually resolve. */
+  width: 100%;
   max-width: 640px;
   margin: 3rem auto;
   padding: 0 1rem;

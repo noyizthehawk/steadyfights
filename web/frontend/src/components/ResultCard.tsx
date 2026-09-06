@@ -46,7 +46,6 @@ export function ResultCard({ result }: { result: PredictResult }) {
       <div className="px-4 pt-4 sm:px-5">
         <div className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 ${picked.pick}`}>
           <span aria-hidden className={`shrink-0 font-display text-[10px] ${picked.name}`}>
-            ▶
           </span>
           <div className="min-w-0 flex-1">
             <div className={LABEL}>STEADYIQ PICK</div>
@@ -68,7 +67,7 @@ export function ResultCard({ result }: { result: PredictResult }) {
         <div className={`${LABEL} mb-1`}>Tale of the tape</div>
         <div className="divide-y divide-zinc-800/70">
           {result.factors.map((f) => (
-            <div key={f.label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2">
+            <div key={f.label} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 py-2">
               {/* the fighter who wins this stat gets their colour; the other stays muted */}
               <span
                 className={`text-left text-sm tabular-nums ${

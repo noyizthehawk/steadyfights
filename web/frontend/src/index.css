@@ -85,6 +85,10 @@ h1 {
   font-size: 56px;
   letter-spacing: -1.68px;
   margin: 32px 0;
+  /* Several h1s are dynamic (room name, username, event title). A long
+     single-token one has no space to wrap at, and in a monospaced pixel font
+     that overflows fast — break it rather than let it push the page wide. */
+  overflow-wrap: anywhere;
   @media (max-width: 1024px) {
     /* Press Start 2P is monospaced at ~1em per glyph, so a one-word title like
        STEADYFIGHTS is 12em wide and cannot wrap. A flat 36px needed ~444px of
