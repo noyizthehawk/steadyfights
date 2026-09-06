@@ -7,6 +7,7 @@ gate, not the prediction math. Runs against in-memory SQLite; never touches app.
 
 Run:  .venv/bin/python -m web.backend.tests.test_predict
 """
+import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -25,6 +26,15 @@ def patch_model():
     # calling predict() never triggers a real train()/predict_fight_api
     predict_module.model.list_fighters = lambda: FIGHTERS
     predict_module.model.predict_fight_api = lambda a, b: {"pick": a, "prob_a": 60.0, "prob_b": 40.0}
+
+
+@pytest.fixture(autouse=True)
+def _patched_model():
+    """pytest imports this module and calls the test functions directly, so the
+    __main__ block below never runs and patch_model() never fires — the real
+    model is then hit untrained and raises NameError: fighters_df. This installs
+    the fakes for pytest while leaving the __main__ runner working as before."""
+    patch_model()
 
 
 def make_db():

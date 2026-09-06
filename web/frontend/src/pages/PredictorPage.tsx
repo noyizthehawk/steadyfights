@@ -105,13 +105,15 @@ export default function PredictorPage() {
   // the pixel display font — that face is reserved for page titles and card
   // internals; using it here made every block shout at the same volume.
   const heading = (text: string) => (
-    <h2 className="mb-2.5 text-center text-[9px] font-medium uppercase tracking-[0.2em] text-zinc-500 sm:mb-3 sm:text-[10px]">{text}</h2>
+    <h2 className="mb-2 text-center text-[8px] font-medium uppercase tracking-[0.14em] text-zinc-500 sm:mb-3 sm:text-[10px] sm:tracking-[0.2em]">{text}</h2>
   );
 
   return (
     <div className="mx-auto w-full max-w-6xl px-3 text-left sm:px-4">
-      <section className="py-5 text-center sm:py-9">
-        <h1>FIGHTS, FIGURED OUT.</h1>
+      <section className="py-5 text-center sm:py-9 ">
+        <h1>
+          <span className="text-[#d33a2c]">FIGHTS,</span> FIGURED OUT.
+        </h1>
         {justSubscribed && (
           <p className="subtitle" style={{ color: "#4ade80" }}>
             You're subscribed! You just made weight.
