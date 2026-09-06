@@ -5,6 +5,15 @@ import { ResultCard } from "./ResultCard";
 
 const STAGES: CareerStage[] = ["Early", "Prime", "Late"];
 
+// One colour per stage rather than a single "selected" fill, so the choice is
+// readable at a glance without reading the labels. Each is dark or light enough
+// to carry its own label colour at 4.5:1+.
+const STAGE_ON: Record<CareerStage, string> = {
+  Early: "bg-blue-400 text-zinc-900",
+  Prime: "bg-[#d33a2c] text-white",
+  Late: "bg-[#4ade80] text-zinc-900",
+};
+
 type Props = {
   paywalled: boolean;
   onFreeLeft: (n: number | null) => void;
@@ -29,8 +38,8 @@ function StagePicker({
           type="button"
           aria-pressed={value === s}
           onClick={() => onChange(s)}
-          className={`cursor-pointer rounded-md py-1.5 text-[11px] font-medium transition-colors ${
-            value === s ? "bg-[#d33a2c] text-white" : "text-zinc-400 hover:text-zinc-200"
+          className={`min-h-[34px] cursor-pointer rounded-md text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 ${
+            value === s ? STAGE_ON[s] : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100"
           }`}
         >
           {s}
@@ -56,7 +65,7 @@ function FighterPicker({
         value={value}
         placeholder="Type a name…"
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white placeholder-zinc-600 transition-colors focus:border-[#d33a2c] focus:outline-none"
+        className="mt-1.5 min-h-[44px] w-full rounded-lg border border-zinc-800 bg-[#0c0d11] px-3 text-base text-white placeholder-zinc-600 transition-colors hover:border-zinc-700 focus:border-[#d33a2c] focus:outline-none focus:ring-[3px] focus:ring-[#d33a2c]/20"
       />
       <datalist id={listId}>
         {options.map((n) => <option key={n} value={n} />)}
@@ -69,14 +78,14 @@ function FighterPicker({
 // What the model averaged to build this version of the fighter — shown so
 // "Prime" is visibly a span of real bouts rather than a label we assert, and so
 // Anderson Silva's prime reading age 36 explains itself.
-function StageLine({ name, meta, align }: { name: string; meta: StageMeta; align: string }) {
+function StageLine({ name, meta, accent }: { name: string; meta: StageMeta; accent: string }) {
   return (
-    <div className={`min-w-0 flex-1 ${align}`}>
-      <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-white">
+    <div>
+      <div className={`text-[11px] font-semibold uppercase tracking-wide ${accent}`}>
         {meta.stage} {name}
       </div>
-      <div className="mt-0.5 truncate text-[10px] tabular-nums text-zinc-500">
-        {meta.span} · {meta.fights} fights · age {meta.avg_age}
+      <div className="mt-0.5 text-[10px] leading-snug tabular-nums text-zinc-500">
+        {meta.span} · {meta.fights} fights · avg age {meta.avg_age}
       </div>
     </div>
   );
@@ -115,7 +124,7 @@ export function DreamFights({ paywalled, onFreeLeft, onPaywall }: Props) {
 
   return (
     <section className="w-full text-left">
-      <div className="rounded-xl border border-zinc-700 bg-black p-4">
+      <div className="rounded-xl border border-zinc-800 bg-black p-3.5 sm:p-4">
         <p className="text-xs leading-snug text-zinc-400">
           Any two fighters, at any point in their careers.
         </p>
@@ -135,11 +144,11 @@ export function DreamFights({ paywalled, onFreeLeft, onPaywall }: Props) {
         </div>
 
         <button
-          className="mt-5 w-full cursor-pointer rounded-lg bg-[#d33a2c] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-50"
+          className="mt-5 min-h-[44px] w-full cursor-pointer rounded-lg bg-[#ffd75e] text-sm font-semibold text-[#17140a] transition-[background-color,transform] duration-150 hover:bg-[#ffe694] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe694] focus-visible:ring-offset-2 focus-visible:ring-offset-black active:scale-[0.99] disabled:cursor-default disabled:opacity-50"
           onClick={run}
           disabled={loading || paywalled}
         >
-          {loading ? "Booking…" : paywalled ? "Out of free predictions" : "Book the fight"}
+          {loading ? "Booking…" : paywalled ? "Out of free predictions" : "Ask Dana!"}
         </button>
 
         {/* A fighter's prime is not always mid-career — Anderson Silva's runs
@@ -155,9 +164,10 @@ export function DreamFights({ paywalled, onFreeLeft, onPaywall }: Props) {
 
       {result && (
         <>
-          <div className="mt-4 flex items-start gap-3 rounded-xl border border-zinc-800 bg-black px-4 py-3">
-            <StageLine name={result.fighter_a} meta={result.stage_a} align="text-left" />
-            <StageLine name={result.fighter_b} meta={result.stage_b} align="text-right" />
+          <div className="mt-4 space-y-2.5 rounded-xl border border-zinc-800 bg-black px-3.5 py-3">
+            <StageLine name={result.fighter_a} meta={result.stage_a} accent="text-[#d33a2c]" />
+            <div className="h-px bg-zinc-800" />
+            <StageLine name={result.fighter_b} meta={result.stage_b} accent="text-blue-400" />
           </div>
           <ResultCard result={result} />
         </>

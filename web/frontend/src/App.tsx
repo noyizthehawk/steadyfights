@@ -149,7 +149,7 @@ export default function App() {
               >
                 <Avatar url={avatarUrl} name={username ?? "?"} size={28} />
                 <span className="nav-username">{username}</span>
-                <span className="nav-caret" aria-hidden="true">▾</span>
+                <span className="nav-caret text-green-500" aria-hidden="true">•</span>
               </button>
               {menuOpen && (
                 <div className="absolute right-0 z-50 mt-2 w-40 rounded-md border border-zinc-700 bg-zinc-900 shadow-lg">

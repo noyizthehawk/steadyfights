@@ -60,7 +60,7 @@ export function QuickPredictCard({ fight, known, paywalled, onFreeLeft, onPaywal
   );
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-700 bg-black">
+    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-black transition-colors hover:border-zinc-700">
       <div className="flex items-end gap-1 px-2 pt-2">
         {fighter(fight.fighter_a, fight.img_a, A, "text-left")}
         <span className="shrink-0 pb-8 font-display text-[10px] text-white max-sm:text-[8px]">VS</span>
@@ -102,7 +102,7 @@ export function QuickPredictCard({ fight, known, paywalled, onFreeLeft, onPaywal
           </div>
         ) : (
           <button
-            className="w-full cursor-pointer rounded-lg bg-[#d33a2c] py-2 font-display text-[10px] text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-50 max-sm:text-[8px]"
+            className="min-h-[38px] w-full cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 font-display text-[10px] text-zinc-100 transition-[background-color,border-color,transform] duration-150 hover:border-zinc-600 hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black active:scale-[0.97] disabled:cursor-default disabled:opacity-50 max-sm:text-[8px]"
             onClick={run}
             disabled={loading}
           >

@@ -65,6 +65,8 @@ body {
 #root {
   width: 100%;
   max-width: 100%;
+  /* home-indicator gutter on iOS so the footer isn't under the swipe bar */
+  padding-bottom: env(safe-area-inset-bottom);
   margin: 0;
   text-align: center;
   min-height: 100svh;
@@ -100,6 +102,11 @@ h1 {
        viewport holds 36px down to ~720px, then shrinks only as far as needed. */
     font-size: clamp(1.25rem, 5vw, 36px);
     margin: 20px 0;
+  }
+  /* phones: the pixel title was eating most of the first screen before any
+     content appeared */
+  @media (max-width: 640px) {
+    margin: 10px 0 14px;
   }
 }
 h2 {

@@ -3,11 +3,16 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  padding: 1rem 1.5rem;
+  padding: 0.625rem 1.25rem;
+  /* Landscape on a notched iPhone puts the cutout over the left edge; max()
+     keeps the normal padding everywhere it isn't an issue. */
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
   /* Without these the nav is free to grow past the viewport and drag a
      horizontal scrollbar (plus a strip of dead space) onto every page. */
   max-width: 100%;
   box-sizing: border-box;
+  border-bottom: 1px solid #17181e;
 }
 
 .nav-left,
@@ -32,27 +37,51 @@
   background: none;
   border: none;
   color: #e7e7ea;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   line-height: 1;
-  padding: 0.25rem;
   cursor: pointer;
+  /* 44px is the minimum comfortable touch target; inline-flex keeps the glyph
+     centred in it instead of the box growing around the text baseline. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  transition: background-color 0.15s, color 0.15s;
 }
+.nav-hamburger:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.nav-hamburger:active { background: rgba(255, 255, 255, 0.1); }
+.nav-hamburger:focus-visible { outline: 2px solid #d33a2c; outline-offset: 2px; }
 
 .nav a {
   color: #e7e7ea;
   text-decoration: none;
   font-weight: 600;
+  transition: color 0.15s;
 }
 
 .nav a:hover {
   color: #d33a2c;
+}
+
+.nav a:focus-visible,
+.nav-email:focus-visible {
+  outline: 2px solid #d33a2c;
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 .nav-email {
   color: #e7e7ea;
   text-decoration: none;
   font-weight: 600;
   min-width: 0; /* lets .nav-username actually truncate inside this flex row */
+  padding: 0.25rem;
+  border-radius: 10px;
+  transition: background-color 0.15s;
 }
+
+.nav-email:hover { background: rgba(255, 255, 255, 0.06); }
 
 /* Desktop: cap the username and ellipsis it rather than letting it set the
    nav's width. Mobile hides it entirely (see the 768px block below). */
@@ -94,8 +123,23 @@ h1 {
 .pickers {
   display: flex;
   align-items: flex-end;
-  gap: 1rem;
-  margin: 1.5rem 0;
+  gap: 0.75rem;
+  margin: 0 0 0.875rem;
+}
+
+/* Two inputs plus the "vs" stop being usable below ~400px — around a 320-375px
+   phone each field would be under 130px. Stack rather than squeeze. */
+@media (max-width: 400px) {
+  .pickers {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .vs {
+    padding: 0;
+    text-align: center;
+    font-size: 0.75rem;
+  }
 }
 
 .field {
@@ -116,11 +160,30 @@ h1 {
   /* pair with .field's min-width:0 so the control fills its column and no more */
   width: 100%;
   box-sizing: border-box;
-  padding: 0.5rem;
-  border-radius: 8px;
-  background: #111;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  /* was borderless on a near-black fill, so the control had no edge against
+     the card behind it */
+  border: 1px solid #2e303a;
+  background: #0c0d11;
   color: #e7e7ea;
-  font-size: 0.95rem;
+  /* 16px exactly: iOS Safari zooms the viewport on focus for anything smaller,
+     and the 16px root on phones made 0.95rem = 15.2px */
+  font-size: 16px;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+.field input::placeholder { color: #55565f; }
+.field select:hover,
+.field input:hover { border-color: #3c3e4a; }
+
+.field select:focus,
+.field input:focus {
+  outline: none;
+  border-color: #d33a2c;
+  background: #101116;
+  box-shadow: 0 0 0 3px rgba(211, 58, 44, 0.18);
 }
 
 .vs {
@@ -131,18 +194,25 @@ h1 {
 
 .predict-btn {
   width: 100%;
+  min-height: 44px;
   padding: 0.7rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #d33a2c;
   color: white;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.15s, transform 0.08s;
 }
 
+.predict-btn:hover:not(:disabled) { background: #e2463a; }
+/* a small dip on press — the only feedback a touch device gets, having no hover */
+.predict-btn:active:not(:disabled) { transform: scale(0.985); }
+.predict-btn:focus-visible { outline: 2px solid #ff7a6b; outline-offset: 2px; }
+
 .predict-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: default;
 }
 
@@ -374,7 +444,14 @@ h1 {
     display: none;
   }
   .nav {
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.875rem;
+    padding-left: max(0.875rem, env(safe-area-inset-left));
+    padding-right: max(0.875rem, env(safe-area-inset-right));
+  }
+  /* the hamburger's 44px box already sets the bar height, so the row can hug it */
+  .nav-left,
+  .nav-right {
+    gap: 0.75rem;
   }
 }
 
