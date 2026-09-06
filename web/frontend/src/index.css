@@ -82,7 +82,11 @@ h2 {
 }
 
 h1 {
-  font-size: 56px;
+  /* Press Start 2P advances a full 1em per glyph, so a title costs
+     chars x (font-size - 1.68px letter-spacing). .page gives 608px of content
+     (640 - 2rem padding), and STEADYFIGHTS is 12 glyphs: 56px needed 652px and
+     overflowed. 48px costs 556px and fits with room to spare. */
+  font-size: 48px;
   letter-spacing: -1.68px;
   margin: 32px 0;
   /* Several h1s are dynamic (room name, username, event title). A long
