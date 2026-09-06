@@ -4,6 +4,8 @@ import { getFighters, predict, startSubscription, PaywallError, AuthError } from
 import type { PredictResult } from "../api";
 import { FighterSelect } from "../components/FighterSelect";
 import { ResultCard } from "../components/ResultCard";
+import { UpcomingPredictions } from "../components/UpcomingPredictions";
+import { DreamFights } from "../components/DreamFights";
 
 export default function PredictorPage() {
   // state
@@ -73,61 +75,85 @@ export default function PredictorPage() {
     }
   }
 
-  return (
-    <div className="page">
-      <h1>STEADYFIGHTS</h1>
-      <p className="subtitle"></p>
-      <div className="flex flex-col items-center min-h-screen">
-          {justSubscribed && (
-              <p className="subtitle mt-6" style={{ color: "#4ade80" }}>
-                  You're subscribed! You just mad weight.
-              </p>
-          )}
-          {paywalled ? (
-              <div className="border border-zinc-700 rounded-lg p-6 w-full max-w-xl mt-10 text-center">
-                  <h2>Out of free predictions</h2>
-                  <p className="subtitle">
-                      You've used all 10 free predictions. Subscribe for $10/month to keep going.
-                  </p>
-                  <button
-                      className="predict-btn"
-                      onClick={handleSubscribe}
-                      disabled={subscribing}
-                  >
-                      {subscribing ? "Redirecting…" : "Subscribe — $10/mo"}
-                  </button>
-              </div>
-          ) : (
-              <div className="border border-zinc-700 rounded-lg p-4 w-full max-w-xl mt-10 h-fit">
-                  <div className="pickers">
-                      <FighterSelect
-                          label="Fighter A"
-                          value={fighterA}
-                          onChange={setFighterA}
-                          options={fighters}
-                      />
-                      <span className="vs">vs</span>
-                      <FighterSelect
-                          label="Fighter B"
-                          value={fighterB}
-                          onChange={setFighterB}
-                          options={fighters}
-                      />
-                  </div>
-                  <button className="predict-btn" onClick={handlePredict} disabled={loading}>
-                      {loading ? "Predicting…" : "Predict"}
-                  </button>
-                  {freeLeft !== null && (
-                      <p className="subtitle">
-                          {freeLeft} free prediction{freeLeft === 1 ? "" : "s"} left
-                      </p>
-                  )}
-              </div>
-          )}
+  // Section header, matching the landing page's idiom exactly. Deliberately not
+  // the pixel display font — that face is reserved for page titles and card
+  // internals; using it here made every block shout at the same volume.
+  const heading = (text: string) => (
+    <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">{text}</h2>
+  );
 
-          {error && <p className="error">{error}</p>}
+  return (
+    <div className="mx-auto w-full max-w-6xl px-4 text-left">
+      <section className="py-10 text-center">
+        <h1>STEADYFIGHTS</h1>
+        {justSubscribed && (
+          <p className="subtitle" style={{ color: "#4ade80" }}>
+            You're subscribed! You just mad weight.
+          </p>
+        )}
+      </section>
+
+      {/* One row, gap-6, no per-child margins — the whole layout's rhythm comes
+          from the two gaps, the way the landing page does it. */}
+      <section className="flex flex-col gap-6 pb-16 lg:flex-row">
+        {/* Center — the predictor itself, then the upcoming slate */}
+        <div className="flex min-w-0 flex-1 flex-col gap-6">
+          <div>
+            {heading(paywalled ? "Bout Brain" : "Predict a fight")}
+            {paywalled ? (
+              <div className="rounded-lg border border-zinc-700 p-6 text-center">
+                <h2>Out of free predictions</h2>
+                <p className="subtitle">
+                  You've used all 10 free predictions. Subscribe for $10/month to keep going.
+                </p>
+                <button className="predict-btn" onClick={handleSubscribe} disabled={subscribing}>
+                  {subscribing ? "Redirecting…" : "Subscribe — $10/mo"}
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-zinc-700 p-4">
+                <div className="pickers">
+                  <FighterSelect label="Fighter A" value={fighterA} onChange={setFighterA} options={fighters} />
+                  <span className="vs">vs</span>
+                  <FighterSelect label="Fighter B" value={fighterB} onChange={setFighterB} options={fighters} />
+                </div>
+                <button className="predict-btn" onClick={handlePredict} disabled={loading}>
+                  {loading ? "Predicting…" : "Predict"}
+                </button>
+                {freeLeft !== null && (
+                  <p className="subtitle">
+                    {freeLeft} free prediction{freeLeft === 1 ? "" : "s"} left
+                  </p>
+                )}
+              </div>
+            )}
+            {error && <p className="error">{error}</p>}
+          </div>
+
           {result && <ResultCard result={result} />}
-      </div>
+
+          <div>
+            {heading("Quick predict")}
+            <UpcomingPredictions
+              known={fighters}
+              paywalled={paywalled}
+              onFreeLeft={setFreeLeft}
+              onPaywall={() => setPaywalled(true)}
+            />
+          </div>
+        </div>
+
+        {/* Right — cross-era matchups. Shares this page's freeLeft/paywalled
+            state, so a booking here spends the same allowance. */}
+        <aside className="lg:w-80 lg:shrink-0">
+          {heading("Dream fights")}
+          <DreamFights
+            paywalled={paywalled}
+            onFreeLeft={setFreeLeft}
+            onPaywall={() => setPaywalled(true)}
+          />
+        </aside>
+      </section>
     </div>
   );
 }

@@ -203,6 +203,113 @@ def list_fighters():
     return sorted(fighters_df["name"].dropna().unique().tolist())
 
 
+# ---------------------------------------------------------------- dream fights
+CAREER_STAGES = ("Early", "Prime", "Late")
+
+# Below this a career can't be split into three meaningful thirds. 3 would be the
+# hard floor (one fight per stage) but averages of one fight are just single
+# fights again, so ask for two per stage.
+DREAM_MIN_FIGHTS = 6
+
+
+def list_dream_fighters():
+    """Fighters with enough UFC fights to split into three career stages."""
+    counts = fighters_df["name"].dropna().value_counts()
+    return sorted(counts[counts >= DREAM_MIN_FIGHTS].index.tolist())
+
+
+def career_stage_snapshot(name, stage):
+    """One composite feature row for a fighter's early / prime / late career.
+
+    Thirds of the fighter's OWN career rather than fixed fight numbers, so a
+    short career still has all three stages (a 1-5/6-10/11-15 split leaves a
+    13-fight fighter with no late career at all).
+
+    Every feature is then AVERAGED across the fights in that third. Picking the
+    third's single best fight instead makes the stages collapse toward whenever
+    the fighter peaked — Early and Prime Jon Jones came out seven months apart —
+    and lets one flash finish define a whole phase. The mean sits in the middle
+    of the third, which keeps the three stages in genuinely different eras.
+    """
+    if stage not in CAREER_STAGES:
+        return None
+    rows = fighters_df[fighters_df["name"] == name].sort_values("date")
+    if len(rows) < len(CAREER_STAGES):
+        return None
+
+    i = CAREER_STAGES.index(stage)
+    part = rows.iloc[int(len(rows) * i / 3): int(len(rows) * (i + 1) / 3)]
+    if part.empty:
+        return None
+
+    snap = {f: float(part[f].mean()) for f in numeric_features_to_diff}
+    for s in ("Orthodox", "Southpaw", "Switch"):
+        col = f"stance_{s}"
+        snap[col] = int(part[col].mode().iloc[0]) if col in part and not part[col].mode().empty else 0
+
+    styles = part["style_name"].dropna()
+    snap["_meta"] = {
+        "stage": stage,
+        "span": f"{str(part['date'].min())[:4]}–{str(part['date'].max())[:4]}",
+        "fights": int(len(part)),
+        "avg_age": round(float(part["age_at_fight"].mean()), 1),
+        "avg_elo": int(round(float(part["elo_before_fight"].mean()))),
+        "style": str(styles.mode().iloc[0]) if not styles.empty else "",
+    }
+    return snap
+
+
+def dream_fight_api(fighter_a, stage_a, fighter_b, stage_b):
+    """Predict a cross-era matchup between two career-stage composites.
+
+    Same model and same tale-of-the-tape ranking as predict_fight_api; only the
+    two feature rows differ (career-stage averages instead of "as of today").
+    """
+    fa = career_stage_snapshot(fighter_a, stage_a)
+    fb = career_stage_snapshot(fighter_b, stage_b)
+    if fa is None or fb is None:
+        return None
+
+    row = {f"diff_{f}": fa[f] - fb[f] for f in numeric_features_to_diff}
+    for s in ("Orthodox", "Southpaw", "Switch"):
+        row[f"diff_stance_{s}"] = fa[f"stance_{s}"] - fb[f"stance_{s}"]
+
+    probs = calibrated_ensemble.predict_proba(pd.DataFrame([row])[diff_features].fillna(0))[0]
+
+    factors = []
+    for base, (label, kind) in FEATURE_LABELS.items():
+        diff = row.get(f"diff_{base}", 0)
+        std = feature_stds.get(f"diff_{base}", 0)
+        if not std:
+            continue
+        factors.append({
+            "label": label,
+            "value_a": _fmt_stat(float(fa[base]), kind),
+            "value_b": _fmt_stat(float(fb[base]), kind),
+            "favors": fighter_a if diff > 0 else fighter_b,
+            "_impact": abs(diff / std),
+        })
+    factors.sort(key=lambda f: f["_impact"], reverse=True)
+    top_factors = factors[:4]
+    for f in top_factors:
+        del f["_impact"]
+
+    prob_a, prob_b = float(probs[1]), float(probs[0])
+    return {
+        "fighter_a": fighter_a,
+        "fighter_b": fighter_b,
+        "style_a": fa["_meta"]["style"],
+        "style_b": fb["_meta"]["style"],
+        "prob_a": round(prob_a * 100, 2),
+        "prob_b": round(prob_b * 100, 2),
+        "pick": fighter_a if prob_a > prob_b else fighter_b,
+        "confidence": round(max(prob_a, prob_b) * 100, 1),
+        "factors": top_factors,
+        "stage_a": fa["_meta"],
+        "stage_b": fb["_meta"],
+    }
+
+
 def train():
     global feature_stds
     global fighters_df, calibrated_ensemble, diff_features, numeric_features_to_diff

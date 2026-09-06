@@ -5,7 +5,7 @@ from sqlalchemy import or_
 
 from ..dependencies import get_curr_user, DBDep
 from ..models import User, UFCFight, UFCEvent
-from ..schemas import PredictRequest
+from ..schemas import PredictRequest, DreamRequest
 from part_2 import Prediction_model as model
 from part_2 import career
 from part_2.career import normalize_name
@@ -71,11 +71,59 @@ def predict(db: DBDep, req: PredictRequest, user: User = Depends(get_curr_user))
 
     result = model.predict_fight_api(req.fighter_a, req.fighter_b)
     #only successful predictions
+    _charge(db, user, subscribed, result)
+
+    return result
+
+
+def _charge(db, user, subscribed, result):
+    """Burn one free prediction (or none, for subscribers) and stamp the count
+    onto the response. Shared by /api/predict and /api/dream so the two can
+    never drift apart on how the allowance is spent."""
     if subscribed:
         result["free_remaining"] = None                 # None = unlimited
     else:
         user.free_predictions_used += 1
         db.commit()
         result["free_remaining"] = FREE_PREDICTION_LIMIT - user.free_predictions_used
+
+
+@router.get("/api/dream/fighters")
+def dream_fighters():
+    """Fighters with enough UFC fights to split into three career stages —
+    a shorter list than /api/fighters, so the dream picker can't offer someone
+    the model would then refuse."""
+    return {"fighters": model.list_dream_fighters(), "stages": list(model.CAREER_STAGES)}
+
+
+@router.post("/api/dream")
+def dream(db: DBDep, req: DreamRequest, user: User = Depends(get_curr_user)):
+    """Cross-era matchup: each fighter frozen at a career stage (Early/Prime/Late)
+    rather than as they are today. Counts against the same free allowance as a
+    normal prediction — it is the same model call."""
+    names = set(model.list_dream_fighters())
+    if req.fighter_a not in names or req.fighter_b not in names:
+        raise HTTPException(
+            status_code=404,
+            detail="One or both fighters don't have enough UFC fights for career stages.",
+        )
+    if req.stage_a not in model.CAREER_STAGES or req.stage_b not in model.CAREER_STAGES:
+        raise HTTPException(status_code=400, detail="Stage must be Early, Prime or Late.")
+    # same fighter at two DIFFERENT stages is a legitimate matchup (prime vs late
+    # Jones); the same stage twice is not a fight
+    if req.fighter_a == req.fighter_b and req.stage_a == req.stage_b:
+        raise HTTPException(status_code=400, detail="Pick two different fighters or two different stages.")
+
+    subscribed = user.subscription_status == "active"
+    if not subscribed and user.free_predictions_used >= FREE_PREDICTION_LIMIT:
+        raise HTTPException(
+            status_code=402,
+            detail="You've used your 10 free predictions — subscribe for unlimited.",
+        )
+
+    result = model.dream_fight_api(req.fighter_a, req.stage_a, req.fighter_b, req.stage_b)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Couldn't build a career stage for that matchup.")
+    _charge(db, user, subscribed, result)
 
     return result

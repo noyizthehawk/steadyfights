@@ -8,6 +8,13 @@ class PredictRequest(BaseModel):
     fighter_a: str
     fighter_b: str
 
+class DreamRequest(BaseModel):
+    """A cross-era matchup: two fighters, each frozen at a career stage."""
+    fighter_a: str
+    stage_a: str          # Early | Prime | Late
+    fighter_b: str
+    stage_b: str
+
 class LoginRequest(BaseModel):
     username: str
     password: str

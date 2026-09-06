@@ -7,7 +7,7 @@
    default) used to fall through to a near-black --text-h on that black
    background and render headings invisible. */
 :root {
-  --text: #9ca3af;
+  --text: #d4d4d8;
   --text-h: #f3f4f6;
   --bg: #000;
   --border: #2e303a;

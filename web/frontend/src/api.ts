@@ -62,6 +62,26 @@ export type PredictResult = {
   }[];
   free_remaining: number | null;   // free predictions left; null = unlimited (subscriber)
 };
+
+export type CareerStage = "Early" | "Prime" | "Late";
+
+// What the model averaged to build one side of a dream fight — shown under the
+// fighter so "Prime" is never just a claim the UI is making.
+export type StageMeta = {
+  stage: CareerStage;
+  span: string;      // "2011–2015"
+  fights: number;
+  avg_age: number;
+  avg_elo: number;
+  style: string;
+};
+
+// Same shape as PredictResult (so it renders through ResultCard) plus the two
+// career-stage summaries.
+export type DreamResult = PredictResult & {
+  stage_a: StageMeta;
+  stage_b: StageMeta;
+};
 export type PhaseBout = {
   fight_number: number;
   opponent: string;
@@ -409,6 +429,42 @@ export async function getFighters(): Promise<string[]> {
   if (!res.ok) throw new Error("Could not load fighters");
   const data: { fighters: string[] } = await res.json();
   return data.fighters;
+}
+
+// Shorter than getFighters(): only fighters with enough UFC bouts to split into
+// three career stages, so the dream picker can't offer someone /api/dream would
+// then reject.
+export async function getDreamFighters(): Promise<string[]> {
+  const res = await fetch(`${BASE_URL}/api/dream/fighters`);
+  if (!res.ok) throw new Error("Could not load fighters");
+  const data: { fighters: string[] } = await res.json();
+  return data.fighters;
+}
+
+export async function dreamFight(
+  fighterA: string,
+  stageA: CareerStage,
+  fighterB: string,
+  stageB: CareerStage,
+): Promise<DreamResult> {
+  const res = await fetch(`${BASE_URL}/api/dream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fighter_a: fighterA, stage_a: stageA,
+      fighter_b: fighterB, stage_b: stageB,
+    }),
+    credentials: "include",
+  });
+  if (res.status === 402) {
+    const err = await res.json().catch(() => ({}));
+    throw new PaywallError(err.detail || "You've used your free predictions.");
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Dream fight failed");
+  }
+  return res.json() as Promise<DreamResult>;
 }
 export async function get_user_past_events(userId: number): Promise<UserEvents[]> {
   const res = await fetch(`${BASE_URL}/api/users/${userId}/events`, {
