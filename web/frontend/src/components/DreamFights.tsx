@@ -63,7 +63,7 @@ function FighterPicker({
         type="text"
         list={listId}
         value={value}
-        placeholder="Type a name…"
+        placeholder="..."
         onChange={(e) => onChange(e.target.value)}
         className="mt-1.5 min-h-[44px] w-full rounded-lg border border-zinc-800 bg-[#0c0d11] px-3 text-base text-white placeholder-zinc-600 transition-colors hover:border-zinc-700 focus:border-[#d33a2c] focus:outline-none focus:ring-[3px] focus:ring-[#d33a2c]/20"
       />
