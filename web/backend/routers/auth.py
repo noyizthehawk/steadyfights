@@ -1,13 +1,13 @@
 """Auth + account endpoints: sign up, login, logout, and "who am I"."""
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 
 from ..config import COOKIE_SECURE
-from ..dependencies import DBDep, get_curr_user, rate_limit
-from ..models import User
+from ..dependencies import DBDep, get_curr_user, rate_limit, issue_session, revoke_family
+from ..models import User, RefreshToken
 from ..schemas import SignUpRequest, LoginRequest
-from ..security import hash_password, verify_password, create_access_token, DUMMY_HASH
+from ..security import hash_password, verify_password, DUMMY_HASH, hash_refresh_token
 from ..email_sender import send_welcome_email
 
 router = APIRouter()
@@ -73,17 +73,26 @@ def login(user: LoginRequest, db: DBDep, response: Response):
     if not valid:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Issue a signed JWT identifying this user; the client sends it on later requests.
-    token = create_access_token({"sub": db_user.email})
-    # secure=COOKIE_SECURE -> HTTPS-only in prod, off locally (plain HTTP dev).
-    response.set_cookie("token", token, httponly=True, samesite="lax", secure=COOKIE_SECURE)
+    # Start a new rotation family: a short-lived access token plus a refresh
+    # token row. secure=COOKIE_SECURE -> HTTPS-only in prod, off locally.
+    issue_session(db, response, db_user)
+    db.commit()
     return { "message": "Login successful" }
 
 
 @router.post("/api/logout")
-def logout(response: Response):
-    # Clear the auth cookie.
+def logout(db: DBDep, response: Response, refresh_token: str = Cookie(None)):
+    """Clear both cookies AND revoke the family server-side. Deleting the cookie
+    alone would leave the refresh token valid for anyone who captured it."""
+    if refresh_token:
+        row = db.execute(
+            select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_token(refresh_token))
+        ).scalar_one_or_none()
+        if row is not None:
+            revoke_family(db, row.family_id)
+            db.commit()
     response.delete_cookie("token", samesite="lax", secure=COOKIE_SECURE)
+    response.delete_cookie("refresh_token", samesite="lax", secure=COOKIE_SECURE)
     return {"message": "Logged out"}
 
 

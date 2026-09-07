@@ -118,6 +118,32 @@ class User(Base):
 
     def __repr__(self):
         return f"<User id={self.id} email={self.email!r} username={self.username!r}>"
+class RefreshToken(Base):
+    
+    # The actual table name in the database.
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+
+    # groups every token descended from one login. Reuse of any member means the
+    # chain leaked, so the whole family is revoked at once.
+    family_id = Column(String(36), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    # set when this row is rotated out; lets a request that raced the rotation
+    # follow the chain forward instead of being treated as a reuse attack
+    replaced_by = Column(Integer, ForeignKey("refresh_tokens.id"), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"<RefreshToken id={self.id} user={self.user_id} family={self.family_id[:8]}>"
+
+
 class CoinReason(enum.Enum):
     purchase    = "purchase"      # + bought coins via Stripe
     room_buyin  = "room_buyin"    # − paid to join a room
