@@ -232,7 +232,9 @@ h1 {
 /* ---- Fighter profile ---- */
 .profile-header {
   display: flex;
-  align-items: center;
+  /* top, not centre: a long name wraps to two lines on a phone and centring
+     floated the score badge halfway down it */
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
 }
@@ -268,11 +270,20 @@ h1 {
 
 .career-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
+  /* Six stats, so 2x3 on phones and 3x2 above — the old repeat(4, 1fr) left two
+     orphans on a second row AND overflowed: 1fr means minmax(auto, 1fr), so each
+     column refused to shrink below its longest unbreakable label
+     ("SteadyPerformaceIQ", ~117px) and four of those need ~492px. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 0.5rem;
   margin: 1rem 0;
   padding: 1rem 0;
-  
+}
+
+@media (min-width: 480px) {
+  .career-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .stat {
@@ -292,12 +303,35 @@ h1 {
   font-size: 0.75rem;
   color: #9a9aa2;
   margin-top: 0.2rem;
+  /* labels like "SteadyPerformaceIQ" are a single token with nowhere to wrap */
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .career-phases {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* Three side-by-side columns need ~366px of min-content; a phone card has 256.
+     Stack them, and lay each phase's four rows out two-up so a stacked phase is
+     two lines tall rather than four. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
+}
+
+@media (min-width: 480px) {
+  .career-phases {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 479px) {
+  .phase {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 0.75rem;
+  }
+  .phase h4 {
+    grid-column: 1 / -1;
+  }
 }
 
 .phase {
@@ -346,7 +380,9 @@ h1 {
 }
 
 .tab {
+  min-height: 44px;
   padding: 0.5rem 0.9rem;
+  transition: color 0.15s, border-color 0.15s;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;

@@ -22,7 +22,7 @@ export function FighterDetailsCard({ summary }: { summary: CareerSummary }) {
     ];
 
     return (
-        <div className="relative border border-zinc-700 rounded-lg p-4">
+        <div className="relative rounded-lg border border-zinc-700 p-4 text-left">
             <div className="profile-header">
                 <div className="flex flex-wrap items-baseline gap-x-2.5">
                     <h2 className="text-xl font-bold text-white sm:text-2xl">{summary.fighter}</h2>

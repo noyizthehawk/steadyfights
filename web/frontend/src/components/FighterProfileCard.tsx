@@ -6,11 +6,20 @@ import { NewsList } from "./NewsList";
 // already-fetched summary from the page so both cards share one request.
 export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
     const [tab, setTab] = useState<"career" | "news">("career");
-    // which phase's floating panel (PiP) is open, or null when none
-    const [activePhase, setActivePhase] = useState<{ title: string; phase: Phase } | null>(null);
+    // title of the expanded phase, or null. One at a time: the panel renders
+    // below the row, so two open at once would have nowhere to go.
+    const [openPhase, setOpenPhase] = useState<string | null>(null);
+
+    // filter out phases the fighter never reached (a 4-fight career has no mid)
+    const phaseList = ([
+        ["Early (1–5)", summary.phases.early],
+        ["Mid (6–10)", summary.phases.mid],
+        ["Late (11+)", summary.phases.late],
+    ] as [string, Phase | undefined][]).filter((e): e is [string, Phase] => Boolean(e[1]));
+    const open = phaseList.find(([title]) => title === openPhase);
 
     return (
-        <div className="relative border border-zinc-700 rounded-lg p-4">
+        <div className="relative rounded-lg border border-zinc-700 p-4 text-left">
             {summary.image_url && (
                 <img
                     src={summary.image_url}
@@ -51,52 +60,62 @@ export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
                     <div className="career-stats">
                         <Stat label="Fights" value={summary.total_fights} />
                         <Stat label="Win rate" value={`${summary.win_rate}%`} />
-                        <Stat label="SteadyPerformaceIQ" value={summary.avg_adj_perf} hint={summary.perf_label} />
+                        <Stat label="SteadyPerformanceIQ" value={summary.avg_adj_perf} hint={summary.perf_label} />
                         <Stat label="Recent Form (L5)" value={summary.recent_perf} hint={`${summary.recent_record} last 5`} hintClass="text-green-500" />
                         <Stat label="SteadyStrengthIQ" value={summary.avg_opp_strength} hint={summary.opp_label} />
                         <Stat label="Volatility" value={summary.volatility} hint={summary.volatility_label} />
                     </div>
 
                     <div className="career-phases">
-                        {summary.phases.early && <PhaseColumn title="Early (1–5)" phase={summary.phases.early} onOpen={setActivePhase} />}
-                        {summary.phases.mid && <PhaseColumn title="Mid (6–10)" phase={summary.phases.mid} onOpen={setActivePhase} />}
-                        {summary.phases.late && <PhaseColumn title="Late (11+)" phase={summary.phases.late} onOpen={setActivePhase} />}
+                        {phaseList.map(([title, phase]) => (
+                            <PhaseColumn
+                                key={title}
+                                title={title}
+                                phase={phase}
+                                isOpen={openPhase === title}
+                                onToggle={() => setOpenPhase((o) => (o === title ? null : title))}
+                            />
+                        ))}
                     </div>
+
+                    {/* Expands in place below the row rather than floating over the
+                        page. Sits outside .career-phases so it spans the full card
+                        instead of being trapped in one grid column on desktop. */}
+                    {open && (
+                        <div
+                            id="phase-bouts"
+                            className="mt-3 rounded-lg border border-[#4ade80]/40 bg-[#0d0d0d] p-3"
+                        >
+                            <div className="mb-2 flex items-baseline justify-between gap-3">
+                                <h4 className="text-[11px] font-semibold uppercase tracking-wide text-[#4ade80]">
+                                    {open[0]}
+                                </h4>
+                                <span className="shrink-0 text-[10px] tabular-nums text-zinc-500">
+                                    {open[1].bouts.length} fight{open[1].bouts.length === 1 ? "" : "s"}
+                                </span>
+                            </div>
+                            <ul className="max-h-72 space-y-1 overflow-y-auto pr-1">
+                                {open[1].bouts.map((b) => (
+                                    <li key={b.fight_number} className="flex items-center gap-2 text-xs">
+                                        <span className={`w-6 shrink-0 rounded-md py-0.5 text-center font-bold text-white ${b.won ? "bg-green-500" : "bg-red-500"}`}>
+                                            {b.won ? "W" : "L"}
+                                        </span>
+                                        <span className="min-w-0 flex-1 truncate">
+                                            <a href={`/fighters/${encodeURIComponent(b.opponent)}/career`} className="text-white hover:text-zinc-400 hover:underline">
+                                                {b.opponent}
+                                            </a>{" "}
+                                            <span className="text-zinc-500">({b.event})</span>
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </>
             )}
 
             {tab === "news" && <NewsList fighter={summary.fighter} />}
 
-            {/* pictire in pictire type look */}
-            {activePhase && (
-                <div className="fixed top-26 right-4 z-50 w-72 rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-2xl">
-                    <div className="mb-2 flex items-center justify-between">
-                        <h4 className="font-semibold text-white">{activePhase.title}</h4>
-                        <button
-                            className="text-zinc-400 hover:text-white"
-                            onClick={() => setActivePhase(null)}
-                            aria-label="Close"
-                        >
-                            ✕
-                        </button>
-                    </div>
-                    <ul className="max-h-[70vh] space-y-1 overflow-y-auto pr-1">
-                        {activePhase.phase.bouts.map((b) => (
-                            <li key={b.fight_number} className="flex items-center gap-2 text-xs">
-                                <span className={`w-6 shrink-0 rounded-md py-0.5 text-center font-bold text-white ${b.won ? "bg-green-500" : "bg-red-500"}`}>
-                                    {b.won ? "W" : "L"}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate">
-                                    <a href={`/fighters/${encodeURIComponent(b.opponent)}/career`} className="text-white hover:text-zinc-400 hover:underline">
-                                        {b.opponent}
-                                    </a>{" "}
-                                    <span className="text-zinc-500">({b.event})</span>
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
         </div>
     );
 }
@@ -114,17 +133,25 @@ function Stat({ label, value, hint, hintClass = "text-[#d33a2c]" }: { label: str
 function PhaseColumn({
     title,
     phase,
-    onOpen,
+    isOpen,
+    onToggle,
 }: {
     title: string;
     phase: Phase;
-    onOpen: (p: { title: string; phase: Phase }) => void;
+    isOpen: boolean;
+    onToggle: () => void;
 }) {
     return (
         <button
-            className="phase w-full cursor-pointer text-left transition-transform duration-200 hover:scale-105"
-            onClick={() => onOpen({ title, phase })}
-            title="Click to see the fights in this phase"
+            className={`phase w-full cursor-pointer border text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4ade80]/40 ${
+                isOpen
+                    ? "border-[#4ade80]/60 bg-zinc-800"
+                    : "border-transparent hover:bg-zinc-800"
+            }`}
+            onClick={onToggle}
+            aria-expanded={isOpen}
+            aria-controls="phase-bouts"
+            title="Show the fights in this phase"
         >
             <h4>{title}</h4>
             <div className="phase-row">{phase.fights} fights</div>
