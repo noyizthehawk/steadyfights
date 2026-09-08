@@ -22,6 +22,8 @@ from ..security import (
     create_access_token,
     hash_refresh_token,
     secret_key,
+    expires_in_minutes,
+    REFRESH_TOKEN_EXPIRE_DAYS,
     REFRESH_REUSE_GRACE_SECONDS,
 )
 
@@ -47,6 +49,19 @@ def cookies_of(response: Response) -> dict:
         name, _, rest = header.partition("=")
         out[name.strip()] = rest.split(";")[0]
     return out
+
+
+def cookie_attrs(response: Response, name: str) -> dict:
+    """Parse the attributes (Max-Age, HttpOnly, SameSite...) off one Set-Cookie."""
+    for header in response.headers.getlist("set-cookie"):
+        if header.split("=", 1)[0].strip() != name:
+            continue
+        attrs = {}
+        for part in header.split(";")[1:]:
+            k, _, v = part.strip().partition("=")
+            attrs[k.lower()] = v or True
+        return attrs
+    return {}
 
 
 def expired_access_token(email: str) -> str:
@@ -79,6 +94,28 @@ def test_valid_access_token_does_not_rotate():
     # the fast path must not touch the DB — this runs on every authenticated request
     assert len(db.execute(select(RefreshToken)).scalars().all()) == len(before)
     assert cookies_of(resp) == {}
+
+
+def test_cookies_outlive_the_browser_session():
+    """Without max_age these are SESSION cookies and the browser drops them when
+    the session ends. Desktop hides it by keeping a window open for days; phones
+    end sessions constantly, so the refresh cookie vanished and the user was
+    logged out with a perfectly valid 30-day row still in the DB."""
+    db = make_db()
+    user = a_user(db)
+    resp = Response()
+    issue_session(db, resp, user)
+    db.commit()
+
+    refresh = cookie_attrs(resp, "refresh_token")
+    access = cookie_attrs(resp, "token")
+
+    assert int(refresh["max-age"]) == REFRESH_TOKEN_EXPIRE_DAYS * 86400
+    assert int(access["max-age"]) == expires_in_minutes * 60
+    # and the flags that keep them off JS and off cross-site requests
+    for attrs in (refresh, access):
+        assert attrs.get("httponly")
+        assert attrs.get("samesite", "").lower() == "lax"
 
 
 def test_expired_access_token_rotates_silently():

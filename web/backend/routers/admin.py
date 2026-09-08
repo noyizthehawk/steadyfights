@@ -26,6 +26,7 @@ def _find_user(db, username: str):
 
 @router.post("/api/admin/notable/{username}", dependencies=[Depends(verify_admin_token)])
 def add_notable(username: str, db: DBDep, body: NotableRequest | None = None):
+    #very important we can also give notable tage to a regular user in the db
     body = body or NotableRequest()
 
     #if there is no channel is specified, try getting it or resolving it from the handle
@@ -122,11 +123,11 @@ def extract_predictions(body: ExtractRequest, db: DBDep):
     else:
         users = db.execute(
             select(User).where(User.is_notable.is_(True), User.youtube_channel_id.isnot(None))
-        ).scalars().all()
+        ).scalars().all()  # has yt channel and is notable
 
     results = {
-        u.username: predictions_ai.run_extraction(db, u, event, video_id=body.video_id)
-        for u in users
+        user.username: predictions_ai.run_extraction(db, user, event, video_id=body.video_id)
+        for user in users #we run extraction for all users that are notable and have a yt channel
     }
     return {"event": event.title, "results": results}
 

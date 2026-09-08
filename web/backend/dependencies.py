@@ -18,6 +18,8 @@ from .security import (
     new_refresh_token,
     hash_refresh_token,
     refresh_expiry,
+    expires_in_minutes,
+    REFRESH_TOKEN_EXPIRE_DAYS,
     REFRESH_REUSE_GRACE_SECONDS,
 )
 from .redis_client import redis_client
@@ -66,8 +68,18 @@ def issue_session(db: Session, response: Response, user: User, family_id: str | 
     db.add(row)
     db.flush()                            # need row.id for the caller's replaced_by
 
+    # max_age matters: without it these are SESSION cookies, which the browser
+    # drops when the browsing session ends. Desktop keeps a window open for days
+    # so it went unnoticed, but iOS/Android end sessions aggressively (tab
+    # eviction, backgrounding, memory pressure) — the phone lost the refresh
+    # cookie and got logged out, while the 30-day row sat valid in the DB.
     common = dict(httponly=True, samesite="lax", secure=COOKIE_SECURE)
-    response.set_cookie("token", create_access_token({"sub": user.email}), **common)
+    response.set_cookie(
+        "token",
+        create_access_token({"sub": user.email}),
+        max_age=expires_in_minutes * 60,
+        **common,
+    )
     # Deliberately NOT path-scoped. The usual advice is path="/api/refresh" so the
     # long-lived credential only ever goes to the one endpoint that needs it. That
     # requires the client to detect a 401, call /api/refresh and retry — and api.ts
@@ -75,7 +87,9 @@ def issue_session(db: Session, response: Response, user: User, family_id: str | 
     # call site. Rotating inside get_curr_user instead keeps the frontend entirely
     # unaware, at the cost of this cookie riding along on every request. httponly
     # still keeps it away from JS; what we give up is the smaller blast radius.
-    response.set_cookie("refresh_token", raw, **common)
+    response.set_cookie(
+        "refresh_token", raw, max_age=REFRESH_TOKEN_EXPIRE_DAYS * 86400, **common
+    )
     return row
 
 
@@ -146,6 +160,7 @@ def get_curr_user(
             if successor is not None and successor.revoked_at is None:
                 response.set_cookie(
                     "token", create_access_token({"sub": row.user.email}),
+                    max_age=expires_in_minutes * 60,
                     httponly=True, samesite="lax", secure=COOKIE_SECURE,
                 )
                 return row.user
