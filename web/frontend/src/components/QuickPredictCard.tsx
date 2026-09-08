@@ -10,8 +10,10 @@ const B = { name: "text-blue-400", bar: "bg-blue-400", glow: "from-blue-400/25" 
 
 type Props = {
   fight: Bout;
-  /** names the model knows — a fight with an unseen fighter can't be predicted */
-  known: Set<string>;
+  /** names the model knows — a fight with an unseen fighter can't be predicted.
+   *  Optional: callers rendering a single card can skip the 2,747-name fetch and
+   *  let the API's 404 surface as the error line instead. */
+  known?: Set<string>;
   /** locked out until they subscribe */
   paywalled: boolean;
   onFreeLeft: (n: number | null) => void;
@@ -24,7 +26,7 @@ export function QuickPredictCard({ fight, known, paywalled, onFreeLeft, onPaywal
   const [error, setError] = useState("");
 
 
-  const predictable = known.has(fight.fighter_a) && known.has(fight.fighter_b);
+  const predictable = !known || (known.has(fight.fighter_a) && known.has(fight.fighter_b));
   const pickedA = result?.pick === fight.fighter_a;
 
   async function run() {

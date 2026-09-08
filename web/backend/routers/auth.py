@@ -56,8 +56,7 @@ async def sign_up(user: SignUpRequest, db: DBDep):
 
 @router.post("/api/login", dependencies=[Depends(rate_limit("login", limit=5, window=900))])
 def login(user: LoginRequest, db: DBDep, response: Response):
-    # verify an existing user: find by username (case-insensitive, matching the
-    # lower(username) unique index), then check the password.
+    # find the user
     db_user = db.execute(
         select(User).where(func.lower(User.username) == user.username.lower())
     ).scalar_one_or_none()

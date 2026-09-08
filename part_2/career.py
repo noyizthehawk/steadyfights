@@ -36,7 +36,7 @@ def _load():
     # compute_career_score needs title_fight + division, which live in the
     # fighter-level data. Join on fighter name and fight number 
     extra = (
-        pd.read_csv(fighter_csv)[["name", "fight_number", "title_fight", "division"]]
+        pd.read_csv(fighter_csv)[["name", "fight_number", "title_fight", "division", "date"]]
         .drop_duplicates(subset=["name", "fight_number"])
     )
     career = career.merge(
@@ -45,6 +45,10 @@ def _load():
         right_on=["name", "fight_number"],
         how="left",
     )
+    # parse once here: the aged-well index compares these against title-fight
+    # dates, and a str vs Timestamp comparison raises rather than silently
+    # misbehaving
+    career["date"] = pd.to_datetime(career["date"], errors="coerce")
     # precompute a normalized name column once so lookups can match accent-free
     career["Fighter_norm"] = career["Fighter"].map(normalize_name)
     _career_df = career
@@ -141,11 +145,50 @@ def _phase(sub):
     return {
         "fights": int(len(sub)),
         "win_rate": round(float(sub["win(1)/loss(0)"].mean()) * 100, 1),
+        
         "raw_perf": round(float(sub["Raw Perf"].mean()), 1),
         "adj_perf": round(float(sub["Adj Perf"].mean()), 1),
+    
         "opp_strength": round(float(sub["Opp Str"].mean()), 3),
         "bouts": bouts,
     }
+_aged_well_index = None
+
+
+def _aged_index():
+    """Two lookups behind the 'aged well' view, built once and cached.
+
+    opp_history — every strength reading each fighter ever recorded AS an
+    opponent, date-sorted. The max of the readings AFTER a given fight is what
+    they went on to become.
+
+    title_wins — every date each fighter won a title fight, sorted. A peak alone
+    can't tell you someone became champion; Opp Str blends win rate and
+    performance and knows nothing about belts.
+    """
+    global _aged_well_index
+    if _aged_well_index is not None:
+        return _aged_well_index
+
+    df = _load()
+    history = {}
+    for name, g in df[["opponent_name", "date", "Opp Str"]].dropna().groupby("opponent_name"):
+        g = g.sort_values("date")
+        history[name] = (g["date"].tolist(), g["Opp Str"].tolist())
+
+    fl = pd.read_csv(fighter_csv, low_memory=False)
+    tf = fl[(fl["title_fight"] == 1) & (fl["winner"] == fl["name"])].copy()
+    tf["date"] = pd.to_datetime(tf["date"], errors="coerce")
+    # EVERY title win, not just the first. Gaethje won an interim belt before
+    # losing to Khabib and two more afterwards — taking the minimum said "already
+    # champion" and hid that he went on to win again. The question is whether any
+    # title came AFTER the fight, not when the earliest one was.
+    title_wins = {n: sorted(g.dropna()) for n, g in tf.groupby("name")["date"]}
+
+    _aged_well_index = (history, title_wins)
+    return _aged_well_index
+
+
 _fighter_level_df = None
 
 
@@ -207,6 +250,70 @@ def career_summary_api(fighter):
         return None
 
     max_adj = df["Adj Perf"].max()
+
+    # Per-fight series for the career chart. Two things happen to a fighter over
+    # time — how well they perform, and how hard the opposition gets — and the
+    # interesting stories live in the gap between them (holding up as opponents
+    # improve = levelling up; falling while opposition is flat = decline).
+    #
+    # Raw Perf, not Adj Perf: Adj Perf is ALREADY opponent-adjusted, so plotting
+    # it against opponent strength would partly explain itself.
+    timeline = [
+        {
+            "fight_number": int(r["fight_number"]),
+            "opponent": r["opponent_name"],
+            "won": bool(int(r["win(1)/loss(0)"])),
+            "event": r["Event"],
+            "perf": round(float(r["Raw Perf"]), 1),
+            "adj_perf": round(float(r["Adj Perf"]), 1),
+            "opp": round(float(r["Opp Str"]), 3),
+        }
+        for _, r in fights.iterrows()
+        if pd.notna(r["Raw Perf"]) and pd.notna(r["Opp Str"])
+    ]
+
+    # "Aged well": what the opponent went on to become AFTER this fight.
+    #
+    # Only what came after. Taking their all-time peak conflates two opposite
+    # stories — Usman beat Leon Edwards in 2015 before Edwards was anyone
+    # (aged well), while Adesanya beat a 2019 Anderson Silva whose peak was
+    # 2012 (caught him late). Both look identical on an all-time max.
+    hist, title_wins = _aged_index()
+    aged = []
+    for _, r in fights.iterrows():
+        opp_name, when = r["opponent_name"], r["date"]
+        if pd.isna(when) or pd.isna(r["Opp Str"]):
+            continue
+        dates, vals = hist.get(opp_name, ([], []))
+        later = [v for d, v in zip(dates, vals) if d > when]
+        peak_after = max(later) if later else None
+
+        # any title won on or after this night. ">=" not ">" because most title
+        # changes look, from the loser's side, like the belt moving in this fight
+        later_titles = [t for t in title_wins.get(opp_name, []) if t >= when]
+        became_champ = bool(later_titles)
+        title_date = later_titles[0] if later_titles else None
+
+        then = float(r["Opp Str"])
+        gain = (peak_after - then) if peak_after is not None else 0.0
+        # a flat reading is usually the <3-fight placeholder (39% of rows), not a
+        # verdict, so it must not qualify as a story
+        if gain > 0.05 or became_champ:
+            aged.append({
+                "fight_number": int(r["fight_number"]),
+                "opponent": opp_name,
+                "won": bool(int(r["win(1)/loss(0)"])),
+                "event": r["Event"],
+                "then": round(then, 3),
+                "peak_after": round(float(peak_after), 3) if peak_after is not None else None,
+                "became_champion": became_champ,
+                # None when it happened in this very fight, else years later
+                "champion_years_later": (
+                    round((title_date - when).days / 365.25, 1)
+                    if became_champ and title_date > when else None
+                ),
+            })
+    aged.sort(key=lambda a: (a["peak_after"] or 0) - a["then"], reverse=True)
 
     # Career-phase buckets — used for the `phases` breakdown in the response.
     early = fights[fights["fight_number"] <= 5]
@@ -272,6 +379,8 @@ def career_summary_api(fighter):
         "tale_of_the_tape": fighter_stats,   # str_acc/td_def/reach/… or None
         "total_fights": int(len(fights)),
         "win_rate": round(float(fights["win(1)/loss(0)"].mean()) * 100, 1),
+        "timeline": timeline,
+        "aged_well": aged,
         "avg_raw_perf": _scale_to_100(float(fights["Raw Perf"].mean()), "raw_perf"),
         "avg_adj_perf": _scale_to_100(avg_adj, "adj_perf"),
         "perf_label": _perf_label(avg_adj),          # label uses the RAW average

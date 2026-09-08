@@ -119,8 +119,34 @@ export type TaleOfTheTape = {
   stance: string | null;
 };
 
+// One fight in the career chart: how the fighter performed, and how strong the
+// opponent was. Both raw — the chart draws its own scales.
+export type TimelineFight = {
+  fight_number: number;
+  opponent: string;
+  won: boolean;
+  event: string;
+  perf: number;       // Raw Perf, roughly 0-85
+  adj_perf: number;   // opponent-adjusted
+  opp: number;        // opponent strength, 0-1
+};
+
+
+export type AgedWell = {
+  fight_number: number;
+  opponent: string;
+  won: boolean;
+  event: string;
+  then: number;              // opponent strength on the night, 0-0.75
+  peak_after: number | null; // best they reached later, null if never fought again
+  became_champion: boolean;
+  champion_years_later: number | null;  // null mean they won the belt in THIS fight
+};
+
 export type CareerSummary = {
   fighter: string;
+  timeline: TimelineFight[];
+  aged_well: AgedWell[];
   image_url: string | null;   // scraped UFC standing headshot
   tale_of_the_tape: TaleOfTheTape | null;
   total_fights: number;

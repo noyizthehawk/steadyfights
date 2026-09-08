@@ -43,8 +43,10 @@ def save_events(events: list, db: Session):
         apply_event_details(event, an_event) #apply event details
 
         existing_fights = {f.matchup: f for f in event.fights}
+        scraped_matchups = set()
 
         for scraped_fight in an_event["fights"]:
+            scraped_matchups.add(scraped_fight["matchup"])
             fight_record = existing_fights.get(scraped_fight["matchup"])
             if fight_record is None:
                 fight_record = UFCFight(
@@ -53,7 +55,16 @@ def save_events(events: list, db: Session):
                     fighter_b=scraped_fight["fighter_b"],
                 )
                 event.fights.append(fight_record)
+            else:
+                # a bout can come back after being pulled (injury cleared, re-booked)
+                if fight_record.status == "cancelled":
+                    fight_record.status = "scheduled"
             apply_fight_odds(fight_record, scraped_fight)
+
+        
+        for matchup, fight_record in existing_fights.items():
+            if matchup not in scraped_matchups and fight_record.status == "scheduled":
+                fight_record.status = "cancelled"
 
     db.commit()
 
@@ -149,6 +160,7 @@ def settle_event(db, event):
             fight.winner = fight.fighter_b
         else:
             continue
+        fight.status = "completed"
         settled += 1
     db.commit()
 
@@ -162,7 +174,10 @@ def run_settle(db) -> dict:
     events = (
         db.query(UFCEvent)
         .filter(UFCEvent.date < now)
-        .filter(UFCEvent.fights.any(UFCFight.winner.is_(None)))
+        # was UFCFight.winner.is_(None): a cancelled bout keeps a NULL winner
+        # forever, so its event matched on every run and got re-scraped for good.
+        # status separates "hasn't happened yet" from "isn't happening".
+        .filter(UFCEvent.fights.any(UFCFight.status == "scheduled"))
         .all()
     )
     total = 0

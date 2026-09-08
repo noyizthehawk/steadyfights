@@ -1,5 +1,64 @@
 """Shared FastAPI dependencies, imported by the routers. Kept out of app.py so
 routers depend on THIS, not on app.py (which would create circular imports)."""
+'''
+When a user logs in, we make a JWT token for the user (sent in a cookie to the
+browser) and we additionally make a refresh token for the user and send it as a
+cookie too. Before those cookies go out, we hash the refresh token, and together
+with the user id, a family id and an expiry we create a row in our db. We only
+ever store the hash — never the raw token, since it's a bearer credential.
+
+Both cookies get an explicit max_age. Without one they'd be session cookies and
+the browser would drop them when the browsing session ends — which desktop hides
+(the window stays open for days) but phones don't, so mobile users get logged out
+while a perfectly valid 30-day row sits in the db.
+
+When 15 minutes has encompassed and another request comes in, we check a few
+things, like whether the JWT is expired or not. If it isn't, we don't need to hit
+the db at all — the signature proves it's ours and that's enough.
+
+However, if it is expired, we use the second cookie: we hash the token in it and
+look up the row by that hash. Four things can happen:
+
+  - the row isn't present at all -> wrong/forged token, so we deny
+  - the row is expired           -> 30 days of inactivity, session over, deny
+  - the row is present but ALREADY REVOKED -> this token was already spent, so two
+    copies of it exist. Unless it was revoked in the last 30 seconds (which just
+    means our own page fired parallel requests and one of them won the race), we
+    treat it as theft: revoke every row sharing that family id, and deny.
+  - the row is present and still valid -> we mint a new JWT and a new refresh
+    token, create the new row in the same family, and revoke the former row with
+    replaced_by pointing at the new one.
+
+The important part: we revoke the old row rather than delete it. Keeping it is
+what leaves a tripwire — if we deleted it, a replayed token would just look like
+
+  - the row isn't present at all -> wrong/forged token, so we deny
+  - the row is expired           -> 30 days of inactivity, session over, deny
+  - the row is present but ALREADY REVOKED -> this token was already spent, so two
+    copies of it exist. Unless it was revoked in the last 30 seconds (which just
+    means our own page fired parallel requests and one of them won the race), we
+    treat it as theft: revoke every row sharing that family id, and deny.
+  - the row is present and still valid -> we mint a new JWT and a new refresh
+    token, create the new row in the same family, and revoke the former row with
+    replaced_by pointing at the new one.
+
+The important part: we revoke the old row rather than delete it. Keeping it is
+    replaced_by pointing at the new one.
+
+The important part: we revoke the old row rather than delete it. Keeping it is
+what leaves a tripwire — if we deleted it, a replayed token would just look like
+an unknown token and we'd never learn a breach happened, and the thief could keep
+using the newer token for 30 days.
+
+The family id is never used to FIND anything; the lookup is always by token_hash,
+which is unique. The family id is the blast radius — what we revoke once we've
+decided there's a breach.
+which is unique. The family
+Two things worth pairing witto 15 minutes. It's a stateful session with a 15-minute stateless cache in front of it, and the lag is just cache staleness.
+
+Why the refresh token isn't a JWT. 
+Making it one would put you back where you started — a long-lived credential nobody can cancel. It's opaque precisely so the only way to validate it is to ask the database, which is also the only way to revoke it.
+'''
 import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -42,7 +101,7 @@ def rate_limit(name: str, limit: int, window: int):
             if count == 1:
                 redis_client.expire(key, window)   # first hit to start the window timer
         except RedisError:
-            return  # Redis down → fail open, don't lock anyone out
+            return 
 
         if count > limit:
             raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
@@ -66,13 +125,7 @@ def issue_session(db: Session, response: Response, user: User, family_id: str | 
         expires_at=refresh_expiry(),      # sliding: every rotation gets a full window
     )
     db.add(row)
-    db.flush()                            # need row.id for the caller's replaced_by
-
-    # max_age matters: without it these are SESSION cookies, which the browser
-    # drops when the browsing session ends. Desktop keeps a window open for days
-    # so it went unnoticed, but iOS/Android end sessions aggressively (tab
-    # eviction, backgrounding, memory pressure) — the phone lost the refresh
-    # cookie and got logged out, while the 30-day row sat valid in the DB.
+    db.flush()                           
     common = dict(httponly=True, samesite="lax", secure=COOKIE_SECURE)
     response.set_cookie(
         "token",
@@ -80,13 +133,7 @@ def issue_session(db: Session, response: Response, user: User, family_id: str | 
         max_age=expires_in_minutes * 60,
         **common,
     )
-    # Deliberately NOT path-scoped. The usual advice is path="/api/refresh" so the
-    # long-lived credential only ever goes to the one endpoint that needs it. That
-    # requires the client to detect a 401, call /api/refresh and retry — and api.ts
-    # has no single fetch wrapper to hang that on, so it would mean touching every
-    # call site. Rotating inside get_curr_user instead keeps the frontend entirely
-    # unaware, at the cost of this cookie riding along on every request. httponly
-    # still keeps it away from JS; what we give up is the smaller blast radius.
+    
     response.set_cookie(
         "refresh_token", raw, max_age=REFRESH_TOKEN_EXPIRE_DAYS * 86400, **common
     )
@@ -94,9 +141,7 @@ def issue_session(db: Session, response: Response, user: User, family_id: str | 
 
 
 def revoke_family(db: Session, family_id: str):
-    """Kill every token descended from one login. Called on logout, and on reuse
-    detection where it is the whole point: if a leaked token is replayed, the
-    legitimate user's chain dies too and both parties must log in again."""
+    """Revoke all tokens for a family. This is what logout does."""
     now = datetime.now(timezone.utc)
     for row in db.execute(
         select(RefreshToken).where(

@@ -20,21 +20,27 @@ export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
 
     return (
         <div className="relative rounded-lg border border-zinc-700 p-4 text-left">
-            {summary.image_url && (
-                <img
-                    src={summary.image_url}
-                    alt={summary.fighter}
-                    className="pointer-events-none absolute bottom-0 right-full mr-3 hidden w-44 drop-shadow-2xl lg:block"
-                />
-            )}
             <div className="profile-header">
-                <div className="flex flex-wrap items-baseline gap-x-2.5">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
                     <h2 className="text-xl font-bold text-white sm:text-2xl">{summary.fighter}</h2>
                     <span className="whitespace-nowrap text-xl font-bold tabular-nums text-red-500 sm:text-2xl">{summary.record}</span>
                 </div>
-                <span className="career-score" title="Career quality (0–100)">
-                    {summary.career_score}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                    <span className="career-score" title="Career quality (0–100)">
+                        {summary.career_score}
+                    </span>
+                    {/* ufc.com serves a waist-up standing cutout, not a headshot, so
+                        object-top is what actually frames the face. The PNGs are
+                        transparent, hence the fill behind them or the circle vanishes. */}
+                    {summary.image_url && (
+                        <img
+                            src={summary.image_url}
+                            alt={summary.fighter}
+                            loading="lazy"
+                            className="h-12 w-12 shrink-0 rounded-full bg-zinc-800 object-cover object-top ring-1 ring-zinc-700 sm:h-14 sm:w-14"
+                        />
+                    )}
+                </div>
             </div>
 
             <div className="tabs">
@@ -156,8 +162,8 @@ function PhaseColumn({
             <h4>{title}</h4>
             <div className="phase-row">{phase.fights} fights</div>
             <div className="phase-row">{phase.win_rate}% wins</div>
-            <div className="phase-row">Adj perf {phase.adj_perf}</div>
-            <div className="phase-row">Opp str {phase.opp_strength}</div>
+            <div className="phase-row">Perf {phase.adj_perf}<span className="text-zinc-500"> / 75</span></div>
+            <div className="phase-row">Opp {Math.round(phase.opp_strength * 100)}<span className="text-zinc-500"> / 75</span></div>
         </button>
     );
 }

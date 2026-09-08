@@ -52,7 +52,10 @@ def get_upcoming_events(db: DBDep):
                         "img_a": f.img_a,
                         "img_b": f.img_b,
                     }
+                    # cancelled bouts stay in the table (upsert-by-matchup never
+                    # deletes) but must not be offered as upcoming
                     for f in e.fights
+                    if f.status != "cancelled"
                 ],
             }
             for e in events
