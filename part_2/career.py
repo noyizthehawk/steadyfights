@@ -2,6 +2,7 @@
 """
 Career analysis for the web API.
 """
+import math
 import os
 
 import numpy as np
@@ -353,6 +354,21 @@ def get_fighter_stats(fighter):
 
 
 
+def _json_safe(obj):
+    """Convert a JSON-unsafe object to a JSON-safe one
+    no nans in the json dunb if not 500 erro. fighter slike kevin holland, 
+    ben askren etc that have been finished without any stirkes thrown etc get giveen a nan which causes the error
+    so we replace it with None
+    """
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    return obj
+
+
 def career_summary_api(fighter):
     """Return n a JSON-serializable career rundown for one fighter or None if not found"""
     df = _load()
@@ -525,7 +541,7 @@ def career_summary_api(fighter):
 
     fighter_stats = get_fighter_stats(fighter)
 
-    return {
+    payload = {
         "fighter": fighter,
         "tale_of_the_tape": fighter_stats,   # str_acc/td_def/reach/… or None
         "total_fights": int(len(fights)),
@@ -552,6 +568,7 @@ def career_summary_api(fighter):
         },
         "record": record
     }
+    return _json_safe(payload)
 
 def top_careers(n = 10, min_fights = 8):
     df = _load()
