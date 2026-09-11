@@ -45,14 +45,10 @@ def compute_career_score(fights, max_adj_perf, *, win_col, perf_col,
     num_title_wins = title_fights[win_col].sum()
 
     # Diminishing returns rather than a hard cap. The old
-    # min(0.01*fights + 0.10*wins, 0.25) maxed out at two title wins, so 60 of
-    # the 388 fighters who ever fought for a belt scored identically — Jon Jones
-    # with 16 title wins landed on the same 0.25 as a one-time champion.
+   
     #
     # Exponential decay never saturates, so the 16th win is still worth more
-    # than the 15th, just far less than the 2nd. The decay constant is 2: slower
-    # decay punished short perfect title runs, dropping Khabib (4-0 in title
-    # fights, retired undefeated) below fighters with twice the losses.
+    # than the 15th, just far less than the 2nd.
     title_bonus = (
         0.05 * (1 - np.exp(-num_title_fights / 4.0))
         + 0.22 * (1 - np.exp(-num_title_wins / 2.0))

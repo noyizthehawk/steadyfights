@@ -50,16 +50,7 @@ def _yt_api() -> YouTubeTranscriptApi:
     return YouTubeTranscriptApi()
 
 
-# Why these are named individually: this used to be a bare `except Exception:
-# return None`, so an IP block and a video with captions genuinely turned off
-# both surfaced as "no transcript available". Those need opposite responses —
-# one is an infra fix, the other is nothing to fix — and the log gave no way to
-# tell them apart.
-#
-# Blocking is volume-triggered, not datacenter-only: an ordinary residential IP
-# earned IpBlocked after ~15 fetches while debugging this, on videos that had
-# succeeded minutes earlier. So a block says nothing on its own about WHERE the
-# request came from — read it together with the [via ...] mode below.
+
 _TRANSCRIPT_ERRORS = {
     "RequestBlocked": "youtube blocked the request (rate/reputation)",
     "IpBlocked": "youtube blocked this IP (rate/reputation)",
