@@ -21,9 +21,10 @@ export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
     return (
         <div className="relative rounded-lg border border-zinc-700 p-4 text-left">
             <div className="profile-header">
-                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-1">
                     <h2 className="text-xl font-bold text-white sm:text-2xl">{summary.fighter}</h2>
                     <span className="whitespace-nowrap text-xl font-bold tabular-nums text-red-500 sm:text-2xl">{summary.record}</span>
+                    <ActivityChip activity={summary.activity} />
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                     <span className="career-score" title="Career quality (0–100)">
@@ -123,6 +124,25 @@ export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
             {tab === "news" && <NewsList fighter={summary.fighter} />}
 
         </div>
+    );
+}
+
+// Deliberately neutral (zinc, not red/green): being retired isn't good or bad,
+// it's context for why the trajectory line is in the past tense. Active fighters
+// get nothing — the absence is the signal, and a chip on every page is noise.
+function ActivityChip({ activity }: { activity: CareerSummary["activity"] }) {
+    if (!activity || activity.status === "active" || activity.status === "unknown") return null;
+    const retired = activity.status === "retired";
+    const detail = retired
+        ? (activity.last_fight ?? "").slice(0, 4)
+        : activity.years_since !== null
+            ? `${activity.years_since}y out`
+            : "";
+    return (
+        <span className="inline-flex shrink-0 items-center gap-1 self-center rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-zinc-400">
+            {retired ? "Retired" : "Inactive"}
+            {detail && <span className="font-normal text-zinc-500">{detail}</span>}
+        </span>
     );
 }
 

@@ -55,6 +55,17 @@ def _load():
     return career
 
 
+# Cut points per metric. adj and vol gain a split at the median because the old
+# p25-p75 band held HALF the roster under a single label, which told a user
+# nothing. opp does NOT get one: 39% of fights carry the 0.500 opponent-strength
+# placeholder, so its p25 and p50 are both exactly 0.50 and any band between
+# them would be unreachable — a label that could never render.
+_QUANTILES = {
+    "adj": (0.25, 0.50, 0.75, 0.90),
+    "vol": (0.25, 0.50, 0.75, 0.90),
+    "opp": (0.25, 0.75, 0.90),
+}
+
 _thresholds = None
 
 
@@ -70,10 +81,20 @@ def _get_thresholds():
         "opp": g["Opp Str"].mean(),
     }
     _thresholds = {
-        key: [s.quantile(0.25), s.quantile(0.75), s.quantile(0.90)]
+        key: [s.quantile(q) for q in _QUANTILES[key]]
         for key, s in series.items()
     }
     return _thresholds
+
+
+def _threshold(key, q):
+    """One cut point, looked up BY QUANTILE rather than by position.
+
+    Positional indexing broke the moment the quantile list changed length —
+    ["vol"][1] meant p75 with three edges and p50 with four, silently moving a
+    behavioural threshold. Ask for the quantile you actually mean.
+    """
+    return _get_thresholds()[key][_QUANTILES[key].index(q)]
 
 
 def _bucket(value, edges, labels):
@@ -86,15 +107,106 @@ def _bucket(value, edges, labels):
     return labels[-1]
 
 
+# How the trajectory line is phrased. Present tense is a lie for someone who
+# last fought in 2017 — "on a tear right now" about GSP reads as broken data.
+# Each bucket carries an active and a past-tense form.
+# When the last-5 vs earlier gap ISN'T bigger than the fighter's own noise,
+# there is no trend to report — so describe the level they sustained instead.
+# Khabib retired 29-0 with a +3.5 delta against a standard error of 3.7: calling
+# that "leveling up" invents a rise and misses that he was simply elite.
+_LEVEL = {
+    "elite":   ("Elite the whole way, sustained at the very top",
+                "Was elite the whole way, sustained at the very top"),
+    "high":    ("A consistent high-level competitor",
+                "Was a consistent high-level competitor"),
+    "solid":   ("Steady and dependable across the run",
+                "Steady and dependable across the run"),
+    "scrappy": ("Fought to a mixed record without finding a groove",
+                "Fought to a mixed record without finding a groove"),
+}
+
+# "No trend" has two very different causes, and they need opposite words.
+# A small delta from a steady fighter means genuinely consistent. A small
+# t-statistic from a WILD fighter means the noise swamped any signal —
+# McGregor's SE is 14.7 because his fights range from 2 to 83, so calling him
+# "consistent" would assert the exact opposite of what the test found.
+_LEVEL_ERRATIC = {
+    "elite":   ("Elite on his night, but wildly up and down",
+                "Elite on his night, but wildly up and down"),
+    "high":    ("Hot and cold — capable of anything on the night",
+                "Was hot and cold — capable of anything on the night"),
+    "solid":   ("Streaky, hard to call from one fight to the next",
+                "Streaky, hard to call from one fight to the next"),
+    "scrappy": ("Never strung a run together",
+                "Never strung a run together"),
+}
+
+# how many standard errors the gap must clear before it counts as a trend
+_TREND_T = 1.5
+
+_TRAJECTORY = {
+    "rising": (
+        "On a tear right now, getting better the harder the fights get",
+        "Was on the rise, getting better as the fights got harder",
+    ),
+    "improving": (
+        "Leveling up, holding their own as the competition gets stiffer",                         
+        "Was leveling up, holding their own as the competition got stiffer",
+    ),
+    "steady": (
+        "Holding it down, grinding against top competition consistently",
+        "Held it down, grinding against top competition consistently",
+    ),
+    "declining": (
+        "Deep in the trenches right now.",
+        "Was deep in the trenches by the end man",
+    ),
+}
+
+
+_level_pop = None
+
+
+def _level_percentile(avg_adj):
+    """Where a career average sits among all fighters with 3+ fights."""
+    global _level_pop
+    if _level_pop is None:
+        df = _load()
+        per = df.groupby("Fighter")["Adj Perf"].mean()
+        counts = df.groupby("Fighter").size()
+        _level_pop = np.sort(per[counts >= 3].dropna().values)
+    if len(_level_pop) == 0:
+        return 50.0
+    return float(np.searchsorted(_level_pop, avg_adj) / len(_level_pop) * 100)
+
+
+def _activity(last_fight, now=None):
+    """active / inactive / retired, from time since the last bout.
+
+    """
+    if pd.isna(last_fight):
+        return {"status": "unknown", "last_fight": None, "years_since": None}
+    now = now or pd.Timestamp.now()
+    years = (now - last_fight).days / 365.25
+    status = "active" if years < 1.5 else ("inactive" if years < 3.0 else "retired")
+    return {
+        "status": status,
+        "last_fight": str(last_fight)[:10],
+        "years_since": round(years, 1),
+    }
+
+
 def _perf_label(avg_adj):
     return _bucket(avg_adj, _get_thresholds()["adj"],
-                   ["Developing", "Competitive Performances", "Strong Performances", "Elite Performances"])
+                   ["Developing", "Competitive Performances", "Solid Performances",
+                    "Strong Performances", "Elite Performances"])
 
 
 def _volatility_label(vol):
     # lower volatility = steadier, the lower the better
     return _bucket(vol, _get_thresholds()["vol"],
-                   ["Very consistent", "Consistent Career", "Streaky", "Highly volatile"])
+                   ["Very consistent performances", "Consistent Performances", "Fairly steady",
+                    "Streaky", "Unpredictable performances"])
 
 
 def _opp_label(avg_opp):
@@ -251,13 +363,7 @@ def career_summary_api(fighter):
 
     max_adj = df["Adj Perf"].max()
 
-    # Per-fight series for the career chart. Two things happen to a fighter over
-    # time — how well they perform, and how hard the opposition gets — and the
-    # interesting stories live in the gap between them (holding up as opponents
-    # improve = levelling up; falling while opposition is flat = decline).
-    #
-    # Raw Perf, not Adj Perf: Adj Perf is ALREADY opponent-adjusted, so plotting
-    # it against opponent strength would partly explain itself.
+    # for the graph
     timeline = [
         {
             "fight_number": int(r["fight_number"]),
@@ -280,6 +386,11 @@ def career_summary_api(fighter):
     # 2012 (caught him late). Both look identical on an all-time max.
     hist, title_wins = _aged_index()
     aged = []
+    # One row per opponent, the EARLIEST meeting. Usman fought Leon Edwards three
+    # times, but only the 2015 win carries any hindsight — by the rematches
+    # Edwards was already champion and there was nothing left to not-know.
+    # `fights` is sorted by fight_number, so first seen is first fought.
+    seen_opponents = set()
     for _, r in fights.iterrows():
         opp_name, when = r["opponent_name"], r["date"]
         if pd.isna(when) or pd.isna(r["Opp Str"]):
@@ -288,9 +399,8 @@ def career_summary_api(fighter):
         later = [v for d, v in zip(dates, vals) if d > when]
         peak_after = max(later) if later else None
 
-        # any title won on or after this night. ">=" not ">" because most title
-        # changes look, from the loser's side, like the belt moving in this fight
-        later_titles = [t for t in title_wins.get(opp_name, []) if t >= when]
+        
+        later_titles = [t for t in title_wins.get(opp_name, []) if t > when]
         became_champ = bool(later_titles)
         title_date = later_titles[0] if later_titles else None
 
@@ -298,7 +408,8 @@ def career_summary_api(fighter):
         gain = (peak_after - then) if peak_after is not None else 0.0
         # a flat reading is usually the <3-fight placeholder (39% of rows), not a
         # verdict, so it must not qualify as a story
-        if gain > 0.05 or became_champ:
+        if (gain > 0.05 or became_champ) and opp_name not in seen_opponents:
+            seen_opponents.add(opp_name)
             aged.append({
                 "fight_number": int(r["fight_number"]),
                 "opponent": opp_name,
@@ -322,6 +433,10 @@ def career_summary_api(fighter):
 
     # Trajectory is recent form that is last 5 fights against everything before them.
     # Need at least 6 fights so there's a baseline to compare the last 5 against.
+    activity = _activity(fights["date"].max())
+    # needed by the trajectory below as well as the career label further down
+    score = _compute_career_score(fights, max_adj)
+
     if len(fights) <= 5:
         trajectory = "Developing career — not enough fights to assess trajectory"
     else:
@@ -329,18 +444,54 @@ def career_summary_api(fighter):
         earlier = fights.iloc[:-5]       # everything before them
         improvement = recent["Adj Perf"].mean() - earlier["Adj Perf"].mean()
 
-        if improvement > 5:
-            trajectory = "On a tear right now, getting better the harder the fights get"
-        elif improvement > 0:
-            trajectory = "Leveling up,  holding their own as the competition gets stiffer"
-        elif improvement > -3:
-            trajectory = "Holding it down,  been grinding against top competition consistently"
+        # Standard error of the difference between the two means. A raw delta
+        # can't tell a real shift from a fighter who simply swings a lot —
+        # McGregor's -18.4 comes with an SE of 14.7, so five fights can't
+        # establish it, while Silva's -16.8 against 7.5 clearly can.
+        se = np.sqrt(
+            recent["Adj Perf"].var(ddof=1) / len(recent)
+            + earlier["Adj Perf"].var(ddof=1) / max(1, len(earlier))
+        )
+        t_stat = improvement / se if se and not pd.isna(se) else 0.0
+
+        if t_stat >= _TREND_T:
+            bucket, table = ("rising" if improvement > 5 else "improving"), _TRAJECTORY
+        elif t_stat <= -_TREND_T:
+            bucket, table = "declining", _TRAJECTORY
         else:
-            trajectory = "Deep in the trenches,  still showing up against the best in the game"
+            # no meaningful trend — say what level they held instead, and pick
+            # the wording by whether they were actually steady or merely noisy.
+            #
+            # career_score, NOT an Adj Perf percentile. Adj Perf measures how well
+            # you performed, not whether you won: Marvin Vettori is 9-9 with a
+            # perfIQ of 75 — higher than Strickland's — and a percentile of 92,
+            # so he read as "elite the whole way". career_score already folds in
+            # win rate, opponent quality and title fights, and its cut points are
+            # the ones career_label below is tuned on.
+            bucket = ("elite" if score >= 90 else "high" if score >= 80
+                      else "solid" if score >= 60 else "scrappy")
+            spread = fights["Raw Perf"].std()
+            # Compare the NUMBER, not the label. This used to test
+            # _volatility_label(...) against display strings, so renaming one of
+            # them silently reverted the fix and McGregor went back to being
+            # called "consistent". edges are [p25, p75, p90]; p75 is where
+            # streaky starts, which is the same cut the label uses.
+            erratic = not pd.isna(spread) and float(spread) >= _threshold("vol", 0.75)
+            table = _LEVEL_ERRATIC if erratic else _LEVEL
+
+        # Past tense once they stop fighting — the read is still about their last
+        # five bouts, but it describes where they were when they walked away
+        # rather than claiming to know where they are now.
+        present, past = table[bucket]
+        if activity["status"] == "active":
+            trajectory = present
+        else:
+            year = (activity["last_fight"] or "")[:4]
+            prefix = "Retired" if activity["status"] == "retired" else "Inactive"
+            trajectory = f"{prefix} since {year}. {past}." if year else past
 
 
 
-    score = _compute_career_score(fights, max_adj)
     if score >= 90:
         label = "All-time dominant UFC career"
     elif score >= 80:
@@ -379,6 +530,7 @@ def career_summary_api(fighter):
         "tale_of_the_tape": fighter_stats,   # str_acc/td_def/reach/… or None
         "total_fights": int(len(fights)),
         "win_rate": round(float(fights["win(1)/loss(0)"].mean()) * 100, 1),
+        "activity": activity,
         "timeline": timeline,
         "aged_well": aged,
         "avg_raw_perf": _scale_to_100(float(fights["Raw Perf"].mean()), "raw_perf"),

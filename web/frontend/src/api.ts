@@ -140,11 +140,22 @@ export type AgedWell = {
   then: number;              // opponent strength on the night, 0-0.75
   peak_after: number | null; // best they reached later, null if never fought again
   became_champion: boolean;
-  champion_years_later: number | null;  // null mean they won the belt in THIS fight
+  champion_years_later: number | null;  // null only when became_champion is false —
+                                        // a belt won IN this fight is the result, not foresight
+};
+
+// Time since the last bout. Thresholds come from the data: 90% of consecutive
+// fights fall within ~1 year, so 18 months is outside a normal rhythm and 3
+// years is past the 99th percentile.
+export type Activity = {
+  status: "active" | "inactive" | "retired" | "unknown";
+  last_fight: string | null;   // "2017-11-04"
+  years_since: number | null;
 };
 
 export type CareerSummary = {
   fighter: string;
+  activity: Activity;
   timeline: TimelineFight[];
   aged_well: AgedWell[];
   image_url: string | null;   // scraped UFC standing headshot

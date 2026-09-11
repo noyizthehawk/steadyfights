@@ -1,4 +1,5 @@
 
+import logging
 import re
 import time
 from datetime import datetime
@@ -16,6 +17,22 @@ from .config import (
 from .models import Pick, NotableExtraction, User, UFCEvent
 from part_2.career import normalize_name
 
+log = logging.getLogger(__name__)
+
+
+def _proxy_mode() -> str:
+    """Which egress path transcript requests take. Logged on failure: a block
+    while routed through Webshare and a block with no proxy at all look the
+    same from the exception, but mean opposite things — the first is a bad
+    Webshare package (their "Proxy Server" tier is datacenter IPs, which
+    YouTube blocks exactly like Railway's; only "Residential" works), the
+    second is env vars not reaching the app."""
+    if WEBSHARE_PROXY_USERNAME and WEBSHARE_PROXY_PASSWORD:
+        return "webshare"
+    if YT_PROXY_URL:
+        return "generic-proxy"
+    return "direct (no proxy configured)"
+
 
 def _yt_api() -> YouTubeTranscriptApi:
     """YouTubeTranscriptApi, routed through a residential proxy when one is
@@ -32,13 +49,45 @@ def _yt_api() -> YouTubeTranscriptApi:
     return YouTubeTranscriptApi()
 
 
-def get_transcript(video_id: str) -> str | None:
+# Why these are named individually: this used to be a bare `except Exception:
+# return None`, so an IP block and a video with captions genuinely turned off
+# both surfaced as "no transcript available". Those need opposite responses —
+# one is an infra fix, the other is nothing to fix — and the log gave no way to
+# tell them apart.
+#
+# Blocking is volume-triggered, not datacenter-only: an ordinary residential IP
+# earned IpBlocked after ~15 fetches while debugging this, on videos that had
+# succeeded minutes earlier. So a block says nothing on its own about WHERE the
+# request came from — read it together with the [via ...] mode below.
+_TRANSCRIPT_ERRORS = {
+    "RequestBlocked": "youtube blocked the request (rate/reputation)",
+    "IpBlocked": "youtube blocked this IP (rate/reputation)",
+    "TranscriptsDisabled": "uploader disabled captions",
+    "NoTranscriptFound": "no captions in a requested language",
+    "VideoUnavailable": "video unavailable (private/deleted)",
+    "VideoUnplayable": "video unplayable",
+    "AgeRestricted": "age-restricted, needs authentication",
+    "PoTokenRequired": "youtube demanded a proof-of-origin token",
+    "InvalidVideoId": "malformed video id",
+}
+
+
+def get_transcript(video_id: str) -> tuple[str | None, str]:
+    """Returns (text, reason). `reason` is only meaningful when text is None."""
     try:
         fetched = _yt_api().fetch(video_id)
         text = " ".join(snippet.text for snippet in fetched).strip()
-        return text or None
-    except Exception:
-        return None
+        if text:
+            return text, ""
+        return None, "transcript was empty"
+    except Exception as e:
+        name = type(e).__name__
+        mode = _proxy_mode()
+        reason = _TRANSCRIPT_ERRORS.get(name, f"transcript fetch failed: {name}")
+        reason = f"{reason} [via {mode}]"
+        log.warning("transcript fetch failed for %s: %s via %s (%s)",
+                    video_id, name, mode, reason)
+        return None, reason
 
 _STOP = {"ufc", "fight", "night", "full", "card", "predictions", "prediction",
          "vs", "and", "the", "center", "centre", "arena", "stadium", "at", "co"}
@@ -263,9 +312,9 @@ def run_extraction(db, user, event, video_id: str | None = None) -> dict:
             return {"ok": False, "reason": "no matching prediction video found"}
         vid = match["video_id"]
 
-    transcript = get_transcript(vid)
+    transcript, reason = get_transcript(vid)
     if not transcript:
-        return {"ok": False, "reason": "no transcript available", "video_id": vid}
+        return {"ok": False, "reason": reason, "video_id": vid}
 
     fights = [{"fighter_a": f.fighter_a, "fighter_b": f.fighter_b} for f in event.fights]
     try:

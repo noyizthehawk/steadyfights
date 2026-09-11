@@ -62,9 +62,7 @@ export function AgedWell({ rows, fighter }: { rows: AgedWellRow[]; fighter: stri
                     >
                       ★ Champion
                       <span className="font-normal opacity-70">
-                        {r.champion_years_later === null
-                          ? "in this fight"
-                          : `${r.champion_years_later}y later`}
+                        {r.champion_years_later}y later
                       </span>
                     </span>
                   )}
