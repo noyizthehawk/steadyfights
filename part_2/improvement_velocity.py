@@ -150,7 +150,9 @@ def calculate_opponent_strength_optimized(row):
     opp_stats = fighter_stats_lookup[key]
     fight_count = opp_stats['fight_count']
 
-    # Calculate opponent strength
+    if fight_count <= 2:
+        return 0.5
+
     opp_win_rate = opp_stats['win_rate']
     opp_perf = opp_stats['performance'] / 100
 
