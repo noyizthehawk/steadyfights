@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 
 from google import genai
+from google.genai import types
 from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig, GenericProxyConfig
@@ -186,9 +187,24 @@ _client = None
 
 
 def _gemini():
+    """Gemini client with retries on transient upstream failures.
+    google llm sometimes gets overloaded and return a 503 sever error. so we rety at least 5 itmes
+    """
     global _client
     if _client is None:
-        _client = genai.Client(api_key=GEMINI_API_KEY)
+        _client = genai.Client(
+            api_key=GEMINI_API_KEY,
+            http_options=types.HttpOptions(
+                retry_options=types.HttpRetryOptions(
+                    attempts=3,
+                    initial_delay=1.0,
+                    exp_base=2.0,
+                    max_delay=8.0,
+                    jitter=1.0,
+                    http_status_codes=[408, 500, 502, 503, 504],
+                ),
+            ),
+        )
     return _client
 
 
@@ -320,7 +336,16 @@ def run_extraction(db, user, event, video_id: str | None = None) -> dict:
     try:
         extracted = extract_picks(transcript, fights)
     except Exception as e:
-        return {"ok": False, "reason": f"extraction failed: {type(e).__name__}", "video_id": vid}
+        # `ServerError` alone was unactionable — it covers an overloaded model,
+        # a bad key and a malformed request alike. The status code separates
+        # "retry later" from "you broke something".
+        code = getattr(e, "code", None) or getattr(e, "status", None)
+        detail = {
+            429: "gemini quota exhausted (free tier is 20 requests/day)",
+            503: "gemini overloaded (transient, retried and still failed)",
+        }.get(code, f"{type(e).__name__}" + (f" {code}" if code else ""))
+        log.warning("extraction failed for %s: %s: %s", vid, detail, str(e)[:300])
+        return {"ok": False, "reason": f"extraction failed: {detail}", "video_id": vid}
 
     summary = _save_picks(db, user.id, event, extracted)
     _save_source_video(db, user.id, event.id, vid)
