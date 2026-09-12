@@ -15,7 +15,7 @@ from .config import (
     GEMINI_API_KEY,
     WEBSHARE_PROXY_USERNAME, WEBSHARE_PROXY_PASSWORD, YT_PROXY_URL,
 )
-from .models import Pick, NotableExtraction, User, UFCEvent
+from .models import Pick, NotableExtraction, User, UFCEvent, UFCFight
 from part_2.career import normalize_name
 
 log = logging.getLogger(__name__)
@@ -379,7 +379,34 @@ def run_extraction_sweep(db, within_days: int = 10, reextract: bool = False) -> 
                     .first()
                 )
                 if already:
+                    # Report skipped pairs too. They used to `continue` silently,
+                    # so a pair that had succeeded long ago and a pair that was
+                    # never attempted looked identical from the response — the
+                    # only clue was `details` being shorter than pundits x events.
                     tally["skipped"] += 1
+                    # How many picks that extraction actually produced. A run can
+                    # write this row having saved ZERO picks — every fight came
+                    # back predicted_winner=null, or no name matched a corner —
+                    # and the pair is then skipped forever with nothing to show.
+                    # Without this count "already extracted" and "extracted
+                    # nothing, permanently" read the same.
+                    n_picks = (
+                        db.query(Pick)
+                        .join(UFCFight, Pick.fight_id == UFCFight.id)
+                        .filter(Pick.user_id == user.id, UFCFight.event_id == event.id)
+                        .count()
+                    )
+                    details.append({
+                        "user": user.username,
+                        "event": event.title,
+                        "ok": n_picks > 0,
+                        "skipped": True,
+                        "reason": "already extracted" if n_picks
+                                  else "already extracted but saved ZERO picks",
+                        "picks": n_picks,
+                        "video_id": already.video_id,
+                        "extracted_at": already.created_at.isoformat() if already.created_at else None,
+                    })
                     continue
 
             try:
