@@ -127,6 +127,15 @@ def find_prediction_video(channel_id: str, event) -> dict | None:
     all_ln = {ln for ln in _last_names([f.fighter_a for f in fights] + [f.fighter_b for f in fights]) if len(ln) >= 3}
     other_ln = all_ln - main_ln                                    # non-headliner card surnames
     venue_words = {w for w in distinctive_words(event.venue) if len(w) >= 4}
+
+    # The card's brand, minus the generic parts. _STOP already drops ufc/fight/
+    # night and distinctive_words drops bare digits, so:
+    #   "Noche UFC"          -> {"noche"}        a real identifier
+    #   "Crypto.com UFC 331" -> {"cryptocom"}    (331 is caught by ev_num)
+    #   "UFC Fight Night"    -> {}               nothing distinctive, as it should be
+    # Unnumbered cards have no other identifier anywhere, which is how a
+    # Belgrade video matched Noche UFC on the single shared surname "rodriguez".
+    series_words = {w for w in distinctive_words(getattr(event, "series", None)) if len(w) >= 4}
     ev_date = event.date
 
     best, best_total = None, 0
@@ -149,10 +158,23 @@ def find_prediction_video(channel_id: str, event) -> dict | None:
         specific = 0
         if ev_num and re.search(rf"ufc\s*{ev_num}\b", title):
             specific += 6                                  # exact event number = strongest, unambiguous id
+        if series_words & title_words:
+            specific += 6                                  # brand ("noche") — as unambiguous as a number
         specific += 2 * len(main_ln & title_words)         # headliner surname
         specific += 1 * len(other_ln & title_words)        # other card surname
         specific += 1 * len(venue_words & title_words)     # distinctive venue word
-        if specific == 0:
+
+        # Two, not one. A single non-headliner surname is not evidence: the
+        # generic bonuses below are worth up to 10, so one shared common name
+        # ("rodriguez", "silva") was enough to carry a video about an entirely
+        # different card. That is exactly how "Medic vs Rodriguez — UFC
+        # Belgrade" beat the field for Noche UFC and then, having matched, got
+        # written in as that pundit's source video.
+        #
+        # Checked against every known-good match: they score 2+ on card
+        # surnames alone (Tsarukyan + Ruffy), or 6 on the event number, or 6 on
+        # the brand. Only the Belgrade false positive sits at 1.
+        if specific < 2:
             continue  # not about this event
 
         #is it a full card predciton video? sometimes youtubers make rant vids
@@ -339,9 +361,19 @@ def run_extraction(db, user, event, video_id: str | None = None) -> dict:
         return {"ok": False, "reason": f"extraction failed: {detail}", "video_id": vid}
 
     summary = _save_picks(db, user.id, event, extracted)
-    _save_source_video(db, user.id, event.id, vid)
+
+    
+    saved = summary["created"] + summary["updated"]
+    if saved:
+        _save_source_video(db, user.id, event.id, vid)
     db.commit()
-    return {"ok": True, "video_id": vid, **summary}
+    return {
+        "ok": bool(saved),
+        "video_id": vid,
+        **summary,
+        **({} if saved else
+           {"reason": "extracted no usable picks — pair left open for a retry"}),
+    }
 
 
 def run_extraction_sweep(db, within_days: int = 10, reextract: bool = False) -> dict:

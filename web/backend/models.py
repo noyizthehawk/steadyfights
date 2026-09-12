@@ -17,6 +17,7 @@ class UFCEvent(Base):
     date = Column(Integer)
     venue = Column(String)
     poster = Column(String)
+    series = Column(String)
     fights = relationship("UFCFight", back_populates="event", cascade="all, delete-orphan")
 
 class UFCFight(Base):

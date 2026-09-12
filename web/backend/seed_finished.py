@@ -20,13 +20,14 @@ EVENT_LINK = "/event/ufc-fight-night-may-30-2026"  # a finished card on ufc.com
 def seed():
     db = SessionLocal()
     try:
-        poster, fights = scrape_event_details(EVENT_LINK)
+        series, poster, fights = scrape_event_details(EVENT_LINK)
         results = [{
             "title": "UFC Fight Night: May 30, 2026 (TEST)",
             "event_link": EVENT_LINK,
             "date": int(time.time()) - 7 * 86400,  # a week ago -> counts as finished
             "venue": "Test Arena",
             "poster": poster,
+            "series": series,
             "fights": fights,
         }]
         save_events(results, db)  # stores the fights with winner left as None

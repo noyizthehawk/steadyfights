@@ -20,6 +20,9 @@ def apply_event_details(event: UFCEvent, an_event: dict):
     event.date = an_event["date"]
     event.venue = an_event["venue"]
     event.poster = an_event["poster"]
+    # .get, not [], because rows scraped before this column existed (and the
+    # test fixtures) have no "series" key at all.
+    event.series = an_event.get("series")
 
 
 def apply_fight_odds(fight: UFCFight, scraped_fight: dict):
@@ -196,6 +199,10 @@ def scrape_event_details(event_url):
     poster_img = soup.select_one(".c-hero__image img")
     poster = poster_img["src"] if poster_img and poster_img.has_attr("src") else None
 
+    #series
+    prefix = soup.select_one(".c-hero__headline-prefix")
+    series = prefix.get_text(" ", strip=True) if prefix else None
+
     fights = []
     for bout in soup.select(".c-listing-fight"):
         names = [n.get_text(" ", strip=True) for n in bout.select(".c-listing-fight__corner-name")] #get names
@@ -223,7 +230,7 @@ def scrape_event_details(event_url):
             "img_b": img_b,
         })
 
-    return poster, fights
+    return series, poster, fights
 
 
 def scrape_events():
@@ -252,7 +259,7 @@ def scrape_events():
         venue = venue_el.text.strip() if venue_el else None
 
         # The bouts (names + odds) come from the event's detail page, where
-        poster, fights = scrape_event_details(event_link) if event_link else (None, []) # get event details and fights 
+        series, poster, fights = scrape_event_details(event_link) if event_link else (None, None, []) # get event details and fights
         time.sleep(1)
         results.append({
             "title": title,
@@ -260,6 +267,7 @@ def scrape_events():
             "date": timestamp,
             "venue": venue,
             "poster": poster,
+            "series": series,
             "fights": fights,
         })
     return results
