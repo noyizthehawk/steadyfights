@@ -4,7 +4,7 @@ Run from the PROJECT ROOT:
 """
 from .database import SessionLocal
 from .scraping import run_settle
-from .routers.groups import run_settle_rooms
+from .room_settlement import run_settle_rooms
 
 
 def main():

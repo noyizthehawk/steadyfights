@@ -26,9 +26,9 @@ export default function PredictionGamePage() {
                 {userId !== null && (
                     <Link
                         to={`/users/${userId}/events`}
-                        className="text-sm text-zinc-400 hover:text-blue-500"
+                        className="text-sm text-red-400 hover:text-blue-500"
                     >
-                        My Past Events
+                        My Events
                     </Link>
                 )}
             </div>

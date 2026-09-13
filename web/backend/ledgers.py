@@ -1,7 +1,6 @@
 from .models import CoinLedger, CoinReason, User
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from .dependencies import DBDep, get_curr_user
 from fastapi import HTTPException, Depends
 
 
