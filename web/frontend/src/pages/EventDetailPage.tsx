@@ -4,6 +4,7 @@ import { getUpcomingEvents, getMyPicks, makePick, clearPick, getEventPunditPicks
          AuthError, type UFCEvent, type EventPunditPicks } from "../api";
 import { picksLocked, punditPicksVisible } from "../lib/lock";
 import { PunditCluster } from "../components/PunditCluster";
+import { Flag } from "../components/Flag";
 
 export default function EventDetailPage() {
    //slug from route
@@ -123,7 +124,10 @@ export default function EventDetailPage() {
                             )}
                             <div className="min-w-0 text-center sm:text-left">
                                 <Link to={`/fighters/${encodeURIComponent(fight.fighter_a)}/career`} className="block truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_a}</Link>
-                                <p className="text-xs text-zinc-400">{fight.odds_a ?? "—"}</p>
+                                <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 sm:justify-start">
+                                    <Flag src={fight.flag_a} country={fight.country_a} />
+                                    {fight.odds_a ?? "—"}
+                                </p>
                                 <PunditCluster
                                     voters={(pundits?.picks[String(fight.id)]?.voters ?? [])
                                         .filter((v) => v.picked === fight.fighter_a)}
@@ -140,7 +144,10 @@ export default function EventDetailPage() {
                             )}
                             <div className="min-w-0 text-center sm:text-right">
                                 <Link to={`/fighters/${encodeURIComponent(fight.fighter_b)}/career`} className="block truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_b}</Link>
-                                <p className="text-xs text-zinc-400">{fight.odds_b ?? "—"}</p>
+                                <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 sm:justify-end">
+                                    <Flag src={fight.flag_b} country={fight.country_b} />
+                                    {fight.odds_b ?? "—"}
+                                </p>
                                 <PunditCluster
                                     voters={(pundits?.picks[String(fight.id)]?.voters ?? [])
                                         .filter((v) => v.picked === fight.fighter_b)}

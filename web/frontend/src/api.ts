@@ -199,6 +199,14 @@ export type Bout = {
   odds_b: string | null;
   img_a: string | null;
   img_b: string | null;
+  // Flag image URL from ufc.com + the country name for the tooltip.
+  // null on rows scraped before these columns existed.
+  flag_a: string | null;
+  flag_b: string | null;
+  country_a: string | null;
+  country_b: string | null;
+  bout_order: number | null;          // 1 = main event
+  card_section: string | null;        // "Main Card" | "Prelims" | "Early Prelims"
 }
 export type UFCEvent = {
   /**

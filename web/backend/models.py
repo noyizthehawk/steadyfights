@@ -18,7 +18,13 @@ class UFCEvent(Base):
     venue = Column(String)
     poster = Column(String)
     series = Column(String)
-    fights = relationship("UFCFight", back_populates="event", cascade="all, delete-orphan")
+    
+    fights = relationship(
+        "UFCFight",
+        back_populates="event",
+        cascade="all, delete-orphan",
+        order_by="[UFCFight.bout_order.is_(None), UFCFight.bout_order, UFCFight.id]",
+    )
 
 class UFCFight(Base):
     __tablename__ = "ufc_fights"
@@ -36,6 +42,21 @@ class UFCFight(Base):
 
     
     status = Column(String, nullable=False, server_default="scheduled", index=True)
+
+    
+    #
+    # Not fixed at first scrape: bouts get promoted when a headliner withdraws,
+    # and save_events upserts, so a re-scrape corrects the order for free.
+    bout_order = Column(Integer, nullable=True)
+    # "Main Card" | "Prelims" | "Early Prelims"
+    card_section = Column(String, nullable=True)
+
+    
+    flag_a = Column(String, nullable=True)
+    flag_b = Column(String, nullable=True)
+    
+    country_a = Column(String, nullable=True)
+    country_b = Column(String, nullable=True)
 
     event = relationship("UFCEvent", back_populates="fights")
 

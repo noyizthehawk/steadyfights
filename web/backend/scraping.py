@@ -1,4 +1,5 @@
 
+import re
 import sys
 import subprocess
 import time
@@ -12,6 +13,17 @@ from .config import BASE, headers
 from .models import UFCEvent, UFCFight
 from part_2 import Prediction_model as model
 from part_2.career import normalize_name  # unidecode-based; handles ł/ø/đ too
+
+# The card-section headings on a ufc.com event page. Anchored ^...$ because
+# BeautifulSoup matches strings with .search(): without the anchors a stray
+# mention in prose ("...on the prelims card...") would register as a section
+# label. Only a text node that is EXACTLY the heading counts.
+_CARD_SECTION = re.compile(r"^(Main Card|Prelims|Early Prelims)$", re.I)
+
+# Flag images are the only place the country appears as a CODE rather than a
+# display name: .../images/flags/BR.PNG. We keep the code and throw the URL
+# away — two characters we can render ourselves beats hotlinking their CDN.
+_FLAG = re.compile(r"/flags/([A-Za-z]{2})\.png", re.I)
 
 
 def apply_event_details(event: UFCEvent, an_event: dict):
@@ -31,6 +43,19 @@ def apply_fight_odds(fight: UFCFight, scraped_fight: dict):
     fight.odds_b = scraped_fight["odds_b"]
     fight.img_a = scraped_fight["img_a"]
     fight.img_b = scraped_fight["img_b"]
+    
+    if scraped_fight.get("bout_order") is not None:
+        fight.bout_order = scraped_fight["bout_order"]
+    if scraped_fight.get("card_section") is not None:
+        fight.card_section = scraped_fight["card_section"]
+    if scraped_fight.get("flag_a") is not None:
+        fight.flag_a = scraped_fight["flag_a"]
+    if scraped_fight.get("flag_b") is not None:
+        fight.flag_b = scraped_fight["flag_b"]
+    if scraped_fight.get("country_a") is not None:
+        fight.country_a = scraped_fight["country_a"]
+    if scraped_fight.get("country_b") is not None:
+        fight.country_b = scraped_fight["country_b"]
 
 
 def save_events(events: list, db: Session):
@@ -204,22 +229,39 @@ def scrape_event_details(event_url):
     series = prefix.get_text(" ", strip=True) if prefix else None
 
     fights = []
+    
+    order = 0
     for bout in soup.select(".c-listing-fight"):
-        names = [n.get_text(" ", strip=True) for n in bout.select(".c-listing-fight__corner-name")] #get names
-        odds = [o.get_text(strip=True) for o in bout.select(".c-listing-fight__odds-amount")] # get odds
+        names = [name.get_text(" ", strip=True) for name in bout.select(".c-listing-fight__corner-name")] #get names
+        odds = [odd.get_text(strip=True) for odd in bout.select(".c-listing-fight__odds-amount")] # get odds
         if len(names) < 2:
             continue  # skip incomplete blocks
 
         fighter_a, fighter_b = names[0], names[1]
-        odds_a = _clean_odds(odds[0]) if len(odds) >= 2 else None
+        odds_a = _clean_odds(odds[0]) if len(odds) >= 2 else None # odds only show if two of the odds are present
         odds_b = _clean_odds(odds[1]) if len(odds) >= 2 else None
 
-        # fighter headshots — scoped to the red/blue corner so we skip the flag imgs
+        # fighter headshots are scoped to the red/blue corner so we skip the flag imgs
         img_a_el = bout.select_one(".c-listing-fight__corner-image--red img")
         img_b_el = bout.select_one(".c-listing-fight__corner-image--blue img")
         img_a = img_a_el["src"] if img_a_el and img_a_el.has_attr("src") else None
         img_b = img_b_el["src"] if img_b_el and img_b_el.has_attr("src") else None
 
+        # to find the most recent header we see to mark if a bout is a maoin event , prelim or early prelim
+        prev = bout.find_previous(string=_CARD_SECTION)
+        section = prev.strip() if prev else None
+
+        
+        flags = [img.get("src") for img in bout.select("img")
+                 if _FLAG.search(img.get("src") or "")] # get flag for afighter provided that they have one
+        countries = [c.get_text(" ", strip=True)
+                     for c in bout.select(".c-listing-fight__country-text")] # scrape the country text to match
+        flag_a = flags[0] if len(flags) > 0 else None
+        flag_b = flags[1] if len(flags) > 1 else None
+        country_a = countries[0] if len(countries) > 0 else None
+        country_b = countries[1] if len(countries) > 1 else None
+
+        order += 1
         fights.append({
             "matchup": f"{fighter_a} vs {fighter_b}",
             "fighter_a": fighter_a,
@@ -228,6 +270,12 @@ def scrape_event_details(event_url):
             "odds_b": odds_b,
             "img_a": img_a,
             "img_b": img_b,
+            "bout_order": order,
+            "card_section": section,
+            "flag_a": flag_a,
+            "flag_b": flag_b,
+            "country_a": country_a,
+            "country_b": country_b,
         })
 
     return series, poster, fights

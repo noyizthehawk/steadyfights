@@ -50,6 +50,14 @@ def get_upcoming_events(db: DBDep):
                         "odds_b": fight.odds_b,
                         "img_a": fight.img_a,
                         "img_b": fight.img_b,
+                        # null on any row not yet re-scraped — the UI renders
+                        # nothing rather than a placeholder flag
+                        "flag_a": fight.flag_a,
+                        "flag_b": fight.flag_b,
+                        "country_a": fight.country_a,
+                        "country_b": fight.country_b,
+                        "bout_order": fight.bout_order,
+                        "card_section": fight.card_section,
                     }
                     # cancelled bouts stay in the table (upsert-by-matchup never
                     # deletes) but must not be offered as upcoming
@@ -299,7 +307,7 @@ def event_pundit_picks(event_id: int, db: DBDep):
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    # pundits we actually track (a linked channel is what makes them extractable)
+    # pundits we actually track, must have linked channel and is notable
     roster = (
         db.query(User)
         .filter(User.is_notable.is_(True), User.youtube_channel_id.isnot(None))
@@ -309,7 +317,7 @@ def event_pundit_picks(event_id: int, db: DBDep):
     phase = event_phase(event.date, int(time.time()))
     if phase == UPCOMING:
         return {"event_id": event.id, "phase": phase, "revealed": False,
-                "roster": roster, "picks": {}}
+                "roster": roster, "picks": {}} # do not reveal picks yet
 
     # the source video each pundit's picks came from, so a pick is verifiable —
     # these are LLM-extracted from speech and will occasionally be wrong, and we
@@ -320,7 +328,7 @@ def event_pundit_picks(event_id: int, db: DBDep):
         .all()
     )
 
-    rows = (
+    pundit_picks = (
         db.query(Pick.picked, UFCFight.id, UFCFight.fighter_a, UFCFight.fighter_b,
                  User.id, User.username, User.avatar_url)
         .join(UFCFight, UFCFight.id == Pick.fight_id)
@@ -334,11 +342,11 @@ def event_pundit_picks(event_id: int, db: DBDep):
     )
 
     picks: dict[int, dict] = {}
-    for picked, fight_id, fighter_a, fighter_b, user_id, username, avatar_url in rows:
-        pn = normalize_name(picked)
-        if pn == normalize_name(fighter_a):
+    for picked, fight_id, fighter_a, fighter_b, user_id, username, avatar_url in pundit_picks:
+        picked_name = normalize_name(picked)
+        if picked_name == normalize_name(fighter_a):
             side = fighter_a
-        elif pn == normalize_name(fighter_b):
+        elif picked_name == normalize_name(fighter_b):
             side = fighter_b
         else:
             continue          # a name matching neither corner — drop it silently
@@ -363,5 +371,5 @@ def event_pundit_picks(event_id: int, db: DBDep):
         "roster": roster,
         # keys are stringified: JSON object keys are always strings, and being
         # explicit here stops the frontend guessing at the type
-        "picks": {str(k): v for k, v in picks.items()},
+        "picks": {str(fight_id): picks for fight_id, picks in picks.items()},
     }
