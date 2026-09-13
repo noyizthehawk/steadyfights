@@ -383,8 +383,12 @@ def run_extraction(db, user, event, video_id: str | None = None) -> dict:
 def run_extraction_sweep(db, within_days: int = 10, reextract: bool = False) -> dict:
     """Cron entrypoint: run the AI pipeline across ALL upcoming events (within
     `within_days`) x all notable pundits. Idempotent and self-healing, so a
-    scheduler can safely hit this daily. `reextract=True` forces already-done
-    pairs to be redone."""
+    scheduler can safely hit this daily.
+
+    An already-extracted pair is re-matched, not blindly skipped: if the channel
+    has since uploaded a video that now scores higher than the stored one, the
+    pair is redone against it. `reextract=True` is the blunter override, forcing
+    every pair to be redone whether or not its best match changed."""
     now = int(time.time())
     horizon = now + within_days * 86400
     events = (
@@ -393,9 +397,8 @@ def run_extraction_sweep(db, within_days: int = 10, reextract: bool = False) -> 
         .order_by(UFCEvent.date)
         .all()
     )
-    # Skip "Road to UFC" events — the title is just fighter names, so match the
-    # URL slug, which is what carries the "road-to-ufc" marker.
-    events = [e for e in events if "road-to-ufc" not in (e.event_link or "").lower()]
+    
+    events = [event for event in events if "road-to-ufc" not in (event.event_link or "").lower()] #skip road to ufc events
     pundits = (
         db.query(User)
         .filter(User.is_notable.is_(True), User.youtube_channel_id.isnot(None))
@@ -406,34 +409,32 @@ def run_extraction_sweep(db, within_days: int = 10, reextract: bool = False) -> 
              "extracted": 0, "skipped": 0, "no_video": 0, "failed": 0}
     details = []
     for event in events:
-        for user in pundits:
+        for pundit in pundits:
             # skip pairs we've already extracted (unless forced)
+            better_video = None
             if not reextract:
                 already = (
                     db.query(NotableExtraction)
-                    .filter_by(user_id=user.id, event_id=event.id)
+                    .filter_by(user_id=pundit.id, event_id=event.id)
                     .first()
                 )
-                if already:
-                    # Report skipped pairs too. They used to `continue` silently,
-                    # so a pair that had succeeded long ago and a pair that was
-                    # never attempted looked identical from the response — the
-                    # only clue was `details` being shorter than pundits x events.
+                
+                if already: # if we already have a video
+                    match = find_prediction_video(pundit.youtube_channel_id, event)
+                    if match and match["video_id"] != already.video_id: #icheck if its matching thr nre prediction video we see
+                        better_video = match["video_id"] # if it isnt, we have a better video
+
+                if already and not better_video:
+                    
                     tally["skipped"] += 1
-                    # How many picks that extraction actually produced. A run can
-                    # write this row having saved ZERO picks — every fight came
-                    # back predicted_winner=null, or no name matched a corner —
-                    # and the pair is then skipped forever with nothing to show.
-                    # Without this count "already extracted" and "extracted
-                    # nothing, permanently" read the same.
                     n_picks = (
                         db.query(Pick)
                         .join(UFCFight, Pick.fight_id == UFCFight.id)
-                        .filter(Pick.user_id == user.id, UFCFight.event_id == event.id)
+                        .filter(Pick.user_id == pundit.id, UFCFight.event_id == event.id)
                         .count()
                     )
                     details.append({
-                        "user": user.username,
+                        "user": pundit.username,
                         "event": event.title,
                         "ok": n_picks > 0,
                         "skipped": True,
@@ -446,10 +447,14 @@ def run_extraction_sweep(db, within_days: int = 10, reextract: bool = False) -> 
                     continue
 
             try:
-                res = run_extraction(db, user, event)
+                # Reuse the id just matched above rather than making
+                # run_extraction fetch the channel's uploads a second time.
+                res = run_extraction(db, pundit, event, video_id=better_video)
             except Exception as e:
                 db.rollback()   # keep the session usable for the next pundit
                 res = {"ok": False, "reason": f"crashed: {type(e).__name__}"}
+            if better_video:
+                res = {**res, "replaced_stale_match": True}
 
             if res.get("ok"):
                 tally["extracted"] += 1
@@ -457,6 +462,6 @@ def run_extraction_sweep(db, within_days: int = 10, reextract: bool = False) -> 
                 tally["no_video"] += 1
             else:
                 tally["failed"] += 1
-            details.append({"user": user.username, "event": event.title, **res})
+            details.append({"user": pundit.username, "event": event.title, **res})
 
     return {**tally, "details": details}
