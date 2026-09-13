@@ -85,17 +85,36 @@ _STOP = {"ufc", "fight", "night", "full", "card", "predictions", "prediction",
          "vs", "and", "the", "center", "centre", "arena", "stadium", "at", "co"}
 
 
+_PUNCT = re.compile(r"[^a-z0-9]+")
+
+# Name tails that are not surnames. Taking parts[-1] blindly made "Rosas Jr."
+# contribute the surname "jr", which then matched any title mentioning a junior
+# and scored a free point toward the `specific >= 2` gate below.
+_NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
+
+
+def _clean(text) -> str:
+    """Normalized text with punctuation flattened to spaces.
+    anyhting that isnt a number or text is replaced with a space
+    """
+    return _PUNCT.sub(" ", normalize_name(text or "")).strip()
+
+
 def _event_number(text: str) -> str | None:
-    m = re.search(r"ufc[\s-]*(\d{2,4})\b", text.lower())
-    return m.group(1) if m else None
+    """event number from text, if any"""
+    event_number_string = re.search(r"ufc[\s-]*(\d{2,4})\b", text.lower())
+    return event_number_string.group(1) if event_number_string else None
 
 
-def _last_names(fighters) -> set[str]:
-    out = set()
-    for f in fighters:
-        parts = normalize_name(f).split()
+def _last_names(fighters: list[str]) -> set[str]:
+    """Last names of fighters(list[str]). it return a set of last names so there isnt any duplciates. put that in mind"""
+    out = set() # using a set here, but just put in mind there can be a very rare situation in future where two fighters have the same last name
+    for fighter in fighters:
+        fighter_name_split =  _clean(fighter).split()
+        parts = [part for part in fighter_name_split
+                 if part not in _NAME_SUFFIXES and not part.isdigit()]
         if parts:
-            out.add(parts[-1])
+            out.add(parts[-1]) # grab the last name with -1
     return out
 
 
@@ -103,7 +122,7 @@ def distinctive_words(*texts) -> set[str]:
     """Words that occur in the text"""
     words = set()
     for text in texts:
-        for word in normalize_name(text or "").split():
+        for word in _clean(text).split():
             if len(word) > 3 and word not in _STOP and not word.isdigit():
                 words.add(word)
     return words
@@ -123,57 +142,42 @@ def find_prediction_video(channel_id: str, event) -> dict | None:
     ev_num = _event_number(f"{event.title} {event.event_link}") #exctract numbers
 
    
-    main_ln = {ln for ln in _last_names(re.split(r"\bvs\.?\b", event.title)) if len(ln) >= 3}
-    all_ln = {ln for ln in _last_names([f.fighter_a for f in fights] + [f.fighter_b for f in fights]) if len(ln) >= 3}
-    other_ln = all_ln - main_ln                                    # non-headliner card surnames
-    venue_words = {w for w in distinctive_words(event.venue) if len(w) >= 4}
+    main_last_names = {last_name for last_name in _last_names(re.split(r"\bvs\.?\b", event.title)) if len(last_name) >= 3} #eg {'Ferreira', 'Silva'}
+    all_ln = {last_name for last_name in _last_names([fight.fighter_a for fight in fights] + [fight.fighter_b for fight in fights]) if len(last_name) >= 3}
+    other_ln = all_ln - main_last_names                                  # non-headliner card surnames
+    venue_words = {word for word in distinctive_words(event.venue) if len(word) >= 4}
 
-    # The card's brand, minus the generic parts. _STOP already drops ufc/fight/
-    # night and distinctive_words drops bare digits, so:
-    #   "Noche UFC"          -> {"noche"}        a real identifier
-    #   "Crypto.com UFC 331" -> {"cryptocom"}    (331 is caught by ev_num)
-    #   "UFC Fight Night"    -> {}               nothing distinctive, as it should be
-    # Unnumbered cards have no other identifier anywhere, which is how a
-    # Belgrade video matched Noche UFC on the single shared surname "rodriguez".
-    series_words = {w for w in distinctive_words(getattr(event, "series", None)) if len(w) >= 4}
+    
+    series_words = {word for word in distinctive_words(getattr(event, "series", None)) if len(word) >= 4}
     ev_date = event.date
 
     best, best_total = None, 0
     for video in uploads:
-        title = normalize_name(video["title"])
-        title_words = set(title.split())   # WHOLE words — so 'ce' can't match 'chance'
+        title = _clean(video["title"])
+        title_words = set(title.split())   # WHOLE words so 'ce' can't match 'chance'
 
-        # date sanity: prediction videos come out shortly before the event.
+        
         days_before = None
-        if video["published_at"] and ev_date:
+        if video["published_at"] and ev_date: # if there is a published date and event date
             try:
-                pub = datetime.fromisoformat(video["published_at"].replace("Z", "+00:00")).timestamp()
-                days_before = (ev_date - pub) / 86400
+                video_publish_date = datetime.fromisoformat(video["published_at"].replace("Z", "+00:00")).timestamp()
+                days_before = (ev_date - video_publish_date) / 86400
             except Exception:
                 days_before = None
             if days_before is not None and (days_before < -14 or days_before > 120): # no farther than 120 days
-                continue  # far outside the plausible window — skip
+                continue  # far outside the plausible window skip
 
-        # WHICH event is this about? (required). Whole-word matches only.
+        #scorer
         specific = 0
         if ev_num and re.search(rf"ufc\s*{ev_num}\b", title):
             specific += 6                                  # exact event number = strongest, unambiguous id
         if series_words & title_words:
             specific += 6                                  # brand ("noche") — as unambiguous as a number
-        specific += 2 * len(main_ln & title_words)         # headliner surname
+        specific += 2 * len(main_last_names & title_words)         # headliner surname
         specific += 1 * len(other_ln & title_words)        # other card surname
         specific += 1 * len(venue_words & title_words)     # distinctive venue word
 
-        # Two, not one. A single non-headliner surname is not evidence: the
-        # generic bonuses below are worth up to 10, so one shared common name
-        # ("rodriguez", "silva") was enough to carry a video about an entirely
-        # different card. That is exactly how "Medic vs Rodriguez — UFC
-        # Belgrade" beat the field for Noche UFC and then, having matched, got
-        # written in as that pundit's source video.
-        #
-        # Checked against every known-good match: they score 2+ on card
-        # surnames alone (Tsarukyan + Ruffy), or 6 on the event number, or 6 on
-        # the brand. Only the Belgrade false positive sits at 1.
+      
         if specific < 2:
             continue  # not about this event
 
