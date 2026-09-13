@@ -1,15 +1,32 @@
 import { Link } from "react-router-dom";
 import { UFCEvent } from "../api";
+import { eventPhase } from "../lib/lock";
 
 
 export function EventTile({ event }: { event: UFCEvent }) {
     // "/event/ufc-329" -> "ufc-329" : a clean URL-safe id for the detail route
     const slug = event.event_link.split("/").filter(Boolean).pop();
+    // Derived from the date rather than read off the payload, so it stays right
+    // on a re-render without refetching. The API sends `phase` too, for a
+    // correct first paint.
+    const live = eventPhase(event.date) === "in_progress";
     return (
         <Link
             to={`/events/${slug}`}
-            className="group relative block aspect-[3/4] w-full overflow-hidden rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
+                // Classes are written out in full on both branches: Tailwind scans
+                // source text, so a class assembled at runtime is never generated.
+            className={
+                live
+                    ? "group relative block aspect-[3/4] w-full overflow-hidden rounded-xl ring-2 ring-blue-500 shadow-[0_0_22px_rgba(59,130,246,0.55)] transition-transform duration-200 hover:scale-105"
+                    : "group relative block aspect-[3/4] w-full overflow-hidden rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
+            }
         >
+            {live && (
+                <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-center gap-1.5 bg-blue-600/90 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                    In progress
+                </div>
+            )}
             {/* poster fills the tile */}
             {event.poster ? (
                 <img

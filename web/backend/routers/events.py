@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import and_, func
 
 from ..dependencies import DBDep
+from ..event_timing import EVENT_DURATION, event_phase, UPCOMING
 from ..models import User, UFCEvent, UFCFight, Pick, NotableExtraction
 from ..stats import compute_user_stats
 from part_2.career import normalize_name
@@ -26,39 +27,40 @@ NOT_MINOR_CARD = ~func.coalesce(UFCEvent.event_link, "").ilike("%road-to-ufc%")
 def get_upcoming_events(db: DBDep):
     #front end call this
     now = int(time.time())
-    #filter by date
+   
     events = (
         db.query(UFCEvent)
-        .filter(UFCEvent.date > now, NOT_MINOR_CARD)
+        .filter(UFCEvent.date > now - EVENT_DURATION, NOT_MINOR_CARD)
         .order_by(UFCEvent.date)
         .all()
     )
     return {
         "events": [
             {
-                "title": e.title,
-                "event_link": e.event_link,
-                "date": e.date,
-                "venue": e.venue,
-                "poster": e.poster,
+                "title": event.title,
+                "event_link": event.event_link,
+                "date": event.date,
+                "venue": event.venue,
+                "poster": event.poster,
+                "phase": event_phase(event.date, now),
                 "fights": [
                     {
-                        "id": f.id,
-                        "matchup": f.matchup,
-                        "fighter_a": f.fighter_a,
-                        "fighter_b": f.fighter_b,
-                        "odds_a": f.odds_a,
-                        "odds_b": f.odds_b,
-                        "img_a": f.img_a,
-                        "img_b": f.img_b,
+                        "id": fight.id,
+                        "matchup": fight.matchup,
+                        "fighter_a": fight.fighter_a,
+                        "fighter_b": fight.fighter_b,
+                        "odds_a": fight.odds_a,
+                        "odds_b": fight.odds_b,
+                        "img_a": fight.img_a,
+                        "img_b": fight.img_b,
                     }
                     # cancelled bouts stay in the table (upsert-by-matchup never
                     # deletes) but must not be offered as upcoming
-                    for f in e.fights
-                    if f.status != "cancelled"
+                    for fight in event.fights
+                    if fight.status != "cancelled"
                 ],
             }
-            for e in events
+            for event in events
         ]
     }
 
@@ -78,7 +80,7 @@ def user_events(user_id: int, db: DBDep):
     pre-results) and past (their track record). Each event carries an `upcoming`
     flag so the frontend can split them into two sections. Newest first."""
     now = int(time.time())
-    rows = (
+    user_event = (
         db.query(UFCEvent.id, UFCEvent.title, UFCEvent.date, UFCEvent.poster)
         .join(UFCFight, UFCFight.event_id == UFCEvent.id)
         .join(Pick, and_(Pick.fight_id == UFCFight.id, Pick.user_id == user_id))
@@ -89,13 +91,17 @@ def user_events(user_id: int, db: DBDep):
     return {
         "events": [
             {
-                "event_id": r.id,
-                "title": r.title,
-                "date": r.date,
-                "poster": r.poster,
-                "upcoming": r.date is not None and r.date > now,
+                "event_id": event.id,
+                "title": event.title,
+                "date": event.date,
+                "poster": event.poster,
+                # A running card is neither upcoming nor past, so `upcoming` is
+                # false for the hours it is actually on. Consumers that only
+                # care about "not finished" should read `phase` instead.
+                "upcoming": event.date is not None and event_phase(event.date, now) == UPCOMING,
+                "phase": event_phase(event.date, now),
             }
-            for r in rows
+            for event in user_event
         ]
     }
 
@@ -205,7 +211,7 @@ def next_event_consensus(db: DBDep):
     now = int(time.time())
     event = (
         db.query(UFCEvent)
-        .filter(UFCEvent.date > now, NOT_MINOR_CARD)
+        .filter(UFCEvent.date > now - EVENT_DURATION, NOT_MINOR_CARD)
         .order_by(UFCEvent.date)
         .first()
     )

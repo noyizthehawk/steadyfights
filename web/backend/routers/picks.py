@@ -1,16 +1,13 @@
 """Pick endpoints: make/update a pick, list my picks, and my overall winrate."""
-import time
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
 from ..dependencies import DBDep, get_curr_user
+from ..event_timing import picks_locked
 from ..models import User, UFCFight, Pick
 from ..schemas import PickRequest
 
 router = APIRouter()
-
-EARLY_START_BUFFER = 3 * 3600  # seconds; picks lock this long before UFC's listed time
 
 
 @router.post("/api/picks")
@@ -24,9 +21,8 @@ def make_pick(req: PickRequest, db: DBDep, user: User = Depends(get_curr_user)):
     if req.picked not in (fight.fighter_a, fight.fighter_b):
         raise HTTPException(status_code=400, detail="Picked fighter is not in this fight")
 
-    # Picks lock EARLY_START_BUFFER before the listed main-card time, since
-    # prelims can start hours before UFC's advertised time.
-    if fight.event and fight.event.date and (fight.event.date - EARLY_START_BUFFER) <= int(time.time()):
+    # Event picks are locked
+    if fight.event and picks_locked(fight.event.date):
         raise HTTPException(status_code=403, detail="Picks are locked for this event")
 
     # Upsert: update the existing pick, or insert a new one
@@ -48,7 +44,7 @@ def clear_pick(fight_id: int, db: DBDep, user: User = Depends(get_curr_user)):
     fight = db.get(UFCFight, fight_id)
     if fight is None:
         raise HTTPException(status_code=404, detail="Fight not found")
-    if fight.event and fight.event.date and (fight.event.date - EARLY_START_BUFFER) <= int(time.time()):
+    if fight.event and picks_locked(fight.event.date):
         raise HTTPException(status_code=403, detail="Picks are locked for this event")
 
     pick = db.execute(
