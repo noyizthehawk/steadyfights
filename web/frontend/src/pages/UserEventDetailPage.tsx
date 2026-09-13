@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { getUserEventCard, type EventCard } from "../api";
 
 // Ring around a fighter's avatar that encodes the pundit's pick + the outcome.
@@ -19,7 +19,6 @@ function ringClass(isPicked: boolean, isWinner: boolean, settled: boolean): stri
 
 export default function UserEventDetailPage() {
     const { userId, eventId } = useParams<{ userId: string; eventId: string }>();
-    const navigate = useNavigate();
     const [card, setCard] = useState<EventCard | null>(null);
     const [error, setError] = useState<string>("");
 
@@ -37,13 +36,11 @@ export default function UserEventDetailPage() {
     const awaiting = summary.picks_made - summary.fights_settled;
 
     return (
-        <div className="event-detail w-full px-6 py-8">
-            <button onClick={() => navigate(-1)} className="text-sm text-zinc-400">
-                ← Back
-            </button>
-
+        // centred column, same width as the event page — a card stretched across
+        // a laptop puts the two fighters at opposite edges with a desert between
+        <div className="event-detail mx-auto w-full max-w-3xl px-6 py-8">
             {/* event header */}
-            <div className="mt-2 flex items-center gap-2">
+            <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-white">{event.title}</h1>
                 {user.have_youtube && (
                     <span className="rounded bg-[#d33a2c] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">

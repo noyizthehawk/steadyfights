@@ -208,13 +208,15 @@ export type UFCEvent = {
                 "venue": e.venue,
                 "poster": e.poster,
                 "fights": [ */
+  id: number;
   title: string;
   event_link: string;
   date: number;
   venue: string | null;
   poster: string | null;
+  phase: "upcoming" | "in_progress" | "past";
   fights: Bout[];
-  
+
 }
 export type NewsArticle = {
   title: string;
@@ -370,6 +372,36 @@ export async function getUpcomingEvents(): Promise<UFCEvent[]> {
   if (!res.ok) throw new Error("Could not load events");
   const data: { events: UFCEvent[] } = await res.json();
   return data.events;
+}
+
+export type PunditVoter = {
+  username: string;
+  avatar_url: string | null;
+  picked: string;               // always one of the fight's two corner names
+  video_id: string | null;      // the video the pick was extracted from
+  video_url: string | null;
+};
+
+export type PunditFightPicks = {
+  a_votes: number;
+  b_votes: number;
+  voters: PunditVoter[];
+};
+
+export type EventPunditPicks = {
+  event_id: number;
+  phase: "upcoming" | "in_progress" | "past";
+  // false until picks lock for this card — the server withholds the data,
+  // it isn't just hidden in the UI
+  revealed: boolean;
+  roster: number;                              // pundits tracked, for "3 of 5"
+  picks: Record<string, PunditFightPicks>;     // keyed by fight id (JSON keys are strings)
+};
+
+export async function getEventPunditPicks(eventId: number): Promise<EventPunditPicks> {
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}/pundit-picks`);
+  if (!res.ok) throw new Error("Could not load pundit picks");
+  return res.json();
 }
 
 export async function getCareerSummary(fighter: string): Promise<CareerSummary> {

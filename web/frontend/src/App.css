@@ -504,8 +504,28 @@ h1 {
 .upcoming-glow {
   animation: upcomingGlow 1.8s ease-in-out infinite;
 }
+/* A card that is ON right now. Blue, not red: red already means "next up", and
+   two urgent reds would compete. Same shape as upcomingGlow so the two read as
+   one family, just a different colour and a slower pulse — live is a state, not
+   a countdown, so it should feel steadier than the one ticking down to it. */
+@keyframes liveGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 1.5px rgba(59, 130, 246, 0.9), 0 0 6px 1px rgba(59, 130, 246, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 1.5px rgba(59, 130, 246, 1), 0 0 18px 4px rgba(59, 130, 246, 0.8);
+  }
+}
+.live-glow {
+  animation: liveGlow 2.4s ease-in-out infinite;
+}
+
 /* Respect reduced-motion: keep a static red glow, drop the blink. */
 @media (prefers-reduced-motion: reduce) {
+  .live-glow {
+    animation: none;
+    box-shadow: 0 0 0 1.5px rgba(59, 130, 246, 0.9), 0 0 8px 1px rgba(59, 130, 246, 0.5);
+  }
   .upcoming-glow {
     animation: none;
     box-shadow: 0 0 0 1.5px rgba(211, 58, 44, 0.9), 0 0 8px 1px rgba(211, 58, 44, 0.5);

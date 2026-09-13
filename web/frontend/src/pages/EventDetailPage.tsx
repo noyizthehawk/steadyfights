@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { getUpcomingEvents, getMyPicks, makePick, clearPick, AuthError, type UFCEvent } from "../api";
-import { picksLocked } from "../lib/lock";
+import { getUpcomingEvents, getMyPicks, makePick, clearPick, getEventPunditPicks,
+         AuthError, type UFCEvent, type EventPunditPicks } from "../api";
+import { picksLocked, punditPicksVisible } from "../lib/lock";
+import { PunditCluster } from "../components/PunditCluster";
 
 export default function EventDetailPage() {
    //slug from route
@@ -11,6 +13,8 @@ export default function EventDetailPage() {
     const [error, setError] = useState<string>("");
     // the current user's picks for this event, as { fight_id: picked fighter }
     const [picks, setPicks] = useState<Record<number, string>>({});
+    // null until picks lock for this card, or if the fetch fails
+    const [pundits, setPundits] = useState<EventPunditPicks | null>(null);
 
     //when slug changes
     useEffect(() => {
@@ -27,6 +31,20 @@ export default function EventDetailPage() {
         
         getMyPicks().then(setPicks);
     }, [slug]);
+
+    // Pundit picks, once picks are locked for THIS card. The server withholds
+    // them before that, so this is a courtesy check rather than the real gate —
+    // it just avoids a request that would come back empty.
+    useEffect(() => {
+        if (!event || !punditPicksVisible(event.date)) {
+            setPundits(null);
+            return;
+        }
+        getEventPunditPicks(event.id)
+            .then(setPundits)
+            // a missing pundit section is not worth breaking the page over
+            .catch(() => setPundits(null));
+    }, [event]);
 
     // Click a fighter: pick them, or — if they're already your pick — un-pick
     // entirely (toggle off). Logged-out users get sent to login.
@@ -59,19 +77,32 @@ export default function EventDetailPage() {
 
     return (
         <div className="event-detail w-full px-6 py-8">
-            <Link to="/prediction-game" className="text-sm text-zinc-400">← Back</Link>
-            <h1 className="mb-1 text-2xl font-bold text-white">{event.title}</h1>
-            <p className="mb-2 text-sm text-zinc-400">
-                {new Date(event.date * 1000).toLocaleDateString()} · {event.venue ?? "TBA"}
-            </p>
-            {locked && (
-                <p className="mb-6 inline-flex items-center gap-1.5 rounded-md bg-zinc-800 px-3 py-1.5 text-sm font-semibold text-amber-400">
-                    Picks are locked for this event
+            {/* Same mx-auto max-w-3xl as the fight list below, so the header and
+                the card sit in one centred column instead of the title hugging
+                the left edge while the fights are centred. */}
+            <div className="mx-auto max-w-3xl">
+                <h1 className="mb-1 text-2xl font-bold text-white">{event.title}</h1>
+                <p className="text-sm text-zinc-400">
+                    {new Date(event.date * 1000).toLocaleDateString()} · {event.venue ?? "TBA"}
                 </p>
-            )}
-            {!locked && <div className="mb-6" />}
+                {locked && (
+                    // mb-10, not mb-6: this banner and the disabled PICK buttons
+                    // below say the same thing, and sitting them close together
+                    // read as one repeated message rather than a heading and its
+                    // consequence.
+                    <p className="mt-4 mb-10 inline-flex items-center gap-1.5 rounded-md bg-zinc-800 px-3 py-1.5 text-sm font-semibold text-amber-400">
+                        Picks are locked for this event
+                    </p>
+                )}
+                {!locked && <div className="mb-8" />}
+            </div>
 
-            <ul className="space-y-3">
+            {/* max-w-3xl, not full width: a fight row stretched across a laptop
+                puts the two fighters at opposite edges of the screen with a
+                desert between them, and leaves nowhere to put anything else.
+                Capping it keeps the pair readable as a pair and frees the right
+                side of the page for whatever goes there next. */}
+            <ul className="mx-auto max-w-3xl space-y-3">
                 {event.fights.map((fight) => {
                     const pickedA = picks[fight.id] === fight.fighter_a;
                     const pickedB = picks[fight.id] === fight.fighter_b;
@@ -93,6 +124,10 @@ export default function EventDetailPage() {
                             <div className="min-w-0 text-center sm:text-left">
                                 <Link to={`/fighters/${encodeURIComponent(fight.fighter_a)}/career`} className="block truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_a}</Link>
                                 <p className="text-xs text-zinc-400">{fight.odds_a ?? "—"}</p>
+                                <PunditCluster
+                                    voters={(pundits?.picks[String(fight.id)]?.voters ?? [])
+                                        .filter((v) => v.picked === fight.fighter_a)}
+                                />
                             </div>
                         </div>
 
@@ -106,6 +141,10 @@ export default function EventDetailPage() {
                             <div className="min-w-0 text-center sm:text-right">
                                 <Link to={`/fighters/${encodeURIComponent(fight.fighter_b)}/career`} className="block truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_b}</Link>
                                 <p className="text-xs text-zinc-400">{fight.odds_b ?? "—"}</p>
+                                <PunditCluster
+                                    voters={(pundits?.picks[String(fight.id)]?.voters ?? [])
+                                        .filter((v) => v.picked === fight.fighter_b)}
+                                />
                             </div>
                         </div>
 

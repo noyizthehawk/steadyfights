@@ -570,7 +570,16 @@ def career_summary_api(fighter):
     }
     return _json_safe(payload)
 
-def top_careers(n = 10, min_fights = 8):
+#memoization for performance    
+_ranked_cache: dict[int, list] = {}
+
+
+def _ranked_careers(min_fights):
+    """Every fighter with >= min_fights, scored and sorted best-first."""
+    cached = _ranked_cache.get(min_fights)
+    if cached is not None:
+        return cached
+
     df = _load()
     #GLOBAL MAX
     max_adj = df["Adj Perf"].max()
@@ -589,7 +598,13 @@ def top_careers(n = 10, min_fights = 8):
             "total_fights": int(len(group)),
         })
 
-    # sort highest first, then take the top n
+    # sort highest first
     results.sort(key=lambda r: r["career_score"], reverse=True)
-    return results[:n]
+    _ranked_cache[min_fights] = results
+    return results
+
+
+def top_careers(n = 10, min_fights = 8):
+    # slice a copy — callers must not be able to mutate the cached list
+    return list(_ranked_careers(min_fights)[:n])
     

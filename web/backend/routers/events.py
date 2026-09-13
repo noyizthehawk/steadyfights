@@ -15,11 +15,7 @@ from part_2.career import normalize_name
 router = APIRouter()
 
 
-# "Road to UFC" is a regional developmental series casual users don't follow and
-# pundits never make videos for, so it only ever surfaces as an empty consensus.
-# Its display TITLE is just the fighter names ("Maheshate vs Flowers"), but the
-# URL slug always keeps the marker (…/event/road-to-ufc-season-5-…), so filter on
-# event_link. coalesce keeps null-link rows (they don't match) instead of dropping.
+
 NOT_MINOR_CARD = ~func.coalesce(UFCEvent.event_link, "").ilike("%road-to-ufc%")
 
 
@@ -37,6 +33,7 @@ def get_upcoming_events(db: DBDep):
     return {
         "events": [
             {
+                "id": event.id,
                 "title": event.title,
                 "event_link": event.event_link,
                 "date": event.date,
@@ -283,4 +280,88 @@ def next_event_consensus(db: DBDep):
             "lean": lean,                   # majority pick, null on tie / no votes
             "voters": voters,               # who picked whom (for avatars)
         },
+    }
+
+
+@router.get("/api/events/{event_id}/pundit-picks")
+def event_pundit_picks(event_id: int, db: DBDep):
+    """Every tracked pundit's pick for every fight on one card.
+
+    Revealed only once picks are LOCKED for this event. Before that, handing out
+    the consensus would let anyone copy it, and hiding it in the frontend hides
+    nothing — this endpoint is public, so the gate belongs here.
+
+    `roster` is how many pundits we track, so the UI can say "3 of 5" rather
+    than implying a fight with two picks had only two opinions. Coverage is
+    genuinely patchy: a pundit with no video for a card contributes nothing.
+    """
+    event = db.get(UFCEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    # pundits we actually track (a linked channel is what makes them extractable)
+    roster = (
+        db.query(User)
+        .filter(User.is_notable.is_(True), User.youtube_channel_id.isnot(None))
+        .count()
+    )
+
+    phase = event_phase(event.date, int(time.time()))
+    if phase == UPCOMING:
+        return {"event_id": event.id, "phase": phase, "revealed": False,
+                "roster": roster, "picks": {}}
+
+    # the source video each pundit's picks came from, so a pick is verifiable —
+    # these are LLM-extracted from speech and will occasionally be wrong, and we
+    # are attributing them to a named real person
+    videos = dict(
+        db.query(NotableExtraction.user_id, NotableExtraction.video_id)
+        .filter(NotableExtraction.event_id == event.id)
+        .all()
+    )
+
+    rows = (
+        db.query(Pick.picked, UFCFight.id, UFCFight.fighter_a, UFCFight.fighter_b,
+                 User.id, User.username, User.avatar_url)
+        .join(UFCFight, UFCFight.id == Pick.fight_id)
+        .join(User, User.id == Pick.user_id)
+        .filter(
+            UFCFight.event_id == event.id,
+            User.is_notable.is_(True),
+            User.youtube_channel_id.isnot(None),
+        )
+        .all()
+    )
+
+    picks: dict[int, dict] = {}
+    for picked, fight_id, fighter_a, fighter_b, user_id, username, avatar_url in rows:
+        pn = normalize_name(picked)
+        if pn == normalize_name(fighter_a):
+            side = fighter_a
+        elif pn == normalize_name(fighter_b):
+            side = fighter_b
+        else:
+            continue          # a name matching neither corner — drop it silently
+        slot = picks.setdefault(fight_id, {"a_votes": 0, "b_votes": 0, "voters": []})
+        if side == fighter_a:
+            slot["a_votes"] += 1
+        else:
+            slot["b_votes"] += 1
+        vid = videos.get(user_id)
+        slot["voters"].append({
+            "username": username,
+            "avatar_url": avatar_url,
+            "picked": side,
+            "video_id": vid,
+            "video_url": f"https://www.youtube.com/watch?v={vid}" if vid else None,
+        })
+
+    return {
+        "event_id": event.id,
+        "phase": phase,
+        "revealed": True,
+        "roster": roster,
+        # keys are stringified: JSON object keys are always strings, and being
+        # explicit here stops the frontend guessing at the type
+        "picks": {str(k): v for k, v in picks.items()},
     }
