@@ -10,7 +10,7 @@ from ..dependencies import DBDep
 from ..event_timing import EVENT_DURATION, event_phase, UPCOMING
 from ..models import User, UFCEvent, UFCFight, Pick, NotableExtraction
 from ..stats import compute_user_stats
-from part_2.career import normalize_name
+from part_2.career import normalize_name, fighter_tag
 
 router = APIRouter()
 
@@ -373,3 +373,34 @@ def event_pundit_picks(event_id: int, db: DBDep):
         # explicit here stops the frontend guessing at the type
         "picks": {str(fight_id): picks for fight_id, picks in picks.items()},
     }
+
+
+@router.get("/api/events/{event_id}/fighter-tags")
+def get_fighter_tags(event_id: int, db: DBDep):
+    """Form/quality numbers for every fighter on a card.
+
+    Its own endpoint rather than part of /api/events/upcoming so the card paints
+    immediately and the tags fill in a moment later — the same split already
+    used for pundit picks. It also means a miss in the career data degrades to
+    "no badge" instead of holding up the whole page.
+
+    Costs nothing per request after the first: fighter_tag memoizes on the
+    normalized name, and the CSVs it derives from only change when a data
+    refresh restarts the process, which clears the memo with them.
+    """
+    event = db.get(UFCEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    tags = {}
+    for fight in event.fights:
+        for name in (fight.fighter_a, fight.fighter_b):
+            # Keyed by the name as the card spells it, so the frontend can look
+            # up by the same string it already renders.
+            if name and name not in tags:
+                # None for anyone missing from the career data — debutants and
+                # short-notice replacements. The client renders no badges rather
+                # than zeros, which would read as the worst fighter on the card.
+                tags[name] = fighter_tag(name)
+
+    return {"event_id": event.id, "tags": tags}

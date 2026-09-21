@@ -866,3 +866,133 @@ export async function getTopCareers(n = 10): Promise<TopCareer[]> {
   const data = await res.json();
   return data.careers;           // assert the shape via the return type
 }
+
+// ── Event comments ────────────────────────────────────────────────────────────
+
+export type CommentAuthor = { id: number; username: string; avatar_url: string | null };
+
+export type Comment = {
+  id: number;
+  parent_id: number | null;
+  body: string | null;        // null when the comment has been deleted
+  deleted: boolean;
+  created_at: string;
+  user: CommentAuthor | null; // null when deleted — the author is stripped too
+  likes: number;
+  dislikes: number;
+  my_vote: number;            // -1 | 0 | 1, this viewer's own vote
+  // Only top-level comments carry this. Replies never nest further, so the
+  // optional marker is the type telling you the tree is exactly two deep.
+  replies?: Comment[];
+};
+
+export type CommentPage = {
+  comments: Comment[];          // top-level, newest first, replies attached
+  has_more: boolean;
+  next_before_id: number | null; // pass back as beforeId to load older
+};
+
+export type CommentsSince = {
+  comments: Comment[];          // FLAT: top-level and replies mixed together
+  has_more: boolean;
+  latest_id: number;            // echoes sinceId back when nothing is new
+};
+
+// One page of comments. Omit beforeId for the newest page; pass the previous
+// response's next_before_id to walk backwards. Cursor, not offset — comments
+// grow at the head, so an offset page 2 would re-serve rows from page 1.
+export async function getComments(eventId: number, beforeId?: number | null): Promise<CommentPage> {
+  const cursor = beforeId ? `&before_id=${beforeId}` : "";
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}/comments?limit=20${cursor}`, {
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load comments");
+  return res.json() as Promise<CommentPage>;
+}
+
+// Poll for anything newer than what we already have.
+// IMPORTANT: sinceId must be the highest id across EVERY comment received,
+// replies included — not just the top-level ones. Replies have higher ids than
+// the parent they hang under, so taking the max of top-level ids alone makes
+// every poll re-deliver the same replies forever.
+export async function getCommentsSince(eventId: number, sinceId: number): Promise<CommentsSince> {
+  const res = await fetch(
+    `${BASE_URL}/api/events/${eventId}/comments/since?since_id=${sinceId}`,
+    { credentials: "include" },
+  );
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load new comments");
+  return res.json() as Promise<CommentsSince>;
+}
+
+// Post a comment, or a reply when parentId is given. Replying to a reply is
+// allowed — the backend re-points it at the thread root.
+export async function postComment(
+  eventId: number,
+  body: string,
+  parentId?: number | null,
+): Promise<Comment> {
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ body, parent_id: parentId ?? null }),
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    // 429 (rate limited) and 400 (empty body) both carry a useful `detail`.
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not post comment");
+  }
+  return res.json() as Promise<Comment>;
+}
+
+// Soft delete — the row survives so replies keep their parent. Author only.
+export async function deleteComment(commentId: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/comments/${commentId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not delete comment");
+}
+
+// value: 1 like, -1 dislike, 0 clears. Idempotent — the DB allows one vote per
+// user per comment, so sending 1 twice still leaves one like.
+export async function voteComment(
+  commentId: number,
+  value: 1 | -1 | 0,
+): Promise<{ id: number; likes: number; dislikes: number; my_vote: number }> {
+  const res = await fetch(`${BASE_URL}/api/comments/${commentId}/vote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ value }),
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not vote");
+  return res.json();
+}
+
+
+// ── Fighter tags (form / quality badges on the event card) ────────────────────
+
+export type FighterTag = {
+  career_score: number;   // 0-100, the headline number
+  recent_form: number;    // 0-100, last 5 fights on the same scale
+  strength_iq: number;    // 0-100, quality of opposition faced
+  total_fights: number;   // a count, not a score — never coloured
+  recent_record: string;  // e.g. "4 - 1"
+};
+
+// null for anyone absent from the career CSVs — debutants, short-notice
+// replacements. Render nothing for them rather than zeros.
+export type FighterTags = Record<string, FighterTag | null>;
+
+export async function getFighterTags(eventId: number): Promise<FighterTags> {
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}/fighter-tags`);
+  if (!res.ok) throw new Error("Could not load fighter tags");
+  const data: { tags: FighterTags } = await res.json();
+  return data.tags;
+}
