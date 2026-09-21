@@ -4,6 +4,7 @@ Career analysis for the web API.
 """
 import math
 import os
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -608,3 +609,46 @@ def top_careers(n = 10, min_fights = 8):
     # slice a copy — callers must not be able to mutate the cached list
     return list(_ranked_careers(min_fights)[:n])
     
+
+@lru_cache(maxsize=None)
+def _fighter_tag_cached(name_norm):
+    """The real work, memoized on the NORMALIZED name so "Jon Jones", "jon
+    jones" and "Jon  Jones" all share one entry.
+
+    Safe to cache forever with no TTL: everything here derives from the CSVs
+    loaded in _load(), and those only change when refresh_data.py runs, which
+    restarts the process — clearing this cache and _career_df together. The
+    memo cannot outlive the data it was computed from.
+    """
+    df = _load()
+    fights = df[df["Fighter_norm"] == name_norm].sort_values("fight_number")
+    if fights.empty:
+        return None
+
+    # Only the four numbers a tag needs. career_summary_api computes the full
+    # timeline, the aged-well index and per-phase breakdowns as well, which is
+    # ~6x the work for data a dot on an event page never shows.
+    recent = fights.tail(5)
+    recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
+
+    return {
+        "career_score": round(float(_compute_career_score(fights, df["Adj Perf"].max())), 1),
+        # Both already min-max scaled to 0-100 by _scale_to_100, using bounds
+        # picked for the realistic career-average band — not the raw column
+        # ranges. So these are directly comparable to each other and to score.
+        "recent_form": _scale_to_100(float(recent["Adj Perf"].mean()), "adj_perf"),
+        "strength_iq": _scale_to_100(float(fights["Opp Str"].mean()), "opp_str"),
+        "total_fights": int(len(fights)),
+        "recent_record": f"{recent_wins} - {len(recent) - recent_wins}",
+    }
+
+
+def fighter_tag(fighter):
+    """Compact form/quality numbers for one fighter, or None if they aren't in
+    the career data at all — debutants and short-notice replacements won't be,
+    and the caller must render that as "no data" rather than as zeros, which
+    would read as the worst fighter on the card."""
+    tag = _fighter_tag_cached(normalize_name(fighter))
+    # Copy: the cached dict is shared by every caller, so handing out the
+    # original would let one of them mutate every future response.
+    return dict(tag) if tag else None

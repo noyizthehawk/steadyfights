@@ -231,3 +231,24 @@ def verify_admin_token(x_settle_token: str | None = Header(default=None)):
     (settle.py, refresh_data.py) bypass HTTP, so they never need this."""
     if not SETTLE_SECRET or not x_settle_token or not secrets.compare_digest(x_settle_token, SETTLE_SECRET):
         raise HTTPException(status_code=401, detail="Invalid or missing admin token")
+
+
+def rate_limit_user(name: str, limit: int, window: int, detail: str = "Slow down. Try again shortly."):
+    """Per-USER rate limit, for actions that already require a login.
+    """
+    def dependency(user: User = Depends(get_curr_user)):
+        if redis_client is None:
+            return
+        key = f"ratelimit:{name}:user:{user.id}"
+        try:
+            count = redis_client.incr(key)
+            if count == 1:
+                redis_client.expire(key, window)
+        except RedisError:
+            
+            return
+
+        if count > limit:
+            raise HTTPException(status_code=429, detail=detail)
+
+    return dependency

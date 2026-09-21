@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getUpcomingEvents, getMyPicks, makePick, clearPick, getEventPunditPicks,
-         AuthError, type UFCEvent, type EventPunditPicks } from "../api";
+         getFighterTags, AuthError, type UFCEvent, type EventPunditPicks,
+         type FighterTags as FighterTagMap } from "../api";
 import { picksLocked, punditPicksVisible } from "../lib/lock";
 import { PunditCluster } from "../components/PunditCluster";
 import { Flag } from "../components/Flag";
+import EventComments from "../components/EventComments";
+import { FighterTags, ScoreChip } from "../components/FighterTags";
 
 export default function EventDetailPage() {
    //slug from route
@@ -16,6 +19,10 @@ export default function EventDetailPage() {
     const [picks, setPicks] = useState<Record<number, string>>({});
     // null until picks lock for this card, or if the fetch fails
     const [pundits, setPundits] = useState<EventPunditPicks | null>(null);
+    // Fetched separately from the card so the fights paint immediately and the
+    // badges fill in — same split as pundit picks. Empty object until then, so
+    // the lookups below just return undefined and render nothing.
+    const [tags, setTags] = useState<FighterTagMap>({});
 
     //when slug changes
     useEffect(() => {
@@ -45,6 +52,14 @@ export default function EventDetailPage() {
             .then(setPundits)
             // a missing pundit section is not worth breaking the page over
             .catch(() => setPundits(null));
+    }, [event]);
+
+    useEffect(() => {
+        if (!event) return;
+        getFighterTags(event.id)
+            // Missing badges are not worth breaking the card over.
+            .then(setTags)
+            .catch(() => setTags({}));
     }, [event]);
 
     // Click a fighter: pick them, or — if they're already your pick — un-pick
@@ -78,10 +93,10 @@ export default function EventDetailPage() {
 
     return (
         <div className="event-detail w-full px-6 py-8">
-            {/* Same mx-auto max-w-3xl as the fight list below, so the header and
-                the card sit in one centred column instead of the title hugging
-                the left edge while the fights are centred. */}
-            <div className="mx-auto max-w-3xl">
+            {/* max-w-6xl to match the two-column row below, so the title lines up
+                with the left edge of the discussion column rather than floating
+                above the middle of the page. */}
+            <div className="mx-auto max-w-6xl">
                 <h1 className="mb-1 text-2xl font-bold text-white">{event.title}</h1>
                 <p className="text-sm text-zinc-400">
                     {new Date(event.date * 1000).toLocaleDateString()} · {event.venue ?? "TBA"}
@@ -98,95 +113,120 @@ export default function EventDetailPage() {
                 {!locked && <div className="mb-8" />}
             </div>
 
-            {/* max-w-3xl, not full width: a fight row stretched across a laptop
-                puts the two fighters at opposite edges of the screen with a
-                desert between them, and leaves nowhere to put anything else.
-                Capping it keeps the pair readable as a pair and frees the right
-                side of the page for whatever goes there next. */}
-            <ul className="mx-auto max-w-3xl space-y-3">
-                {event.fights.map((fight) => {
-                    const pickedA = picks[fight.id] === fight.fighter_a;
-                    const pickedB = picks[fight.id] === fight.fighter_b;
-                    return (
-                    // Each fighter is a self-contained column (avatar, name, odds, its own
-                    // PICK button) with "vs" between them, so the two sides stay aligned at
-                    // any width instead of collapsing into one cramped flex row on a phone.
-                    <li
-                        key={fight.id}
-                        className="grid grid-cols-[1fr_auto_1fr] items-start gap-2 rounded-lg bg-zinc-800 p-3 text-white sm:gap-4 sm:p-4"
-                    >
-                        {/* fighter a */}
-                        <div className="flex min-w-0 flex-col items-center gap-2 sm:flex-row sm:items-center sm:gap-3">
-                            {fight.img_a && (
-                                // shrink-0 keeps the box square — without it flex squeezes the
-                                // width and object-cover crops a full-body sliver.
-                                <img src={fight.img_a} alt={fight.fighter_a} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
-                            )}
-                            <div className="min-w-0 text-center sm:text-left">
-                                <Link to={`/fighters/${encodeURIComponent(fight.fighter_a)}/career`} className="block truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_a}</Link>
-                                <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 sm:justify-start">
-                                    <Flag src={fight.flag_a} country={fight.country_a} />
-                                    {fight.odds_a ?? "—"}
-                                </p>
-                                <PunditCluster
-                                    voters={(pundits?.picks[String(fight.id)]?.voters ?? [])
-                                        .filter((v) => v.picked === fight.fighter_a)}
-                                />
-                            </div>
-                        </div>
+            {/* One row, same shape as the landing page: stacked on mobile, two
+                columns from lg up. */}
+            <section className="mx-auto flex max-w-6xl flex-col gap-6 lg:flex-row">
+                {/* Left — discussion. order-2 on mobile so the card itself stays
+                    the first thing you see on a phone; order-1 from lg so it
+                    takes the left column on desktop. */}
+                <aside className="order-2 lg:order-1 lg:w-96 lg:shrink-0">
+                    <EventComments eventId={event.id} />
+                </aside>
 
-                        <span className="self-center text-zinc-500">vs</span>
+                {/* Right — the fight card. min-w-0 so long fighter names wrap
+                    instead of forcing the flex row wider than its container.
+                    Still capped at max-w-3xl: a fight row stretched across a
+                    laptop puts the two fighters at opposite edges with a desert
+                    between them, and reads worse as a pair. */}
+                <div className="order-1 min-w-0 flex-1 lg:order-2">
+                    {/* ml-auto: the cap can leave slack in this column on wide
+                        screens, and left-aligned that slack sits on the right as
+                        a gap. Pushing the list to the end of the column lines its
+                        right edge up with the header above it. */}
+                    <ul className="ml-auto max-w-3xl space-y-3">
+                        {event.fights.map((fight) => {
+                            const pickedA = picks[fight.id] === fight.fighter_a;
+                            const pickedB = picks[fight.id] === fight.fighter_b;
+                            return (
+                            // Each fighter is a self-contained column (avatar, name, odds, its own
+                            // PICK button) with "vs" between them, so the two sides stay aligned at
+                            // any width instead of collapsing into one cramped flex row on a phone.
+                            <li
+                                key={fight.id}
+                                className="grid grid-cols-[1fr_auto_1fr] items-start gap-2 rounded-lg bg-zinc-800 p-3 text-white sm:gap-4 sm:p-4"
+                            >
+                                {/* fighter a */}
+                                <div className="flex min-w-0 flex-col items-center gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                    {fight.img_a && (
+                                        // shrink-0 keeps the box square — without it flex squeezes the
+                                        // width and object-cover crops a full-body sliver.
+                                        <img src={fight.img_a} alt={fight.fighter_a} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
+                                    )}
+                                    <div className="min-w-0 text-center sm:text-left">
+                                        <FighterTags tag={tags[fight.fighter_a]} />
+                                        <span className="flex items-center justify-center gap-1.5 sm:justify-start">
+                                            <Link to={`/fighters/${encodeURIComponent(fight.fighter_a)}/career`} className="min-w-0 truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_a}</Link>
+                                            <ScoreChip tag={tags[fight.fighter_a]} />
+                                        </span>
+                                        <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 sm:justify-start">
+                                            <Flag src={fight.flag_a} country={fight.country_a} />
+                                            {fight.odds_a ?? "—"}
+                                        </p>
+                                        <PunditCluster
+                                            voters={(pundits?.picks[String(fight.id)]?.voters ?? [])
+                                                .filter((v) => v.picked === fight.fighter_a)}
+                                        />
+                                    </div>
+                                </div>
 
-                        {/* fighter B */}
-                        <div className="flex min-w-0 flex-col items-center gap-2 sm:flex-row-reverse sm:items-center sm:gap-3">
-                            {fight.img_b && (
-                                <img src={fight.img_b} alt={fight.fighter_b} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
-                            )}
-                            <div className="min-w-0 text-center sm:text-right">
-                                <Link to={`/fighters/${encodeURIComponent(fight.fighter_b)}/career`} className="block truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_b}</Link>
-                                <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 sm:justify-end">
-                                    <Flag src={fight.flag_b} country={fight.country_b} />
-                                    {fight.odds_b ?? "—"}
-                                </p>
-                                <PunditCluster
-                                    voters={(pundits?.picks[String(fight.id)]?.voters ?? [])
-                                        .filter((v) => v.picked === fight.fighter_b)}
-                                />
-                            </div>
-                        </div>
+                                <span className="self-center text-zinc-500">vs</span>
 
-                        {/* pick A / pick B sit under their own fighter */}
-                        <button
-                            onClick={() => handlePick(fight.id, fight.fighter_a)}
-                            disabled={locked}
-                            title={locked ? "Picks are locked" : pickedA ? "Tap to remove your pick" : `Pick ${fight.fighter_a}`}
-                            className={`btn w-full rounded px-3 py-1 text-sm font-display ${
-                                locked
-                                    ? `cursor-not-allowed ${pickedA ? "bg-red-600/60" : "bg-zinc-800 text-zinc-600"}`
-                                    : pickedA ? "bg-red-600" : "bg-zinc-700 hover:bg-red-600"
-                            }`}
-                        >
-                            {pickedA ? "PICKED" : "PICK"}
-                        </button>
+                                {/* fighter B */}
+                                <div className="flex min-w-0 flex-col items-center gap-2 sm:flex-row-reverse sm:items-center sm:gap-3">
+                                    {fight.img_b && (
+                                        <img src={fight.img_b} alt={fight.fighter_b} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
+                                    )}
+                                    <div className="min-w-0 text-center sm:text-right">
+                                        <FighterTags tag={tags[fight.fighter_b]} mirrored />
+                                        <span className="flex items-center justify-center gap-1.5 sm:justify-end">
+                                            <ScoreChip tag={tags[fight.fighter_b]} />
+                                            <Link to={`/fighters/${encodeURIComponent(fight.fighter_b)}/career`} className="min-w-0 truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_b}</Link>
+                                        </span>
+                                        <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 sm:justify-end">
+                                            <Flag src={fight.flag_b} country={fight.country_b} />
+                                            {fight.odds_b ?? "—"}
+                                        </p>
+                                        <PunditCluster
+                                            voters={(pundits?.picks[String(fight.id)]?.voters ?? [])
+                                                .filter((v) => v.picked === fight.fighter_b)}
+                                        />
+                                    </div>
+                                </div>
 
-                        <span aria-hidden="true" />
+                                {/* pick A / pick B sit under their own fighter */}
+                                <button
+                                    onClick={() => handlePick(fight.id, fight.fighter_a)}
+                                    disabled={locked}
+                                    title={locked ? "Picks are locked" : pickedA ? "Tap to remove your pick" : `Pick ${fight.fighter_a}`}
+                                    className={`btn w-full rounded px-3 py-1 text-sm font-display ${
+                                        locked
+                                            ? `cursor-not-allowed ${pickedA ? "bg-red-600/60" : "bg-zinc-800 text-zinc-600"}`
+                                            : pickedA ? "bg-red-600" : "bg-zinc-700 hover:bg-red-600"
+                                    }`}
+                                >
+                                    {pickedA ? "PICKED" : "PICK"}
+                                </button>
 
-                        <button
-                            onClick={() => handlePick(fight.id, fight.fighter_b)}
-                            disabled={locked}
-                            title={locked ? "Picks are locked" : pickedB ? "Tap to remove your pick" : `Pick ${fight.fighter_b}`}
-                            className={`btn w-full rounded px-3 py-1 text-sm font-display ${
-                                locked
-                                    ? `cursor-not-allowed ${pickedB ? "bg-blue-600/60" : "bg-zinc-800 text-zinc-600"}`
-                                    : pickedB ? "bg-blue-600" : "bg-zinc-700 hover:bg-blue-600"
-                            }`}
-                        >
-                            {pickedB ? "PICKED" : "PICK"}
-                        </button>
-                    </li>
-                    );
-                })}
-            </ul>
+                                <span aria-hidden="true" />
+
+                                <button
+                                    onClick={() => handlePick(fight.id, fight.fighter_b)}
+                                    disabled={locked}
+                                    title={locked ? "Picks are locked" : pickedB ? "Tap to remove your pick" : `Pick ${fight.fighter_b}`}
+                                    className={`btn w-full rounded px-3 py-1 text-sm font-display ${
+                                        locked
+                                            ? `cursor-not-allowed ${pickedB ? "bg-blue-600/60" : "bg-zinc-800 text-zinc-600"}`
+                                            : pickedB ? "bg-blue-600" : "bg-zinc-700 hover:bg-blue-600"
+                                    }`}
+                                >
+                                    {pickedB ? "PICKED" : "PICK"}
+                                </button>
+                            </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            </section>
         </div>
     );
 }

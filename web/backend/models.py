@@ -154,13 +154,10 @@ class RefreshToken(Base):
 
     token_hash = Column(String(64), unique=True, nullable=False, index=True)
 
-    # groups every token descended from one login. Reuse of any member means the
-    # chain leaked, so the whole family is revoked at once.
     family_id = Column(String(36), nullable=False, index=True)
     expires_at = Column(DateTime, nullable=False)
     revoked_at = Column(DateTime, nullable=True)
-    # set when this row is rotated out; lets a request that raced the rotation
-    # follow the chain forward instead of being treated as a reuse attack
+    
     replaced_by = Column(Integer, ForeignKey("refresh_tokens.id"), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -211,3 +208,56 @@ class GroupMember(Base):
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=False, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     status = Column(String, default="pending", nullable=False)
+
+
+class EventComment(Base):
+    """One comment on an event page.
+
+    A reply is a row in THIS table with parent_id set — there is no `replies`
+    column. The child always points up; storing a list on the parent would mean
+    the same reply lived in two places and every edit rewrote the parent row.
+    """
+    __tablename__ = "event_comments"
+    __table_args__ = (
+        Index("ix_event_comments_feed", "event_id", "parent_id", "id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    
+    event_id = Column(Integer, ForeignKey("ufc_events.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    parent_id = Column(Integer, ForeignKey("event_comments.id"), nullable=True, index=True)
+
+    body = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    deleted_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+    replies = relationship("EventComment", back_populates="parent")
+    parent = relationship("EventComment", back_populates="replies", remote_side=[id])
+
+    def __repr__(self):
+        kind = "reply" if self.parent_id else "top"
+        return f"<EventComment id={self.id} event={self.event_id} {kind}>"
+
+
+class CommentVote(Base):
+    """One user's vote on one comment.
+
+    The unique constraint is what enforces one-vote-per-user — in the database,
+    not in application logic that two concurrent requests could race past.
+    Switching a like to a dislike is an UPDATE of `value`, not a second row.
+    """
+    __tablename__ = "comment_votes"
+    __table_args__ = (
+        UniqueConstraint("comment_id", "user_id", name="uq_comment_votes_one_per_user"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    comment_id = Column(Integer, ForeignKey("event_comments.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    value = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

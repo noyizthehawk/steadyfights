@@ -53,6 +53,16 @@ class InviteRequest(BaseModel):
         if self.email is None and self.user_id is None:
             raise ValueError("either email or user_id is required")
         return self
+class CommentCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+    parent_id: int | None = None
+
+
+class CommentVoteRequest(BaseModel):
+    # +1 like, -1 dislike, 0 clears an existing vote.
+    value: int = Field(ge=-1, le=1)
+
+
 class GroupCreate(BaseModel):
     name: str
     entry_fee: int = 0      # COINS, not dollars — same unit as CoinLedger.amount
