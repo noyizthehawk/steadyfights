@@ -38,7 +38,8 @@ def _load():
     # compute_career_score needs title_fight + division, which live in the
     # fighter-level data. Join on fighter name and fight number 
     extra = (
-        pd.read_csv(fighter_csv)[["name", "fight_number", "title_fight", "division", "date"]]
+        pd.read_csv(fighter_csv)[["name", "fight_number", "title_fight", "division", "date",
+                                  "method", "finish_round"]]
         .drop_duplicates(subset=["name", "fight_number"])
     )
     career = career.merge(
@@ -57,15 +58,13 @@ def _load():
     return career
 
 
-# Cut points per metric. adj and vol gain a split at the median because the old
-# p25-p75 band held HALF the roster under a single label, which told a user
-# nothing. opp does NOT get one: 39% of fights carry the 0.500 opponent-strength
-# placeholder, so its p25 and p50 are both exactly 0.50 and any band between
-# them would be unreachable — a label that could never render.
 _QUANTILES = {
-    "adj": (0.25, 0.50, 0.75, 0.90),
+    "adj": (0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90),
     "vol": (0.25, 0.50, 0.75, 0.90),
-    "opp": (0.25, 0.75, 0.90),
+    # Bell-shaped
+    "opp": (0.03, 0.10, 0.20, 0.35, 0.50, 0.65, 0.80, 0.90, 0.97),
+    "opp_recent": (0.03, 0.10, 0.20, 0.35, 0.50, 0.65, 0.80, 0.90, 0.97),
+
 }
 
 _thresholds = None
@@ -81,6 +80,7 @@ def _get_thresholds():
         "adj": g["Adj Perf"].mean(),
         "vol": g["Raw Perf"].std().dropna(), 
         "opp": g["Opp Str"].mean(),
+        "opp_recent": g["Opp Str"].apply(lambda x: x.tail(5).mean()).dropna(),
     }
     _thresholds = {
         key: [s.quantile(q) for q in _QUANTILES[key]]
@@ -100,7 +100,19 @@ def _threshold(key, q):
 
 
 def _bucket(value, edges, labels):
-    """Map value to a label. `labels` has len(edges)+1 entries, low band first."""
+    """Map value to a label. `labels` has len(edges)+1 entries, low band first.
+
+    The length check is not paranoia — it is the bug this function already had.
+    zip() stops at the shorter sequence, so adding quantiles to _QUANTILES
+    without adding labels silently truncated the ladder: everything above the
+    last paired edge fell through to labels[-1], and 60% of all fighters were
+    reported as "Elite Performances". Nothing errored. Fail loudly instead.
+    """
+    if len(labels) != len(edges) + 1:
+        raise ValueError(
+            f"_bucket needs len(labels) == len(edges)+1, "
+            f"got {len(labels)} labels for {len(edges)} edges"
+        )
     if value is None or pd.isna(value):
         return "Not enough data"
     for edge, label in zip(edges, labels):
@@ -135,8 +147,8 @@ _LEVEL = {
 _LEVEL_ERRATIC = {
     "elite":   ("Elite on his night, but wildly up and down",
                 "Elite on his night, but wildly up and down"),
-    "high":    ("Hot and cold — capable of anything on the night",
-                "Was hot and cold — capable of anything on the night"),
+    "high":    ("Hot and cold, capable of anything on the night",
+                "Was hot and cold, capable of anything on the night"),
     "solid":   ("Streaky, hard to call from one fight to the next",
                 "Streaky, hard to call from one fight to the next"),
     "scrappy": ("Never strung a run together",
@@ -198,10 +210,28 @@ def _activity(last_fight, now=None):
     }
 
 
-def _perf_label(avg_adj):
-    return _bucket(avg_adj, _get_thresholds()["adj"],
-                   ["Developing", "Competitive Performances", "Solid Performances",
-                    "Strong Performances", "Elite Performances"])
+# Ten bands, one per decile. Each label has to be distinguishable from its
+# neighbours at a glance, so the ladder climbs through plain words rather than
+# stacking adverbs ("fairly solid", "very solid") that read as the same rung.
+_PERF_LABELS = [
+    "Outmatched", "Developing", "Raw", "Competitive", "Capable",
+    "Solid", "Proven", "Strong", "Standout", "Elite",
+]
+
+
+# Label bands are bands of the DISPLAYED number, in tens.
+#
+# The number was a min-max position on a fixed range while the label was a
+# quantile rank against other fighters — two different transforms, so they
+# drifted apart and a displayed 60 could carry a label earned by a far higher
+# value ("Elite Opposition" at 60). Bucketing the scaled figure means the label
+# reads straight off the number and the two can never disagree.
+_DISPLAY_BANDS = (10, 20, 30, 40, 50, 60, 70, 80, 90)
+
+
+def _perf_label(scaled):
+    """`scaled` is the 0-100 figure shown on the page, not the raw average."""
+    return _bucket(scaled, _DISPLAY_BANDS, _PERF_LABELS)
 
 
 def _volatility_label(vol):
@@ -211,9 +241,17 @@ def _volatility_label(vol):
                     "Streaky", "Unpredictable performances"])
 
 
-def _opp_label(avg_opp):
-    return _bucket(avg_opp, _get_thresholds()["opp"],
-                   ["Lighter competition", "Average competition", "Tough competition", "Elite competition"])
+def _opp_label(scaled):
+    """`scaled` is the 0-100 figure shown on the page, not the raw average.
+
+    One set of bands for both the career and last-5 figures: they are shown on
+    the same scale, so the same number has to mean the same thing in both.
+    """
+    return _bucket(scaled, _DISPLAY_BANDS,
+                   ["Cherry-Picked Opposition", "Padded Opposition", "Protected Opposition",
+                    "Soft Opposition", "Average Opposition", "Respectable Opposition",
+                    "Tough Opposition", "Contender-Level Opposition", "Elite Opposition",
+                    "Murderers' Row"])
 
 
 # Observed min/max of per-fighter career AVERAGES (fighters with >=3 fights),
@@ -223,6 +261,11 @@ _SCALE_BOUNDS = {
     "raw_perf": (30.0, 70.0),
     "adj_perf": (3.0, 65.0),
     "opp_str":  (0.42, 0.63),
+    # A 5-fight mean swings wider than a career mean, so it needs its own upper
+    # bound or it clamps: observed last-5 range is 0.422-0.688 against a career
+    # range of 0.422-0.626.
+    "opp_str_recent": (0.42, 0.69),
+    "opp_str_recent": (0.42, 0.69),
 }
 
 
@@ -241,6 +284,40 @@ def _compute_career_score(fights, max_adj_perf):
     )
 
 
+_METHOD_SHORT = [
+    ("doctor", "TKO"), ("could not continue", "TKO"),
+    ("tko", "TKO"), ("ko", "KO"),
+    ("sub", "SUB"),
+    ("u-dec", "UD"), ("unanimous", "UD"),
+    ("s-dec", "SD"), ("split", "SD"),
+    ("m-dec", "MD"), ("majority", "MD"),
+    ("draw", "DRAW"), ("overturned", "NC"), ("no contest", "NC"), ("dq", "DQ"),
+]
+
+
+def _short_method(method, finish_round):
+    """ 'Decision - Unanimous' -> 'UD';  'KO/TKO' in round 2 -> 'KO R2'.
+
+    The raw column carries 40-odd spellings of a dozen outcomes, several of
+    them per-technique ('SUB Rear Naked Choke'), which is far too long to sit
+    in a list row. Matching is ordered and on a substring, since 'KO/TKO' holds
+    both 'ko' and 'tko' and the more specific one has to win.
+    """
+    if pd.isna(method):
+        return None
+    text = str(method).lower()
+    short = next((code for needle, code in _METHOD_SHORT if needle in text), None)
+    if short is None:
+        return None
+    # A decision has no meaningful round; a finish does.
+    if short in {"KO", "TKO", "SUB"} and pd.notna(finish_round):
+        try:
+            return f"{short} R{int(finish_round)}"
+        except (TypeError, ValueError):
+            pass
+    return short
+
+
 def _phase(sub):
     """Aggregate one career phase (early/mid/late), or None if it has no fights."""
     if sub.empty:
@@ -252,6 +329,8 @@ def _phase(sub):
             "opponent": r["opponent_name"],
             "won": bool(int(r["win(1)/loss(0)"])),
             "event": r["Event"],
+            "date": str(r["date"])[:10] if pd.notna(r.get("date")) else None,
+            "method": _short_method(r.get("method"), r.get("finish_round")),
             "adj_perf": round(float(r["Adj Perf"]), 1),
         }
         for _, r in sub.sort_values("fight_number").iterrows()
@@ -455,6 +534,7 @@ def career_summary_api(fighter):
     score = _compute_career_score(fights, max_adj)
 
     if len(fights) <= 5:
+        bucket = "developing"
         trajectory = "Developing career — not enough fights to assess trajectory"
     else:
         recent = fights.tail(5)          # most recent 5 fights (rows are sorted by fight_number)
@@ -540,6 +620,8 @@ def career_summary_api(fighter):
     recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
     recent_record = f"{recent_wins} - {len(recent) - recent_wins}"
 
+    recent_opp = float(recent["Opp Str"].mean())
+
     fighter_stats = get_fighter_stats(fighter)
 
     payload = {
@@ -552,16 +634,22 @@ def career_summary_api(fighter):
         "aged_well": aged,
         "avg_raw_perf": _scale_to_100(float(fights["Raw Perf"].mean()), "raw_perf"),
         "avg_adj_perf": _scale_to_100(avg_adj, "adj_perf"),
-        "perf_label": _perf_label(avg_adj),          # label uses the RAW average
+        "perf_label": _perf_label(_scale_to_100(avg_adj, "adj_perf")),
         "recent_perf": recent_perf,                  # last-5 form, same 0-100 scale
         "recent_record": recent_record,              # e.g. "4 - 1"
         "avg_opp_strength": _scale_to_100(avg_opp, "opp_str"),
-        "opp_label": _opp_label(avg_opp),            # label uses the RAW average
+        "opp_label": _opp_label(_scale_to_100(avg_opp, "opp_str")),
+        "recent_opp_strength": _scale_to_100(recent_opp, "opp_str_recent"),
+        "recent_opp_label": _opp_label(_scale_to_100(recent_opp, "opp_str_recent")),
         "volatility": volatility,
         "volatility_label": _volatility_label(vol),
         "career_score": round(float(score), 1),
         "career_label": label,
         "trajectory": trajectory,
+        # The bucket behind the sentence, so the UI can pick an icon without
+        # pattern-matching the prose. Matching display strings is how the
+        # volatility check broke once already (see the comment above).
+        "trajectory_bucket": bucket,
         "phases": {
             "early": _phase(early),
             "mid": _phase(mid),

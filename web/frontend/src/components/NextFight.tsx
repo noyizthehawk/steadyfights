@@ -85,6 +85,33 @@ export function NextFight({ fighter }: { fighter: string }) {
         onPaywall={() => setPaywalled(true)}
       />
 
+      {/* Predicting and picking are different acts: one asks the model, the
+          other commits the user to a call that gets scored. The predict button
+          lives inside QuickPredictCard above, so this sits directly under it. */}
+      {/* Solid red, no border. This is the one thing on the card we want the
+          user to actually do, and an outlined tinted button reads as secondary —
+          the same weight as a "learn more". The sheen sweeps once on hover
+          rather than looping: a permanently animated control is noise, but a
+          surface that responds to the cursor says "this is live". */}
+      <Link
+        to={`/events/${event.event_link.split("/").filter(Boolean).pop()}`}
+        className="group relative mt-3 flex w-full items-center justify-center gap-2 overflow-hidden rounded-lg bg-[#d33a2c] px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white transition-all duration-200 hover:bg-[#e8503f] hover:shadow-[0_4px_16px_-2px_rgba(211,58,44,0.5)] active:scale-[0.98]"
+      >
+        <span className="relative z-10">Make your picks</span>
+        <svg
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round"
+          className="relative z-10 h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
+        >
+        </svg>
+        {/* -translate-x-full -> translate-x-full, so the highlight crosses the
+            button once per hover and parks off the far edge. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full"
+        />
+      </Link>
+
       {paywalled ? (
         <p className="mt-3 text-[11px] leading-snug text-zinc-400">
           You've used your free predictions.{" "}

@@ -310,49 +310,18 @@ h1 {
 
 .career-phases {
   display: grid;
-  /* Three side-by-side columns need ~366px of min-content; a phone card has 256.
-     Stack them, and lay each phase's four rows out two-up so a stacked phase is
-     two lines tall rather than four. */
   grid-template-columns: minmax(0, 1fr);
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
-@media (min-width: 480px) {
+/* 820px, not 480. The old breakpoint suited the text-row phases it was written
+   for; these cards carry a title, a win-rate block, two labelled bars and a
+   range number, and three of them at 480px leaves ~150px each — the title and
+   the win rate collide immediately. Stack until there is genuinely room. */
+@media (min-width: 820px) {
   .career-phases {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-}
-
-@media (max-width: 479px) {
-  .phase {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 0.75rem;
-  }
-  .phase h4 {
-    grid-column: 1 / -1;
-  }
-}
-
-.phase {
-  padding: 0.75rem;
-  border-radius: 8px;
-  background: #0d0d0d;
-}
-
-.phase h4 {
-  margin: 0 0 0.5rem;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #d33a2c;
-}
-
-.phase-row {
-  font-size: 0.85rem;
-  color: #c8c8d0;
-  padding: 0.15rem 0;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Fighters browse page ---- */

@@ -40,10 +40,14 @@ export function AgedWell({ rows, fighter }: { rows: AgedWellRow[]; fighter: stri
               <tr key={`${r.fight_number}-${r.opponent}`} className="align-top">
                 <td className="py-2 pr-2">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    {/* W/L first: the same rise means opposite things depending on it */}
+                    {/* W/L first: the same rise means opposite things depending
+                        on it. Same filled badge as the phase dropdown, sized
+                        down: these rows are a dense table, and py-0.5 on a
+                        10px glyph set the row height for the whole column. A
+                        fixed 16px box keeps the badge off the line height. */}
                     <span
-                      className={`shrink-0 text-[10px] font-bold ${
-                        r.won ? "text-green-500" : "text-red-500"
+                      className={`flex h-4 w-5 shrink-0 items-center justify-center rounded text-[9px] font-bold leading-none text-white ${
+                        r.won ? "bg-green-500" : "bg-red-500"
                       }`}
                     >
                       {r.won ? "W" : "L"}

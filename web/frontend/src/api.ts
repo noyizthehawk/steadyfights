@@ -87,6 +87,8 @@ export type PhaseBout = {
   opponent: string;
   won: boolean;
   event: string;
+  date: string | null;    // YYYY-MM-DD
+  method: string | null;  // short form: "KO R2", "UD", "SUB R1"
   adj_perf: number;
 };
 export type Phase = {
@@ -169,6 +171,8 @@ export type CareerSummary = {
   recent_record: string;     // e.g. "4 - 1"
   avg_opp_strength: number;
   opp_label: string;
+  recent_opp_strength: number;  // last-5 opposition on the same 0–100 scale
+  recent_opp_label: string;
   volatility: number;
   volatility_label: string;
   career_score: number;   // 0–100
