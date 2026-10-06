@@ -145,3 +145,40 @@ code {
 .animate-card-in {
   animation: card-in 0.25s ease-out;
 }
+
+/* ---- PP Neue Montreal (rundown) ----
+   Commercial licence, so the .woff2 files are not committed — see
+   public/fonts/README.md. font-display:swap means a missing or slow font shows
+   the fallback immediately rather than blocking the text. */
+@font-face {
+  font-family: "PP Neue Montreal";
+  src: url("/fonts/PPNeueMontreal-Book.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Neue Montreal";
+  src: url("/fonts/PPNeueMontreal-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Neue Montreal";
+  src: url("/fonts/PPNeueMontreal-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Neue Montreal";
+  src: url("/fonts/PPNeueMontreal-MediumItalic.woff2") format("woff2");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  --font-rundown: "PP Neue Montreal", ui-sans-serif, system-ui, sans-serif;
+}

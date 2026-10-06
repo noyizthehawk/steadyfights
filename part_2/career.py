@@ -4,6 +4,7 @@ Career analysis for the web API.
 """
 import math
 import os
+import re
 from functools import lru_cache
 
 import numpy as np
@@ -624,8 +625,19 @@ def career_summary_api(fighter):
 
     fighter_stats = get_fighter_stats(fighter)
 
+    # Where they campaign, by majority of their last 4 bouts rather than the
+    # most recent one — a single catchweight or a move up should not reassign
+    # a fighter. Lower-cased and stripped of title/interim noise.
+    recent_divisions = [
+        re.sub(r"\b(ufc|interim|title|bout|championship)\b", " ", str(d).lower()).strip()
+        for d in fights["division"].dropna().tail(4)
+    ]
+    recent_divisions = [re.sub(r"\s+", " ", d) for d in recent_divisions if d]
+    division = max(set(recent_divisions), key=recent_divisions.count) if recent_divisions else None
+
     payload = {
         "fighter": fighter,
+        "division": division,
         "tale_of_the_tape": fighter_stats,   # str_acc/td_def/reach/… or None
         "total_fights": int(len(fights)),
         "win_rate": round(float(fights["win(1)/loss(0)"].mean()) * 100, 1),

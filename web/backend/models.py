@@ -261,3 +261,25 @@ class CommentVote(Base):
 
     value = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class FighterBio(Base):
+    """An LLM-written summary of one fighter's career.
+
+    Cached on `fights_at_generation`, not on a timestamp. A fighter's record only
+    changes when they fight, so that number IS the cache key: equal means the
+    text is still true, different means regenerate. Time-based expiry would burn
+    quota rewriting identical prose about someone who last fought in 2019.
+    """
+    __tablename__ = "fighter_bios"
+
+    id = Column(Integer, primary_key=True)
+    # Normalized, because the two data sources spell names differently
+    # (accents) and a lookup must not miss its own cache entry.
+    fighter_norm = Column(String, unique=True, nullable=False, index=True)
+    fighter = Column(String, nullable=False)       # display spelling
+    body = Column(String, nullable=False)
+
+    fights_at_generation = Column(Integer, nullable=False)
+    model = Column(String, nullable=False)         # which model wrote it
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

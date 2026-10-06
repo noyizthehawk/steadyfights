@@ -60,13 +60,28 @@ export function AgedWell({ rows, fighter }: { rows: AgedWellRow[]; fighter: stri
                     </Link>
                   </div>
                   {r.became_champion && (
-                    <span
-                      className="mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
-                      style={{ color: GOLD, background: `${GOLD}1a`, boxShadow: `inset 0 0 0 1px ${GOLD}44` }}
-                    >
-                      ★ Champion
-                      <span className="font-normal opacity-70">
-                        {r.champion_years_later}y later
+                    /* A hairline rule and tracked caps, not a gold pill with a
+                       star. The star and the filled badge are the generic
+                       language of achievement — every app uses them, and they
+                       read as a sticker stuck onto the row rather than part of
+                       it. The rule is the same motif the rundown uses, so the
+                       rail shares one idea; the arrow carries the meaning that
+                       matters here, which is that this happened AFTER the
+                       fight, not on the night. */
+                    <span className="mt-1 flex items-center gap-2 pl-px">
+                      <span
+                        aria-hidden
+                        className="h-3 w-px shrink-0"
+                        style={{ background: GOLD }}
+                      />
+                      <span
+                        className="text-[9px] font-medium uppercase tracking-[0.18em]"
+                        style={{ color: GOLD }}
+                      >
+                        BECAME CHAMPION
+                      </span>
+                      <span className="text-[9px] tabular-nums tracking-wide text-zinc-500">
+                        &#8599;{r.champion_years_later}y
                       </span>
                     </span>
                   )}

@@ -8,6 +8,7 @@ from ..models import User, UFCFight, UFCEvent
 from ..schemas import PredictRequest, DreamRequest
 from part_2 import Prediction_model as model
 from part_2 import career
+from .. import fighter_bio
 from part_2.career import normalize_name
 
 router = APIRouter()
@@ -45,6 +46,17 @@ def fighter_career(name: str, db: DBDep):
         raise HTTPException(status_code=404, detail="Fighter not found")
     data["image_url"] = _fighter_image(db, name)  
     return data
+
+
+@router.get("/api/fighters/{name}/bio")
+def fighter_bio_endpoint(name: str, db: DBDep):
+    """LLM-written career rundown. Cached in Postgres against the fighter's
+    fight count, so a given fighter is written about once per bout they take.
+    """
+    result = fighter_bio.get_or_create(db, name)
+    if result.get("body") is None and result.get("reason") == "fighter not found":
+        raise HTTPException(status_code=404, detail="Fighter not found")
+    return result
 
 
 @router.get("/api/careers/top")

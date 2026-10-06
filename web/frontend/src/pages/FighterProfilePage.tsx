@@ -6,6 +6,7 @@ import { FighterProfileCard } from "../components/FighterProfileCard";
 import { NextFight } from "../components/NextFight";
 import { CareerChart } from "../components/CareerChart";
 import { AgedWell } from "../components/AgedWell";
+import { FighterBio } from "../components/FighterBio";
 
 export default function FighterProfilePage() {
     // The route is /fighters/:id/career, where :id is the fighter's name.
@@ -48,6 +49,11 @@ export default function FighterProfilePage() {
                     so an unbooked fighter with no notable opponents collapses it */}
                 <aside className="flex flex-col gap-5 sm:gap-6 lg:w-80 lg:shrink-0">
                     <NextFight fighter={summary.fighter} />
+                    {/* The rundown lives in the rail, not the main column. It is
+                        the only prose on a page of figures, and at full width its
+                        lines ran long enough to lose your place; a 320px column is
+                        close to the measure it wants anyway. */}
+                    <FighterBio fighter={summary.fighter} />
                     <AgedWell rows={summary.aged_well} fighter={summary.fighter} />
                 </aside>
             </section>

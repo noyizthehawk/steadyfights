@@ -1000,3 +1000,24 @@ export async function getFighterTags(eventId: number): Promise<FighterTags> {
   const data: { tags: FighterTags } = await res.json();
   return data.tags;
 }
+
+
+// ── Fighter bio (LLM-written career rundown) ─────────────────────────────────
+
+export type FighterBio = {
+  body: string | null;
+  cached?: boolean;
+  /** true when generation failed and this is the previous text — a bio one
+   *  fight out of date, which still beats an empty section. */
+  stale?: boolean;
+  fights?: number;
+  reason?: string;
+};
+
+// Separate from getCareerSummary on purpose: a cache miss takes ~15s to
+// generate, and the profile must render its numbers without waiting.
+export async function getFighterBio(name: string): Promise<FighterBio> {
+  const res = await fetch(`${BASE_URL}/api/fighters/${encodeURIComponent(name)}/bio`);
+  if (!res.ok) throw new Error("Could not load bio");
+  return res.json() as Promise<FighterBio>;
+}

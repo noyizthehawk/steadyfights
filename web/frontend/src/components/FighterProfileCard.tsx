@@ -231,17 +231,6 @@ const PHASE_ACCENT = {
     late: "#ff9a4d",
 } as const;
 
-/** A barely-there wash over near-black.
- *
- * The mockup's gradients were full-saturation panels, which read as three
- * coloured blocks competing with the data on top of them. At 10% and 4% the
- * hue is just enough to tell the phases apart at a glance while the card still
- * belongs to a black page — colour peeking through rather than painted on.
- */
-function phaseWash(accent: string): string {
-    return `radial-gradient(120% 120% at 100% 0%, ${accent}1a 0%, ${accent}0a 45%, transparent 100%), #0a0a0b`;
-}
-
 function PhaseColumn({
     title,
     kind,
@@ -265,10 +254,7 @@ function PhaseColumn({
                 onClick={onToggle}
                 aria-expanded={isOpen}
                 className="relative flex min-h-[15.5rem] w-full cursor-pointer flex-col overflow-hidden rounded-[14px] border p-5 text-left transition-transform duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_30px_rgba(0,0,0,.5)] focus-visible:outline-none focus-visible:ring-2"
-                style={{
-                    background: phaseWash(accent),
-                    borderColor: isOpen ? `${accent}66` : "rgba(255,255,255,.08)",
-                }}
+                style={{ borderColor: isOpen ? `${accent}66` : "rgba(255,255,255,.08)" }}
             >
                 {/* Oversized range number, bottom-right, barely visible. Press
                     Start 2P advances a full em per glyph, so this is sized well
