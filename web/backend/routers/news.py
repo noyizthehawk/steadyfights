@@ -38,12 +38,31 @@ def _is_mma(article: dict) -> bool:
     return "ufc" in text and any(c in text for c in _CONTEXT)
 
 
+def _search_query(q: str) -> str:
+    """NewsAPI query for `q`.
+
+    A bare fighter name is a bad search: "Jon Jones" returns musicians and
+    politicians, and NewsAPI has no idea we mean the heavyweight. So a name gets
+    anchored to the sport, while the default general feed keeps the broad
+    editorial query. The _is_mma post-filter still runs over whatever comes
+    back, which catches what the anchor misses.
+    """
+    term = (q or "").strip()
+    if not term or term.upper() == "UFC":
+        return _QUERY
+    return (
+        f'"{term}" AND (UFC OR MMA OR "mixed martial arts" OR fight OR fighter '
+        f'OR octagon OR bout)'
+    )
+
+
 @router.get("/api/news")
 def get_news(q: str = "UFC"):
     if newsapi is None:
         raise HTTPException(status_code=503, detail="News API not configured (set NEWS_API_KEY).")
 
-    cache_key = "news:mma"
+    
+    cache_key = f"news:{(q or 'UFC').strip().lower()}"
 
     # serve cached news if present; on a miss OR a Redis outage, fall through to
     # the live API so the cache is never a hard dependency.
@@ -57,7 +76,7 @@ def get_news(q: str = "UFC"):
 
     try:
         result = newsapi.get_everything(
-            q=_QUERY,
+            q=_search_query(q),
             language="en",
             sort_by="publishedAt",
             page_size=40,   # over-fetch; the MMA post-filter trims it down
