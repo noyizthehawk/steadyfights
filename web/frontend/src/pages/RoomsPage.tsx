@@ -15,6 +15,9 @@ import "../rooms.css";
 
 type Tab = "public" | "private" | "mine";
 
+/** Shared by the real tiles and the loading skeletons so both lay out the same. */
+const GRID = "grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
+
 export default function RoomsPage() {
   const [tab, setTab] = useState<Tab>("public");
   const [q, setQ] = useState(""); // what's in the input right now
@@ -106,7 +109,7 @@ export default function RoomsPage() {
         </p>
       );
     if (tab === "mine")
-      return <p className="text-zinc-400">You haven't joined any rooms yet — browse the public lobby.</p>;
+      return <p className="text-zinc-400">You haven't joined any rooms yet, browse the public lobby.</p>;
     return <p className="text-zinc-400">No public rooms yet.</p>;
   }
 
@@ -138,8 +141,9 @@ export default function RoomsPage() {
         </div>
       </div>
 
-      {/* tabs */}
-      <div className="mb-4 flex gap-2">
+      {/* tabs — the app's shared .tabs/.tab (App.css): red underline on the
+          active one, same as Career/News on the fighter profile */}
+      <div className="tabs">
         {(["public", "private", "mine"] as Tab[]).map((t) => (
           <button
             key={t}
@@ -147,13 +151,9 @@ export default function RoomsPage() {
               setTab(t);
               setPage(1);
             }}
-            className={`rounded-full border px-4 py-1.5 text-sm capitalize transition-colors ${
-              tab === t
-                ? "border-red-500/50 bg-red-500/10 text-red-400"
-                : "border-transparent text-zinc-400 hover:text-white"
-            }`}
+            className={tab === t ? "tab active" : "tab"}
           >
-            {t === "mine" ? "My rooms" : t}
+            {t === "mine" ? "My rooms" : t === "public" ? "Public" : "Private"}
           </button>
         ))}
       </div>
@@ -171,20 +171,27 @@ export default function RoomsPage() {
 
       {!loading && rooms.length === 0 && !error && emptyState()}
 
-      {/* skeleton rows while fetching — same height as a real row so the
-          list doesn't jump when data lands */}
+      {/* skeleton tiles while fetching — same shape as a real tile so the
+          grid doesn't jump when data lands */}
       {loading && (
-        <div className="flex flex-col gap-3" aria-hidden>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl border border-zinc-800 bg-zinc-900" />
+        <div className={GRID} aria-hidden>
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i}>
+              <div className="aspect-[4/3] animate-pulse rounded-xl bg-zinc-900" />
+              <div className="mt-4 border-l-2 border-zinc-800 pl-3">
+                <div className="h-2 w-2/3 animate-pulse rounded bg-zinc-900" />
+                <div className="mt-2 h-2 w-1/2 animate-pulse rounded bg-zinc-900" />
+                <div className="mt-1.5 h-2 w-1/3 animate-pulse rounded bg-zinc-900" />
+              </div>
+            </div>
           ))}
         </div>
       )}
 
-      {/* full-width arcade rows — key includes tab/page/query so rows re-mount
-          and replay the stagger-in animation on every view change */}
+      {/* picture tiles — key includes tab/page/query so tiles re-mount and
+          replay the stagger-in animation on every view change */}
       {!loading && (
-        <div className="flex flex-col gap-3">
+        <div className={GRID}>
           {rooms.map((room, i) => (
             <div
               key={`${tab}:${page}:${debouncedQ}:${room.id}`}

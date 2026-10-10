@@ -1,10 +1,12 @@
-from ..models import  CoinReason, Group, GroupMember, User, CoinLedger, Friendship
-from fastapi import APIRouter, Depends, HTTPException
+from ..models import  CoinReason, Group, GroupMember, User, CoinLedger, Friendship, RoomCoverReport
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from ..schemas import GroupCreate
 from ..ledgers import record_movement, get_balance
 from ..stats import compute_leaderboard
 from ..dependencies import get_curr_user, DBDep
+from ..storage import resize_cover, upload_room_cover, ALLOWED_IMAGE_TYPES, MAX_COVER_BYTES
 # settlement lives in room_settlement so the cron job can import it without
 # pulling in auth; re-exported here for existing imports
 from ..room_settlement import split_pot, settle_room, run_settle_rooms  # noqa: F401
@@ -71,10 +73,89 @@ def create_group(body: GroupCreate, db: DBDep, user: User = Depends(get_curr_use
     db.refresh(group)      # reload so group.id is populated
 
     #same shape as the lobby tiles; a brand-new room has no members yet
+    #(and no cover — that's uploaded separately, after the room exists)
     return {"id": group.id, "name": group.name, "entry_fee": group.entry_fee,
             "owner_id": group.owner_id, "closes_at": group.closes_at,
-            "is_public": group.is_public,
+            "is_public": group.is_public, "cover_url": None,
             "owner_name": user.username, "member_count": 0}
+
+
+#distinct users it takes to pull a cover down without waiting for an admin.
+#low on purpose: a lobby tile is shown to everyone, and the cost of a wrong
+#takedown is only that the room falls back to its generated cover.
+COVER_REPORTS_TO_HIDE = 3
+
+
+@router.post("/api/groups/{group_id}/cover")
+async def upload_group_cover(group_id: int, db: DBDep, file: UploadFile = File(...),
+                             user: User = Depends(get_curr_user)):
+    """Owner uploads a cover photo for their room. Resized + re-encoded before
+    it's stored (see storage.resize_cover), so the lobby never ships raw photos."""
+    group = db.get(Group, group_id)
+    if group is None:
+        raise HTTPException(404, "Group not found")
+    if group.owner_id != user.id:
+        raise HTTPException(403, "Only the room owner can change the cover")
+
+    #same checks as avatars, with a bigger cap since we shrink it anyway
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(400, "Cover must be a JPEG, PNG, or WebP image")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Empty file")
+    if len(data) > MAX_COVER_BYTES:
+        raise HTTPException(400, "Cover must be 10 MB or smaller")
+
+    #the content-type header is just a claim; actually decoding it is the real check
+    try:
+        resized = resize_cover(data)
+    except ValueError:
+        raise HTTPException(400, "That file isn't a readable image")
+
+    try:
+        url = upload_room_cover(group.id, resized)
+    except RuntimeError:
+        # R2 not configured (missing env vars) — don't 500, tell the client.
+        raise HTTPException(503, "Image uploads are not configured")
+
+    #reports were against the OLD picture; the new one starts with a clean slate
+    db.query(RoomCoverReport).filter_by(group_id=group.id).delete()
+    group.cover_url = url
+    db.commit()
+    return {"cover_url": url}
+
+
+@router.post("/api/groups/{group_id}/cover/report")
+def report_group_cover(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
+    """Flag a room's cover as inappropriate. Once COVER_REPORTS_TO_HIDE
+    different users have flagged it, the cover is removed and the room goes
+    back to its generated one. Reporting twice is a no-op, not an error."""
+    group = db.get(Group, group_id)
+    if group is None:
+        raise HTTPException(404, "Group not found")
+    if group.cover_url is None:
+        raise HTTPException(400, "This room has no cover to report")
+    if group.owner_id == user.id:
+        raise HTTPException(400, "You can't report your own room's cover")
+
+    try:
+        db.add(RoomCoverReport(group_id=group.id, user_id=user.id,
+                               cover_url=group.cover_url))
+        db.commit()
+    except IntegrityError:
+        #unique (group_id, user_id) — they already reported this cover
+        db.rollback()
+        return {"status": "already_reported", "cover_removed": False}
+
+    reports = db.query(func.count(RoomCoverReport.id)).filter_by(group_id=group.id).scalar()
+    removed = reports >= COVER_REPORTS_TO_HIDE
+    if removed:
+        #only the pointer is cleared; the reports (and the reported URL on
+        #them) stay, so until the owner uploads a new cover an admin can
+        #still see what was taken down and by whom
+        group.cover_url = None
+        db.commit()
+    return {"status": "reported", "cover_removed": removed}
 
 
 @router.get("/api/groups/{group_id}/leaderboard")
@@ -134,14 +215,15 @@ def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
 
     #active members, joined to users so we can show names (not full emails)
     rows = (
-        db.query(User.id, User.username)
+        db.query(User.id, User.username, User.avatar_url)
         .join(GroupMember, GroupMember.user_id == User.id)
         .filter(GroupMember.group_id == group_id,
                 GroupMember.status == "active")
         .all()
     )
-    members = [{"id": uid, "name": username} for uid, username in rows]
-    member_ids = {uid for uid, _ in rows}
+    members = [{"id": uid, "name": username, "avatar_url": avatar_url}
+               for uid, username, avatar_url in rows]
+    member_ids = {uid for uid, _, _ in rows}
 
     #pot = coins staked in this room. buy-ins are stored NEGATIVE, so negate the sum.
     staked = (
@@ -156,6 +238,10 @@ def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
     owner = db.get(User, group.owner_id)
     owner_name = owner.username if owner else "unknown"
 
+    #has this viewer already flagged the current cover?
+    has_reported = group.cover_url is not None and db.query(RoomCoverReport.id).filter_by(
+        group_id=group_id, user_id=user.id).first() is not None
+
     return {
         "id": group.id,
         "name": group.name,
@@ -164,6 +250,7 @@ def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
         "owner_id": group.owner_id,
         "owner_name": owner_name,
         "is_public": group.is_public,
+        "cover_url": group.cover_url,                # null → UI draws the generated cover
         "is_open": group.closes_at > datetime.utcnow(),
         "pot": pot,
         "member_count": len(members),
@@ -171,6 +258,8 @@ def group_detail(group_id: int, db: DBDep, user: User = Depends(get_curr_user)):
         # handy flags so the UI knows what buttons to show this viewer
         "is_member": user.id in member_ids,
         "is_owner": user.id == group.owner_id,
+        # so the report button can show "Reported" instead of inviting a repeat
+        "has_reported_cover": has_reported,
     }
 
 
@@ -205,6 +294,7 @@ def _room_summaries(db, rooms: list) -> list[dict]:
         "entry_fee": g.entry_fee,
         "closes_at": g.closes_at,
         "is_public": g.is_public,
+        "cover_url": g.cover_url,
         "owner_id": g.owner_id,
         "owner_name": owner_names.get(g.owner_id, "unknown"),
         "member_count": counts.get(g.id, 0),

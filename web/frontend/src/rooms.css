@@ -16,31 +16,9 @@
   animation: tile-in 0.35s ease-out both;
 }
 
-/* Arcade selection cursor (▶ next to the room name): invisible until the row
-   is hovered, then blinks like a menu cursor. The animation only runs on
-   :hover, so at rest the element keeps its opacity-0 utility class. */
-@keyframes cursor-blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0;
-  }
-}
-
-.group:hover .cursor-blink {
-  animation: cursor-blink 0.9s step-end infinite;
-}
-
-/* Users who opt out of motion get instant, static tiles and a steady cursor. */
+/* Users who opt out of motion get instant, static tiles. */
 @media (prefers-reduced-motion: reduce) {
   .tile-in {
     animation: none;
-  }
-
-  .group:hover .cursor-blink {
-    animation: none;
-    opacity: 1;
   }
 }

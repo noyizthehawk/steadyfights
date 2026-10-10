@@ -28,9 +28,10 @@ export type Room = {              // list item (from GET /api/groups, /api/rooms
   owner_id: number;
   owner_name: string;             // email prefix, links to /users/:owner_id
   member_count: number;           // active (paid) members
+  cover_url: string | null;       // owner's uploaded photo; null → generated RoomCover
 };
 
-export type RoomMember = { id: number; name: string };
+export type RoomMember = { id: number; name: string; avatar_url: string | null };
 
 export type RoomDetail = Room & { // from GET /api/groups/{id}
   is_open: boolean;
@@ -39,6 +40,7 @@ export type RoomDetail = Room & { // from GET /api/groups/{id}
   members: RoomMember[];
   is_member: boolean;
   is_owner: boolean;
+  has_reported_cover: boolean;    // this viewer already flagged the current cover
 };
 
 
@@ -355,6 +357,38 @@ export async function getRoom(id: number): Promise<RoomDetail> {
   if (res.status === 401) throw new AuthError("Not authenticated");
   if (!res.ok) throw new Error("Could not load room");
   return res.json() as Promise<RoomDetail>; // endpoint returns the object directly
+}
+
+// Upload (or replace) a room's cover photo — owner only. The backend resizes it,
+// so phone photos straight off the camera are fine (up to 10 MB).
+export async function uploadRoomCover(id: number, file: File): Promise<{ cover_url: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE_URL}/api/groups/${id}/cover`, {
+    method: "POST",
+    credentials: "include",
+    body: form, // no Content-Type header — the browser sets the multipart boundary
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not upload cover");
+  }
+  return res.json() as Promise<{ cover_url: string }>;
+}
+
+// Flag a room's cover. cover_removed = this report was the one that took it down.
+export async function reportRoomCover(id: number): Promise<{ cover_removed: boolean }> {
+  const res = await fetch(`${BASE_URL}/api/groups/${id}/cover/report`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not report cover");
+  }
+  return res.json() as Promise<{ cover_removed: boolean }>;
 }
 
 export async function joinRoom(id: number): Promise<void> {

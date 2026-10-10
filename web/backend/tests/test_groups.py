@@ -9,23 +9,31 @@ transaction, error translation — without needing an HTTP server or auth cookie
 Runs against in-memory SQLite, so it never touches data/app.db.
 Run:  .venv/bin/python -m web.backend.tests.test_groups
 """
+import asyncio
+import io
+import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
+from PIL import Image as PILImage
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from starlette.datastructures import Headers
 
 from ..database import Base
 from ..models import (
     User, Group, GroupMember, CoinReason, CoinLedger, UFCFight, Pick, Friendship,
+    RoomCoverReport,
 )
 from ..ledgers import get_balance, record_movement
 from ..stats import compute_leaderboard
+from ..routers import groups as groups_router
 from ..routers.groups import (
     create_group, join_group, group_leaderboard,
     my_groups, group_detail, my_balance,
     browse_public_rooms, browse_private_rooms, split_pot, settle_room,
-    run_settle_rooms,
+    run_settle_rooms, upload_group_cover, report_group_cover,
+    COVER_REPORTS_TO_HIDE,
 )
 from ..schemas import GroupCreate
 
@@ -668,6 +676,146 @@ def test_run_settle_rooms_only_touches_due_unsettled_rooms():
     assert db.get(Group, done["id"]).settled_at == stamped_before  # not re-stamped
 
 
+# ---------------------------------------------------------------- room covers
+
+def _png(width, height):
+    """A real encoded PNG of the given size, as an upload would send it."""
+    buf = io.BytesIO()
+    PILImage.new("RGB", (width, height), (200, 30, 30)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _cover(group_id, db, user, file_bytes, content_type="image/png"):
+    """Call the async upload endpoint with R2 stubbed out. Returns (result, stored)
+    where stored is the bytes that would have gone to R2."""
+    stored = {}
+
+    def fake_upload(room_id, data):
+        stored["data"] = data
+        return f"https://cdn.test/rooms/{room_id}/{uuid.uuid4().hex}.webp"
+
+    upload = UploadFile(file=io.BytesIO(file_bytes), filename="cover",
+                        headers=Headers({"content-type": content_type}))
+    original = groups_router.upload_room_cover
+    groups_router.upload_room_cover = fake_upload
+    try:
+        result = asyncio.run(upload_group_cover(group_id, db, upload, user))
+    finally:
+        groups_router.upload_room_cover = original
+    return result, stored.get("data")
+
+
+def _more_users(db, n, prefix="u"):
+    users = [User(email=f"{prefix}{i}@example.com", hashed_password="x",
+                  username=f"{prefix}{i}") for i in range(n)]
+    db.add_all(users)
+    db.commit()
+    return users
+
+
+def test_cover_upload_is_resized_and_shows_on_tiles():
+    db, owner = make_db()
+    room = create_group(a_group(is_public=True), db, owner)
+    assert room["cover_url"] is None                     # brand-new room: generated cover
+
+    result, stored = _cover(room["id"], db, owner, _png(3000, 1800))
+    img = PILImage.open(io.BytesIO(stored))
+    assert img.format == "WEBP"
+    assert img.size == (1200, 720)                       # shrunk, aspect kept
+
+    assert group_detail(room["id"], db, owner)["cover_url"] == result["cover_url"]
+    lobby = browse_public_rooms(db, owner)["rooms"]
+    assert lobby[0]["cover_url"] == result["cover_url"]
+
+
+def test_small_cover_is_not_upscaled():
+    db, owner = make_db()
+    room = create_group(a_group(), db, owner)
+    _, stored = _cover(room["id"], db, owner, _png(400, 240))
+    assert PILImage.open(io.BytesIO(stored)).size == (400, 240)
+
+
+def test_only_owner_can_upload_cover():
+    db, owner = make_db()
+    (other,) = _more_users(db, 1)
+    room = create_group(a_group(), db, owner)
+    try:
+        _cover(room["id"], db, other, _png(100, 60))
+        assert False, "non-owner upload should be rejected"
+    except HTTPException as e:
+        assert e.status_code == 403
+    assert db.get(Group, room["id"]).cover_url is None
+
+
+def test_cover_upload_rejects_non_images():
+    db, owner = make_db()
+    room = create_group(a_group(), db, owner)
+    # header claims PNG, bytes are not one — the decode is the real check
+    for body, ctype in [(b"definitely not a png", "image/png"), (_png(10, 10), "image/gif")]:
+        try:
+            _cover(room["id"], db, owner, body, ctype)
+            assert False, f"{ctype} upload should be rejected"
+        except HTTPException as e:
+            assert e.status_code == 400
+    assert db.get(Group, room["id"]).cover_url is None
+
+
+def test_cover_reports_hide_cover_at_threshold():
+    db, owner = make_db()
+    room = create_group(a_group(is_public=True), db, owner)
+    _cover(room["id"], db, owner, _png(100, 60))
+    reporters = _more_users(db, COVER_REPORTS_TO_HIDE)
+
+    for u in reporters[:-1]:
+        assert report_group_cover(room["id"], db, u)["cover_removed"] is False
+    assert db.get(Group, room["id"]).cover_url is not None   # still below threshold
+    assert group_detail(room["id"], db, reporters[0])["has_reported_cover"] is True
+
+    assert report_group_cover(room["id"], db, reporters[-1])["cover_removed"] is True
+    assert db.get(Group, room["id"]).cover_url is None       # back to the generated cover
+
+
+def test_reporting_twice_counts_once():
+    db, owner = make_db()
+    room = create_group(a_group(), db, owner)
+    _cover(room["id"], db, owner, _png(100, 60))
+    (u,) = _more_users(db, 1)
+    report_group_cover(room["id"], db, u)
+    assert report_group_cover(room["id"], db, u)["status"] == "already_reported"
+    assert db.query(RoomCoverReport).count() == 1
+
+
+def test_owner_cannot_report_own_cover_and_no_cover_cannot_be_reported():
+    db, owner = make_db()
+    room = create_group(a_group(), db, owner)
+    (u,) = _more_users(db, 1)
+    try:
+        report_group_cover(room["id"], db, u)                # nothing uploaded yet
+        assert False, "reporting a missing cover should fail"
+    except HTTPException as e:
+        assert e.status_code == 400
+    _cover(room["id"], db, owner, _png(100, 60))
+    try:
+        report_group_cover(room["id"], db, owner)
+        assert False, "owner should not be able to report their own cover"
+    except HTTPException as e:
+        assert e.status_code == 400
+
+
+def test_new_cover_clears_old_reports():
+    db, owner = make_db()
+    room = create_group(a_group(), db, owner)
+    _cover(room["id"], db, owner, _png(100, 60))
+    for u in _more_users(db, COVER_REPORTS_TO_HIDE - 1):
+        report_group_cover(room["id"], db, u)
+
+    _cover(room["id"], db, owner, _png(120, 60))             # replace the picture
+    assert db.query(RoomCoverReport).count() == 0
+    # one more report must NOT tip the new cover over using the old count
+    (fresh,) = _more_users(db, 1, prefix="fresh")
+    assert report_group_cover(room["id"], db, fresh)["cover_removed"] is False
+
+
 if __name__ == "__main__":
     tests = [
         test_create_group,
@@ -704,6 +852,14 @@ if __name__ == "__main__":
         test_room_board_resets_on_entry,
         test_settle_room_points_beat_small_sample_winrate,
         test_run_settle_rooms_only_touches_due_unsettled_rooms,
+        test_cover_upload_is_resized_and_shows_on_tiles,
+        test_small_cover_is_not_upscaled,
+        test_only_owner_can_upload_cover,
+        test_cover_upload_rejects_non_images,
+        test_cover_reports_hide_cover_at_threshold,
+        test_reporting_twice_counts_once,
+        test_owner_cannot_report_own_cover_and_no_cover_cannot_be_reported,
+        test_new_cover_clears_old_reports,
     ]
     passed = 0
     for t in tests:

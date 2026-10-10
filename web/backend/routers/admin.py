@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 
 from ..dependencies import DBDep, verify_admin_token
-from ..models import User, UFCEvent
+from ..models import User, UFCEvent, Group, RoomCoverReport
 from ..schemas import NotableRequest, ExtractRequest
 from ..security import hash_password
 from ..scraping import run_settle, scrape_and_save
@@ -139,3 +139,36 @@ def extract_predictions_sweep(db: DBDep, within_days: int = 10, reextract: bool 
     scheduler can safely hit this daily. `reextract=True` forces already-done
     pairs to be redone."""
     return predictions_ai.run_extraction_sweep(db, within_days=within_days, reextract=reextract)
+
+
+@router.get("/api/admin/cover-reports", dependencies=[Depends(verify_admin_token)])
+def list_cover_reports(db: DBDep):
+    """Rooms whose covers have been reported, most-reported first. Includes ones
+    already auto-removed (cover_url now null), so a takedown can be reviewed."""
+    rows = db.execute(
+        select(RoomCoverReport.group_id, RoomCoverReport.cover_url,
+               func.count(RoomCoverReport.id), Group.name, Group.cover_url)
+        .join(Group, Group.id == RoomCoverReport.group_id)
+        .group_by(RoomCoverReport.group_id, RoomCoverReport.cover_url,
+                  Group.name, Group.cover_url)
+        .order_by(func.count(RoomCoverReport.id).desc())
+    ).all()
+    return [{
+        "group_id": gid,
+        "room": name,
+        "reported_url": reported_url,
+        "reports": count,
+        "still_showing": current_url == reported_url,
+    } for gid, reported_url, count, name, current_url in rows]
+
+
+@router.delete("/api/admin/rooms/{group_id}/cover", dependencies=[Depends(verify_admin_token)])
+def remove_room_cover(group_id: int, db: DBDep):
+    """Take a room's cover down by hand; the room falls back to its generated one.
+    The R2 object is left in place (same as replaced avatars)."""
+    group = db.get(Group, group_id)
+    if group is None:
+        raise HTTPException(status_code=404, detail="Group not found")
+    group.cover_url = None
+    db.commit()
+    return {"status": "removed", "group_id": group_id}

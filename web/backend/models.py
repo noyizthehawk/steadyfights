@@ -198,6 +198,30 @@ class Group(Base):
     # public = anyone can find it in the lobby; private = only the owner's friends see it
     is_public = Column(Boolean, nullable=False, default=False)
     settled_at = Column(DateTime, nullable=True)
+    # Owner-uploaded cover photo in R2; null = the UI draws the generated
+    # RoomCover from the room id instead. Nulled again if enough users report it.
+    cover_url = Column(String, nullable=True)
+
+class RoomCoverReport(Base):
+    """One user flagging one room's current cover photo.
+
+    Reports are about the IMAGE, not the room: uploading a new cover deletes
+    the room's reports, so votes against an old picture can't take down the
+    new one. The unique constraint makes one-report-per-user hold in the
+    database, like CommentVote.
+    """
+    __tablename__ = "room_cover_reports"
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_room_cover_reports_one_per_user"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # the URL that was reported, so an admin can still see what it was after
+    # the cover has been taken down
+    cover_url = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 class GroupMember(Base):
     __tablename__ = "group_members"

@@ -1,9 +1,28 @@
+import { useState } from "react";
 import { mulberry32 } from "../lib/rooms";
 
-/** Procedurally generated arcade cover, seeded by the room id.
+/** A room's cover: the owner's uploaded photo when there is one (`src`),
+ *  otherwise procedurally generated arcade art seeded by the room id.
  *  Same room -> same art forever; different rooms -> different art.
  *  Mirrored pixel grid (identicon-style): red + orange emblems with gold flecks on dark. */
-export function RoomCover({ seed, className }: { seed: number; className?: string }) {
+export function RoomCover({ seed, src, className }: { seed: number; src?: string | null; className?: string }) {
+  // a photo that fails to load (deleted from R2, network blip) falls back to
+  // the generated art rather than a broken-image icon in the lobby
+  const [failed, setFailed] = useState<string | null>(null);
+  if (src && failed !== src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(src)}
+        // object-cover crops to whatever box the caller sizes, same as the
+        // svg's "slice" — one photo serves the 5:3 tile and the wide banner
+        className={`object-cover ${className ?? ""}`}
+      />
+    );
+  }
+
   const rand = mulberry32(seed || 1);
 
   const COLS = 10;

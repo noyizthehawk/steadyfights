@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AuthError, createRoom } from "../api";
+import { AuthError, createRoom, uploadRoomCover } from "../api";
+import { RoomCover } from "../components/RoomCover";
 import { errorMessage } from "../lib/errorMessage";
+
+const MAX_COVER_MB = 10; // mirrors MAX_COVER_BYTES on the backend
 
 /** "yyyy-MM-ddTHH:mm" in LOCAL time — the format <input type="datetime-local"> wants.
  *  (Can't use toISOString() here: that's UTC and would shift the min by the timezone offset.) */
@@ -17,7 +20,26 @@ export default function CreateRoomPage() {
   const [isPublic, setIsPublic] = useState(false); // private by default, like the backend
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [cover, setCover] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // local blob URL so the picked photo previews before anything is uploaded;
+  // revoked on change/unmount or every pick would leak the file in memory
+  useEffect(() => {
+    if (!cover) return setPreview(null);
+    const url = URL.createObjectURL(cover);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [cover]);
+
+  function pickCover(f: File | undefined) {
+    setError("");
+    if (!f) return;
+    if (f.size > MAX_COVER_MB * 1024 * 1024)
+      return setError(`Cover must be ${MAX_COVER_MB} MB or smaller`);
+    setCover(f);
+  }
 
   // earliest allowed close time: an hour from now (no point in a room that closes instantly)
   const minCloses = toLocalInputValue(new Date(Date.now() + 60 * 60 * 1000));
@@ -37,7 +59,7 @@ export default function CreateRoomPage() {
 
     setSubmitting(true);
     try {
-      await createRoom({
+      const room = await createRoom({
         name: name.trim(),
         entry_fee: entryFee,
         // toISOString() converts the local pick to UTC ("...Z"), which the
@@ -45,6 +67,19 @@ export default function CreateRoomPage() {
         closes_at: closes.toISOString(),
         is_public: isPublic,
       });
+      // the cover is a second request on purpose: the room already exists, so
+      // a failed upload can't lose it. On failure, send the owner to the room
+      // page, where the banner has a retry button.
+      if (cover) {
+        try {
+          await uploadRoomCover(room.id, cover);
+        } catch (err) {
+          if (err instanceof AuthError) return navigate("/login");
+          return navigate(`/rooms/${room.id}`, {
+            state: { coverError: `Room created, but the cover didn't upload: ${errorMessage(err)}` },
+          });
+        }
+      }
       navigate("/rooms");
     } catch (err) {
       if (err instanceof AuthError) return navigate("/login");
@@ -123,6 +158,45 @@ export default function CreateRoomPage() {
                   <div className="mt-1 text-xs text-zinc-400">{o.desc}</div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* cover — optional, but sitting right in the form so people actually
+              add one. Shows the generated art until a photo is picked, so the
+              owner sees exactly what the lobby tile will look like either way. */}
+          <div>
+            <label className="mb-1 block text-sm text-zinc-400">
+              Cover photo <span className="text-zinc-500">(optional — shows on your lobby tile)</span>
+            </label>
+            <div className="flex items-center gap-4">
+              <RoomCover
+                seed={1}
+                src={preview}
+                className="aspect-[5/3] h-20 shrink-0 rounded-lg border border-zinc-700"
+              />
+              <div className="flex flex-col items-start gap-1.5">
+                <label className="cursor-pointer rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 transition-colors hover:border-zinc-500">
+                  {cover ? "Choose a different photo" : "Upload a photo"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      pickCover(e.target.files?.[0]);
+                      e.target.value = ""; // so re-picking the same file still fires
+                    }}
+                  />
+                </label>
+                {cover && (
+                  <button
+                    type="button"
+                    onClick={() => setCover(null)}
+                    className="text-xs text-zinc-500 hover:text-zinc-300"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
