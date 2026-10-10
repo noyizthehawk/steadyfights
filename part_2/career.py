@@ -266,7 +266,6 @@ _SCALE_BOUNDS = {
     # bound or it clamps: observed last-5 range is 0.422-0.688 against a career
     # range of 0.422-0.626.
     "opp_str_recent": (0.42, 0.69),
-    "opp_str_recent": (0.42, 0.69),
 }
 
 
@@ -737,7 +736,7 @@ def _fighter_tag_cached(name_norm):
         # picked for the realistic career-average band — not the raw column
         # ranges. So these are directly comparable to each other and to score.
         "recent_form": _scale_to_100(float(recent["Adj Perf"].mean()), "adj_perf"),
-        "strength_iq": _scale_to_100(float(fights["Opp Str"].mean()), "opp_str"),
+        "strength_iq": _scale_to_100(float(recent["Opp Str"].mean()), "opp_str_recent"),
         "total_fights": int(len(fights)),
         "recent_record": f"{recent_wins} - {len(recent) - recent_wins}",
     }

@@ -387,6 +387,8 @@ def get_fighter_tags(event_id: int, db: DBDep):
     Costs nothing per request after the first: fighter_tag memoizes on the
     normalized name, and the CSVs it derives from only change when a data
     refresh restarts the process, which clears the memo with them.
+
+    now with a chnage to recent strength of oppponenet instead of overall
     """
     event = db.get(UFCEvent, event_id)
     if event is None:
