@@ -4,15 +4,14 @@ import re
 import time
 from datetime import datetime
 
-from google import genai
-from google.genai import types
+import anthropic
 from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig, GenericProxyConfig
 
 from .youtube import fetch_channel_uploads
 from .config import (
-    GEMINI_API_KEY,
+    ANTHROPIC_API_KEY,
     WEBSHARE_PROXY_USERNAME, WEBSHARE_PROXY_PASSWORD, YT_PROXY_URL,
 )
 from .models import Pick, NotableExtraction, User, UFCEvent, UFCFight
@@ -200,33 +199,25 @@ def find_prediction_video(channel_id: str, event) -> dict | None:
     return best
 
 
+# Haiku: picking one of two given names per fight, against a strict schema,
+# is extraction — the cheapest model does it, at ~$0.002 for a long transcript.
+MODEL = "claude-haiku-5-5"
+
 _client = None
 
 
-def _gemini():
-    """Gemini client with retries on transient upstream failures.
-    google llm sometimes gets overloaded and return a 503 sever error. so we rety at least 5 itmes
-    """
+def _anthropic():
+    """Anthropic client, built lazily so the app boots without a key. The SDK
+    retries 408/409/429/5xx (incl. 529 overloaded) with backoff on its own;
+    3 retries matches what the old Gemini client was configured to do."""
     global _client
     if _client is None:
-        _client = genai.Client(
-            api_key=GEMINI_API_KEY,
-            http_options=types.HttpOptions(
-                retry_options=types.HttpRetryOptions(
-                    attempts=3,
-                    initial_delay=1.0,
-                    exp_base=2.0,
-                    max_delay=8.0,
-                    jitter=1.0,
-                    http_status_codes=[408, 500, 502, 503, 504],
-                ),
-            ),
-        )
+        _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, max_retries=3)
     return _client
 
 
 def is_configured() -> bool:
-    return bool(GEMINI_API_KEY)
+    return bool(ANTHROPIC_API_KEY)
 
 
 # One extracted pick per fight. fighter_a/fighter_b are echoed back so we can
@@ -262,17 +253,29 @@ def extract_picks(transcript: str, fights: list[dict]) -> list[dict]:
         f"TRANSCRIPT:\n{transcript}"
     )
 
-    resp = _gemini().models.generate_content(
-        model="gemini-3.6-flash",
-        contents=user,
-        config={
-            "system_instruction": _PROMPT,
-            "response_mime_type": "application/json",
-            "response_schema": _Predictions,
-        },
+    # messages.parse + output_format constrains the reply to the _Predictions
+    # schema and validates it, so there's no JSON to hand-parse.
+    # effort set explicitly: Haiku 5.5 thinks by default (at "medium"), which
+    # earns its keep here — pundits hedge, and "do not guess" needs judgment.
+    # Thinking counts toward max_tokens, hence the headroom over a ~15-row list.
+    resp = _anthropic().messages.parse(
+        model=MODEL,
+        max_tokens=16000,
+        system=_PROMPT,
+        output_config={"effort": "medium"},
+        output_format=_Predictions,
+        messages=[{"role": "user", "content": user}],
     )
-    parsed: _Predictions = resp.parsed
-    return [p.model_dump() for p in parsed.picks]
+    # A safety decline is a 200 with no parsed output, and Haiku has no
+    # server-side fallback. Raise so run_extraction records a failure and the
+    # pair stays open for a retry, instead of saving zero picks as if the
+    # pundit had made none.
+    if resp.stop_reason == "refusal":
+        category = resp.stop_details.category if resp.stop_details else None
+        raise RuntimeError(f"model declined ({category})")
+    if resp.parsed_output is None:
+        raise RuntimeError(f"no structured output (stop_reason={resp.stop_reason})")
+    return [p.model_dump() for p in resp.parsed_output.picks]
 
 
 # save picks — match names  fights, upsert Picks 
@@ -334,7 +337,7 @@ def _save_source_video(db, user_id: int, event_id: int, video_id: str) -> None:
 def run_extraction(db, user, event, video_id: str | None = None) -> dict:
   
     if not is_configured():
-        return {"ok": False, "reason": "GEMINI_API_KEY not configured"}
+        return {"ok": False, "reason": "ANTHROPIC_API_KEY not configured"}
     if not video_id and not user.youtube_channel_id:
         return {"ok": False, "reason": "user has no linked YouTube channel"}
 
@@ -353,13 +356,15 @@ def run_extraction(db, user, event, video_id: str | None = None) -> dict:
     try:
         extracted = extract_picks(transcript, fights)
     except Exception as e:
-        # `ServerError` alone was unactionable — it covers an overloaded model,
-        # a bad key and a malformed request alike. The status code separates
-        # "retry later" from "you broke something".
-        code = getattr(e, "code", None) or getattr(e, "status", None)
+        # The exception class alone is unactionable — an overloaded model, a
+        # bad key and a malformed request all surface as API errors. The status
+        # code separates "retry later" from "you broke something". (The SDK has
+        # already retried 429/5xx before raising.)
+        code = getattr(e, "status_code", None)
         detail = {
-            429: "gemini quota exhausted (free tier is 20 requests/day)",
-            503: "gemini overloaded (transient, retried and still failed)",
+            401: "anthropic api key rejected",
+            429: "anthropic rate limit (retried and still failed)",
+            529: "anthropic overloaded (transient, retried and still failed)",
         }.get(code, f"{type(e).__name__}" + (f" {code}" if code else ""))
         log.warning("extraction failed for %s: %s: %s", vid, detail, str(e)[:300])
         return {"ok": False, "reason": f"extraction failed: {detail}", "video_id": vid}

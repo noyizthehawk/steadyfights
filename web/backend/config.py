@@ -21,9 +21,9 @@ headers = {"User-Agent": "Mozilla/5.0"}
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
+# Every LLM call in the app: fighter rundowns (Sonnet) and pundit-pick
+# extraction (Haiku).
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # News API
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")

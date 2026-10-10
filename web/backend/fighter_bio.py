@@ -15,15 +15,19 @@ from part_2.career import career_summary_api, normalize_name
 
 log = logging.getLogger(__name__)
 
-MODEL = "claude-opus-5"
+# Sonnet, not Opus: this is ~200 words of prose from facts we hand over in
+# full, which doesn't need the bigger model — and Sonnet 5.5 is 40% of Opus 5's
+# per-token price.
+MODEL = "claude-sonnet-5-5"
 
 # Ceiling on how many bios may be WRITTEN in a day, across everyone.
 #
 # Not a per-user or per-IP limit: those cap behaviour, and the thing worth
 # capping here is spend. The endpoint is public and the cache key is the
-# fighter, so walking 2,766 names generates 2,766 times — about $36. Bounded,
-# since each fighter is only ever written once, but $36 at a stranger's
-# choosing. A global counter bounds it regardless of who asks or from where.
+# fighter, so walking 2,766 names generates 2,766 times — about $15 on Sonnet
+# 5.5 (it was ~$36 on Opus 5). Bounded, since each fighter is only ever written
+# once, but still spend at a stranger's choosing. A global counter bounds it
+# regardless of who asks or from where.
 #
 # 60/day covers a card settling (~12 fighters) several times over, and fills
 # the back catalogue in under three months of ordinary browsing.
@@ -34,7 +38,7 @@ def _generation_budget_left() -> bool:
     """False once today's cap is spent. Fails OPEN when Redis is unavailable.
 
     Failing open on a spend control is normally wrong, but the total exposure
-    here is a one-time ~$36 and the alternative is every profile losing its
+    here is a one-time ~$15 and the alternative is every profile losing its
     rundown whenever the cache is down.
     """
     if redis_client is None:
@@ -67,7 +71,11 @@ def is_configured() -> bool:
 _PROMPT = """You write the career rundown that sits on a fighter's profile page.
 
 You are given one fighter's complete record as JSON. Write 3 short paragraphs,
-around 150-190 words, in plain prose. No headings, no bullet points, no markdown.
+150-210 words in total, in plain prose. No headings, no bullet points, no markdown.
+210 words is a hard maximum, not a target: the rundown sits in a narrow side
+column on the profile, and anything longer pushes the cards below it out of
+view. If you are over, cut the least important detail rather than compressing
+every sentence.
 
 VOICE
 Write like someone who watches the sport talking to someone who also watches it.
@@ -149,19 +157,32 @@ def generate(summary: dict) -> str:
 
     effort "low" because this is short, fully-specified writing with every fact
     supplied. Thinking is on by default on this model and there is nothing here
-    worth thinking hard about.
+    worth thinking hard about — and Sonnet 5.5 defaults to "high", so leaving
+    it unset would quietly cost more.
+
+    fallbacks="default": if a safety classifier declines, the API retries on
+    Anthropic's recommended model for that refusal category inside the same
+    call. On Sonnet 5.5 that only covers the "cyber" and "frontier_llm"
+    categories, which a fight bio should never trip — it's there so a false
+    positive costs a retry instead of a missing rundown.
     """
-    resp = _anthropic().messages.create(
+    resp = _anthropic().beta.messages.create(
         model=MODEL,
-        max_tokens=1024,                      # the brief asks for 150-190 words
+        max_tokens=1024,                      # the brief caps it at 210 words
         system=_PROMPT,
         output_config={"effort": "low"},
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
         messages=[{"role": "user", "content": _payload(summary)}],
     )
-    # Join rather than take the first: content is a list of blocks, a thinking
-    # block can precede the text, and long output can arrive split across
-    # several text blocks.
-    return "".join(b.text for b in resp.content if b.type == "text").strip()
+    # A decline is a normal 200 with no usable text. Check before reading
+    # content, and return "" so the caller reports "model returned nothing"
+    # and keeps any cached bio, instead of storing a partial answer.
+    if resp.stop_reason == "refusal":
+        category = resp.stop_details.category if resp.stop_details else None
+        log.warning("bio generation declined by safety classifier (%s)", category)
+        return ""
+    return "".join(rundown.text for rundown in resp.content if rundown.type == "text").strip()
 
 
 
@@ -213,6 +234,9 @@ def get_or_create(db, fighter: str, *, force: bool = False) -> dict:
         return {"body": None, "reason": detail}
 
     if not body:
+        # same rule as the failure branches above: an old rundown beats none
+        if row is not None:
+            return {"body": row.body, "cached": True, "stale": True, "fights": fights}
         return {"body": None, "reason": "model returned nothing"}
 
     if row is None:
