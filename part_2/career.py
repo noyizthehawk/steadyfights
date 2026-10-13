@@ -434,6 +434,156 @@ def get_fighter_stats(fighter):
 
 
 
+# Tale-of-the-tape stats and which way is good. Raw values can't be compared
+# across stats — a typical takedown defence (~63%) dwarfs a typical striking
+# accuracy (~45%) — so each is ranked against its OWN spread across the roster.
+STAT_DIRECTION = {
+    "str_acc": +1, "str_def": +1, "td_acc": +1, "td_def": +1,
+    "slpm": +1,                 # strikes landed / min
+    "sapm": -1,                 # strikes absorbed / min: closer to zero is better
+    "td_avg": +1, "sub_avg": +1,
+}
+
+
+# get_fighter_stats key -> column in the fighter-level CSV
+_STAT_COLUMNS = {"str_acc": "str_acc", "str_def": "str_def", "td_acc": "td_avg_acc",
+                 "td_def": "td_def", "slpm": "splm", "sapm": "sapm",
+                 "td_avg": "td_avg", "sub_avg": "sub_avg"}
+STAT_PERCENTILE_MIN_FIGHTS = 5   # the roster a percentile is measured against
+
+
+@lru_cache(maxsize=None)
+def _stat_distribution():
+    """Each stat's values across fighters with 5+ UFC fights, sorted.
+
+    Percentiles exist for CHOOSING a card's best stat and for its "Top X%"
+    label. The bar itself is drawn by the frontend on the profile's own scale
+    (web/frontend/src/lib/statScale.ts) so colours match everywhere; that
+    scale isn't fair for choosing (a typical absorbed rate already scores ~63
+    on it, a typical accuracy ~47), percentiles are. Cached for the process."""
+    df = _fighter_level()
+    good = df[df["str_acc"].notna()].sort_values("fight_number")
+    latest = good.groupby("name_norm").last()          # same row get_fighter_stats picks
+    counts = _load().groupby("Fighter_norm").size()
+    roster = latest[latest.index.isin(counts[counts >= STAT_PERCENTILE_MIN_FIGHTS].index)]
+    return {key: np.sort(roster[col].dropna().to_numpy(dtype=float))
+            for key, col in _STAT_COLUMNS.items()}
+
+
+def stat_percentile(key, value):
+    """Share of the roster (0-100) this value is BETTER than, flipped where
+    lower is better. Ties count half, so a value shared by many fighters
+    lands in the middle of them rather than at either end."""
+    values = _stat_distribution()[key]
+    if len(values) == 0:
+        return 50.0
+    below = np.searchsorted(values, value, side="left")
+    at_or_below = np.searchsorted(values, value, side="right")
+    worse = len(values) - at_or_below if STAT_DIRECTION[key] < 0 else below
+    ties = at_or_below - below
+    return float((worse + ties / 2) / len(values) * 100)
+
+
+# ---------------------------------------------------------------------------
+# Leaderboards: the Fighters page's fun lists ("in form", "the gauntlet", ...)
+# ---------------------------------------------------------------------------
+LEADERBOARD_SIZE = 20
+LEADERBOARD_MIN_FIGHTS = 5        # same bar as the stat percentiles
+LEADERBOARD_MIN_MINUTES = 30      # per-minute rates explode over a 90-second career
+ACTIVE_DAYS = 730                 # "active" = fought in the 2 years before the newest data
+
+
+def _pct_rank(series):
+    """0-100 percentile of each value within its own pool (ties share a rank)."""
+    return series.rank(pct=True, method="average") * 100
+
+
+def _cm_to_ft(cm):
+    inches = round(cm / 2.54)
+    return f"{inches // 12}'{inches % 12}\""
+
+
+@lru_cache(maxsize=None)
+def leaderboards():
+    """Every list, top LEADERBOARD_SIZE each, as plain dicts:
+
+        {key: [{"fighter", "value", "display", "fill", "note"}, ...]}
+
+    `fill` is the bar (0-100): the score itself for the 0-100 scores (so it
+    matches the PERF/OPP/RF cells), otherwise the percentile within that
+    list's eligible pool. `note` is the one line under the bar.
+
+    Eligible = active (relative to the newest fight in the data, so a stale
+    refresh can't empty the lists) and 5+ UFC fights. Cached for the process,
+    like the rest of the module: the data only changes on restart."""
+    career_df = _load().copy()
+    career_df["date"] = pd.to_datetime(career_df["date"], errors="coerce")
+    newest = career_df["date"].max()
+    per_fighter = career_df.groupby("Fighter_norm").agg(n=("fight_number", "size"), last=("date", "max"))
+    eligible = per_fighter[(per_fighter["n"] >= LEADERBOARD_MIN_FIGHTS)
+                           & ((newest - per_fighter["last"]).dt.days <= ACTIVE_DAYS)].index
+
+    out = {}
+
+    # -- from the tag: recent form and the last-5 schedule (both 0-100) -------
+    tags = []
+    for norm in eligible:
+        t = _fighter_tag_cached(norm)
+        name = career_df.loc[career_df["Fighter_norm"] == norm, "Fighter"].iloc[-1]
+        tags.append((name, t))
+    for key, field in (("in_form", "recent_form"), ("gauntlet", "strength_iq")):
+        ranked = sorted(tags, key=lambda nt: nt[1][field], reverse=True)[:LEADERBOARD_SIZE]
+        out[key] = [{"fighter": name, "value": t[field], "display": f"{t[field]:.0f}",
+                     "fill": t[field], "note": f"Last 5: {t['recent_record']}"}
+                    for name, t in ranked]
+
+    # -- from the per-fight table: clinch, leg kicks, height --------------------
+    fl = _fighter_level()
+    fl = fl[fl["name_norm"].isin(eligible)]
+    g = fl.groupby("name_norm").agg(
+        name=("name", "last"), mins=("fight_time_min", "sum"),
+        clinch=("clinch_landed", "sum"), sig=("sig_str_landed", "sum"),
+        leg_att=("leg_atmpted", "sum"), leg_landed=("leg_landed", "sum"))
+    g = g[g["mins"] >= LEADERBOARD_MIN_MINUTES]
+
+    # clinch: ranked on VOLUME (strikes landed per 15 min); the share of all
+    # their strikes goes underneath, which is what says "this is how they fight"
+    g["clinch15"] = g["clinch"] / g["mins"] * 15
+    g["clinch_fill"] = _pct_rank(g["clinch15"])
+    out["clinch"] = [{"fighter": r["name"], "value": round(r["clinch15"], 2),
+                      "display": f"{r['clinch15']:.1f}", "fill": r["clinch_fill"],
+                      "note": f"{r['clinch'] / r['sig'] * 100:.0f}% of their strikes" if r["sig"] else ""}
+                     for _, r in g.nlargest(LEADERBOARD_SIZE, "clinch15").iterrows()]
+
+    # leg kicks: THROWN per minute, as asked. UFCStats counts every strike to the
+    # leg, which in practice is kicks — hence "leg strikes" in the label
+    g["leg_pm"] = g["leg_att"] / g["mins"]
+    g["leg_fill"] = _pct_rank(g["leg_pm"])
+    out["leg_kicks"] = [{"fighter": r["name"], "value": round(r["leg_pm"], 2),
+                         "display": f"{r['leg_pm']:.1f}", "fill": r["leg_fill"],
+                         "note": f"{r['leg_landed'] / r['leg_att'] * 100:.0f}% land" if r["leg_att"] else ""}
+                        for _, r in g.nlargest(LEADERBOARD_SIZE, "leg_pm").iterrows()]
+
+    # height: the latest row's figure; reach breaks ties (lots of 6'4"s)
+    body = (fl.sort_values("fight_number").groupby("name_norm")
+              .agg(name=("name", "last"), height=("height", "last"), reach=("reach", "last"))
+              .dropna(subset=["height"]))
+    body["fill"] = _pct_rank(body["height"])
+    tallest = body.sort_values(["height", "reach"], ascending=False).head(LEADERBOARD_SIZE)
+    out["tallest"] = [{"fighter": r["name"], "value": float(r["height"]),
+                       "display": f"{_cm_to_ft(r['height'])} · {r['height']:.0f} cm",
+                       "fill": r["fill"],
+                       "note": f"Reach {r['reach']:.0f} cm" if pd.notna(r["reach"]) else ""}
+                      for _, r in tallest.iterrows()]
+
+    # plain floats only (numpy types don't serialise) and a rounded fill
+    for rows in out.values():
+        for row in rows:
+            row["value"] = float(row["value"])
+            row["fill"] = round(float(row["fill"]), 1)
+    return out
+
+
 def _json_safe(obj):
     """Convert a JSON-unsafe object to a JSON-safe one
     no nans in the json dunb if not 500 erro. fighter slike kevin holland, 
@@ -623,16 +773,7 @@ def career_summary_api(fighter):
     recent_opp = float(recent["Opp Str"].mean())
 
     fighter_stats = get_fighter_stats(fighter)
-
-    # Where they campaign, by majority of their last 4 bouts rather than the
-    # most recent one — a single catchweight or a move up should not reassign
-    # a fighter. Lower-cased and stripped of title/interim noise.
-    recent_divisions = [
-        re.sub(r"\b(ufc|interim|title|bout|championship)\b", " ", str(d).lower()).strip()
-        for d in fights["division"].dropna().tail(4)
-    ]
-    recent_divisions = [re.sub(r"\s+", " ", d) for d in recent_divisions if d]
-    division = max(set(recent_divisions), key=recent_divisions.count) if recent_divisions else None
+    division = _division(fights)
 
     payload = {
         "fighter": fighter,
@@ -709,6 +850,19 @@ def top_careers(n = 10, min_fights = 8):
     return list(_ranked_careers(min_fights)[:n])
     
 
+def _division(fights):
+    """Where they campaign, by majority of their last 4 bouts rather than the
+    most recent one — a single catchweight or a move up should not reassign
+    a fighter. Lower-cased and stripped of title/interim noise. Shared by the
+    profile and the tag so the two can never name different divisions."""
+    recent_divisions = [
+        re.sub(r"\b(ufc|interim|title|bout|championship)\b", " ", str(d).lower()).strip()
+        for d in fights["division"].dropna().tail(4)
+    ]
+    recent_divisions = [re.sub(r"\s+", " ", d) for d in recent_divisions if d]
+    return max(set(recent_divisions), key=recent_divisions.count) if recent_divisions else None
+
+
 @lru_cache(maxsize=None)
 def _fighter_tag_cached(name_norm):
     """The real work, memoized on the NORMALIZED name so "Jon Jones", "jon
@@ -724,13 +878,21 @@ def _fighter_tag_cached(name_norm):
     if fights.empty:
         return None
 
-    # Only the four numbers a tag needs. career_summary_api computes the full
-    # timeline, the aged-well index and per-phase breakdowns as well, which is
-    # ~6x the work for data a dot on an event page never shows.
+    # Only the numbers a tag or a fighter card needs. career_summary_api computes
+    # the full timeline, the aged-well index and per-phase breakdowns as well,
+    # which is ~6x the work for data a dot on an event page never shows.
     recent = fights.tail(5)
     recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
+    wins = int((fights["win(1)/loss(0)"] == 1).sum())
 
     return {
+        # Overall figures for the fighter cards, scaled exactly as the profile's
+        # rings (avg_adj_perf / avg_opp_strength) so a card and the profile
+        # always show the same number.
+        "overall_perf": _scale_to_100(float(fights["Adj Perf"].mean()), "adj_perf"),
+        "overall_opp": _scale_to_100(float(fights["Opp Str"].mean()), "opp_str"),
+        "record": f"{wins} - {len(fights) - wins}",
+        "division": _division(fights),
         "career_score": round(float(_compute_career_score(fights, df["Adj Perf"].max())), 1),
         # Both already min-max scaled to 0-100 by _scale_to_100, using bounds
         # picked for the realistic career-average band — not the raw column

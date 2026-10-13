@@ -27,7 +27,7 @@ function tone(value: number): string {
  *  somewhere else on the page, and can't learn at all on a phone where there
  *  is no hover.
  */
-function ScoreDot({ label, value, title }: { label: string; value: number; title: string }) {
+export function ScoreDot({ label, value, title }: { label: string; value: number; title: string }) {
   return (
     <span className="flex flex-col items-center gap-0.5" title={title}>
       <span className="text-[8px] font-bold uppercase leading-none tracking-wider text-zinc-500">
@@ -103,12 +103,18 @@ export function FighterTags({
  */
 export function ScoreChip({ tag }: { tag: FighterTag | null | undefined }) {
   if (!tag) return null;
+  return <CareerScoreChip value={tag.career_score} />;
+}
+
+/** The same chip from a bare value — for places with no FighterTag, like the
+ *  Fighters page cards. One component, so the chip can't drift between pages. */
+export function CareerScoreChip({ value }: { value: number }) {
   return (
     <span
-      title={`Career score ${tag.career_score}/100`}
-      className={`inline-flex shrink-0 items-center justify-center rounded px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${tone(tag.career_score)}`}
+      title={`Career score ${value}/100`}
+      className={`inline-flex shrink-0 items-center justify-center rounded px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${tone(value)}`}
     >
-      {Math.round(tag.career_score)}
+      {Math.round(value)}
     </span>
   );
 }

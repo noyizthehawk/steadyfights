@@ -307,3 +307,30 @@ class FighterBio(Base):
     fights_at_generation = Column(Integer, nullable=False)
     model = Column(String, nullable=False)         # which model wrote it
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class FighterHeadshot(Base):
+    """A backfilled picture for a fighter the event scrape never pictured.
+
+    Event scrapes only picture fighters on cards scraped since that code
+    shipped, so anyone who hasn't fought since (most legends) has no image.
+    The backfill tries, in order: the fighter's ufc.com athlete page (same
+    standing studio shot as the event cards), then their Wikipedia article's
+    photo on Wikimedia Commons, which must be credited.
+
+    One row per fighter we've LOOKED for: image_url null means "checked both,
+    nothing usable", which stops the backfill re-requesting dead pages.
+    """
+    __tablename__ = "fighter_headshots"
+
+    id = Column(Integer, primary_key=True)
+    fighter_norm = Column(String, unique=True, nullable=False, index=True)
+    fighter = Column(String, nullable=False)       # display spelling
+    image_url = Column(String, nullable=True)
+    source = Column(String, nullable=True)         # "ufc" | "commons" | null (none found)
+    # Commons licences require attribution: author, licence name, and a link to
+    # the file page. All null for ufc.com images.
+    credit_author = Column(String, nullable=True)
+    credit_license = Column(String, nullable=True)
+    credit_url = Column(String, nullable=True)
+    fetched_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

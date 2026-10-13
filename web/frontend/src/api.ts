@@ -539,6 +539,66 @@ export async function getNextConsensus(): Promise<NextConsensus> {
 }
 
 // Fetch the list of fighter names for the dropdowns.
+// One card on the Fighters page. Numbers are null for a UFC debutant (no
+// career data) — render "UFC debut", never zeros.
+export type FighterCardData = {
+  name: string;
+  image_url: string | null;     // event headshot, ufc.com, or Commons; null → placeholder
+  // Wikimedia Commons photos must be credited; null for UFC images
+  image_credit: { author: string | null; license: string; url: string } | null;
+  // from the most recent scraped event card; null for anyone not on one (legends)
+  flag_url: string | null;
+  country: string | null;
+  career_score: number | null;  // 0-100, same chip as the event page
+  record: string | null;        // "wins - losses"
+  division: string | null;
+  overall_perf: number | null;  // 0-100, same as the profile's career rings
+  overall_opp: number | null;
+  recent_perf: number | null;   // last 5 fights
+  // the stat they're best at relative to the roster (chosen by percentile).
+  // The bar is drawn from `value` with lib/statScale (same as the profile);
+  // display is the real figure; top_pct is "Top X%" of fighters with 5+ UFC fights.
+  best_metric: {
+    key: string;
+    label: string;
+    value: number;
+    display: string;
+    percentile: number;
+    top_pct: number;
+  } | null;
+  // leaderboard cards only: the list's own stat, shown instead of best_metric.
+  // fill is the bar (0-100); note is the line under it ("Last 5: 4 - 1").
+  highlight?: {
+    label: string;
+    value: number;
+    display: string;
+    fill: number;
+    note: string;
+  };
+};
+
+export type Leaderboard = {
+  key: string;
+  title: string;
+  meta: string;
+  fighters: FighterCardData[];   // ranked, #1 first
+};
+
+export type BrowseFighters = {
+  next_card: {
+    event: { id: number; title: string; date: number; event_link: string };
+    fighters: FighterCardData[];   // whole card, bout order (main event first)
+  } | null;
+  top_careers: FighterCardData[];
+  leaderboards: Leaderboard[];
+};
+
+export async function getBrowseFighters(): Promise<BrowseFighters> {
+  const res = await fetch(`${BASE_URL}/api/fighters/browse`);
+  if (!res.ok) throw new Error("Could not load fighters");
+  return res.json() as Promise<BrowseFighters>;
+}
+
 export async function getFighters(): Promise<string[]> {
   const res = await fetch(`${BASE_URL}/api/fighters`);
   if (!res.ok) throw new Error("Could not load fighters");
