@@ -9,8 +9,7 @@ from sqlalchemy import or_
 from ..dependencies import get_curr_user, DBDep
 from ..models import User, UFCFight, UFCEvent
 from ..schemas import PredictRequest, DreamRequest
-from ..event_timing import EVENT_DURATION
-from .events import NOT_MINOR_CARD
+from .events import upcoming_events
 from part_2 import Prediction_model as model
 from part_2 import career
 from .. import fighter_bio, headshots
@@ -137,24 +136,41 @@ def _fighter_card(name: str, pictures: dict) -> dict:
     }
 
 
+def _card_fighters(event) -> list[str]:
+    """Everyone on the card once, in bout order (main event first).
+
+    The card churns all fight week: a withdrawal leaves the old bout in the
+    table as "cancelled" (upserts never delete) next to the rebooked one, so a
+    fighter can sit in two rows. Cancelled bouts are skipped, and if a fighter
+    is still in two live bouts, only their NEWEST booking (highest id — the
+    latest scrape to add it) counts."""
+    live = [fight for fight in event.fights if fight.status != "cancelled"]
+    newest = {}                                  # name_norm -> fight id
+    for fight in sorted(live, key=lambda fight: fight.id, reverse=True):
+        for name in (fight.fighter_a, fight.fighter_b):
+            if name:
+                newest.setdefault(normalize_name(name), fight.id)
+
+    names, seen = [], set()
+    for fight in live:                           # relationship order = bout order
+        for name in (fight.fighter_a, fight.fighter_b):
+            norm = normalize_name(name) if name else None
+            if norm and newest[norm] == fight.id and norm not in seen:
+                seen.add(norm)
+                names.append(name)
+    return names
+
+
 @router.get("/api/fighters/browse")
 def browse_fighters(db: DBDep):
     """The Fighters page's sections: everyone on the next card (in bout order)
     and the top careers. Pictures come from headshots.lookup, which only reads
     the database — the slow ufc.com / Commons fetching happens in the backfill
     script, never here."""
-    now = int(time.time())
-    event = (
-        db.query(UFCEvent)
-        .filter(UFCEvent.date > now - EVENT_DURATION, NOT_MINOR_CARD)
-        .order_by(UFCEvent.date)
-        .first()
-    )
-    card_names = []
-    if event:
-        # relationship is already in bout order, so the main event comes first
-        for fight in event.fights:
-            card_names += [n for n in (fight.fighter_a, fight.fighter_b) if n]
+    # the same "next event" the events pages show
+    upcoming = upcoming_events(db, int(time.time()))
+    event = upcoming[0] if upcoming else None
+    card_names = _card_fighters(event) if event else []
     top_names = [r["fighter"] for r in career.top_careers(n=TOP_CAREERS_SHOWN)]
     boards = career.leaderboards()
     board_names = [row["fighter"] for b in LEADERBOARDS for row in boards[b["key"]]]

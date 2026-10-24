@@ -19,17 +19,30 @@ router = APIRouter()
 NOT_MINOR_CARD = ~func.coalesce(UFCEvent.event_link, "").ilike("%road-to-ufc%")
 
 
-@router.get("/api/events/upcoming")
-def get_upcoming_events(db: DBDep):
-    #front end call this
-    now = int(time.time())
-   
+def upcoming_events(db, now: int) -> list[UFCEvent]:
+    """Events the site shows as upcoming, soonest first. The ONE place that
+    decides it — the events list, the next-event consensus and the Fighters
+    page's next card all call this, so no page can show an event another
+    hides.
+
+    An event needs a live main event (the bout named in its title, not
+    cancelled). Far-off placeholders — a "UFC Fight Night" with a few prelims
+    announced and no headliner — and cards whose headliner fell out stay
+    hidden until a scrape fills the main event in."""
     events = (
         db.query(UFCEvent)
         .filter(UFCEvent.date > now - EVENT_DURATION, NOT_MINOR_CARD)
         .order_by(UFCEvent.date)
         .all()
     )
+    return [e for e in events if _main_fight(e) is not None]
+
+
+@router.get("/api/events/upcoming")
+def get_upcoming_events(db: DBDep):
+    #front end call this
+    now = int(time.time())
+    events = upcoming_events(db, now)
     return {
         "events": [
             {
@@ -202,6 +215,8 @@ def _main_fight(event) -> UFCFight | None:
     if not title_tokens: # no headliners return none
         return None
     for fight in event.fights:
+        if fight.status == "cancelled":    # a cancelled headliner is no main event
+            continue
         names = set(normalize_name(fight.fighter_a).split()) | set(normalize_name(fight.fighter_b).split())
         if title_tokens <= names:          # every headliner token appears in this bout
             return fight
@@ -214,19 +229,12 @@ def next_event_consensus(db: DBDep):
     the notable users' picks for that one fight into a vote split, with the count of
     how many of the tracked pundits have weighed in so far (fills through fight week)."""
     now = int(time.time())
-    event = (
-        db.query(UFCEvent)
-        .filter(UFCEvent.date > now - EVENT_DURATION, NOT_MINOR_CARD)
-        .order_by(UFCEvent.date)
-        .first()
-    )
-    if event is None:
+    events = upcoming_events(db, now)
+    if not events:
         return {"event": None, "fight": None, "consensus": None}
-
-    fight = _main_fight(event)
+    event = events[0]
+    fight = _main_fight(event)          # never None: upcoming_events requires one
     event_out = {"id": event.id, "title": event.title, "date": event.date, "poster": event.poster}
-    if fight is None:
-        return {"event": event_out, "fight": None, "consensus": None}
 
     # roster = notable pundits we actually track (have a linked channel)
     roster = (
