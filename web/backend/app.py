@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -28,6 +29,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="UFC Fight Predictor API", lifespan=lifespan)
+# compress big JSON (the Bout Brain record is ~400 KB raw, ~55 KB gzipped)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,

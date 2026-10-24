@@ -199,6 +199,26 @@ def browse_fighters(db: DBDep):
     }
 
 
+@router.get("/api/bout-brain/record")
+def bout_brain_record():
+    """Public: Bout Brain's record on past fights it never trained on (the
+    temporal hold-out), for the Bout Brain page. Built once per training run."""
+    if model.backtest is None:
+        raise HTTPException(status_code=503, detail="Model record not ready")
+    # the summary + latest picks; every pick is ~1,800 rows, so that's its own call
+    return {k: v for k, v in model.backtest.items() if k != "by_event"}
+
+
+@router.get("/api/bout-brain/picks")
+def bout_brain_picks():
+    """Public: every past pick in the record, grouped by event, newest first."""
+    if model.backtest is None:
+        raise HTTPException(status_code=503, detail="Model record not ready")
+    b = model.backtest
+    return {k: b[k] for k in ("accuracy", "fights", "events", "trained_on", "from", "to",
+                              "confident", "bands", "by_event")}
+
+
 @router.get("/api/fighters")
 def get_fighters():
     """List every fighter the model knows about this is used to fill the dropdowns

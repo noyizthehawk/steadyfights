@@ -6,6 +6,7 @@ import { FighterSelect } from "../components/FighterSelect";
 import { ResultCard } from "../components/ResultCard";
 import { UpcomingPredictions } from "../components/UpcomingPredictions";
 import { DreamFights } from "../components/DreamFights";
+import { BoutBrainRecord } from "../components/BoutBrainRecord";
 
 // Ten dots instead of "2 free predictions left" — the count is glanceable and
 // stops the line rewrapping as the number changes. The text still exists for
@@ -169,13 +170,17 @@ export default function PredictorPage() {
 
         {/* Right — cross-era matchups. Shares this page's freeLeft/paywalled
             state, so a booking here spends the same allowance. */}
-        <aside className="lg:w-80 lg:shrink-0">
+        <aside className="flex flex-col gap-5 sm:gap-6 lg:w-80 lg:shrink-0">
+          {/* the advert: its record on past fights, above Dream fights */}
+          <BoutBrainRecord heading={heading("The record")} />
+          <div>
           {heading("Dream fights")}
           <DreamFights
             paywalled={paywalled}
             onFreeLeft={setFreeLeft}
             onPaywall={() => setPaywalled(true)}
           />
+          </div>
         </aside>
       </section>
     </div>

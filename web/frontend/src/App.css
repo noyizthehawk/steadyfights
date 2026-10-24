@@ -504,8 +504,21 @@ h1 {
   animation: liveGlow 2.4s ease-in-out infinite;
 }
 
+/* Bout Brain's record (components/BoutBrainRecord.tsx): the feed's rows
+   stream in one by one on load (delay set inline per row), as if read in */
+@keyframes bbRowIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.bb-row-in {
+  animation: bbRowIn 0.35s ease-out backwards;
+}
+
 /* Respect reduced-motion: keep a static red glow, drop the blink. */
 @media (prefers-reduced-motion: reduce) {
+  .bb-row-in {
+    animation: none;
+  }
   .nav-logo-mark {
     animation: none;
   }

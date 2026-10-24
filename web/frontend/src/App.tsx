@@ -2,6 +2,7 @@ import { Routes, Route, Link, useLocation, useNavigate } from "react-router-dom"
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import PredictorPage from "./pages/PredictorPage";
+import BoutBrainRecordPage from "./pages/BoutBrainRecordPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import FighterProfilePage from "./pages/FighterProfilePage";
@@ -217,6 +218,7 @@ export default function App() {
         <Route path="/cancel" element={<CoinsCancelPage />} />
         <Route path="/top-career" element={<TopCareerPage />} />
         <Route path="/predictor" element={<PredictorPage />} />
+        <Route path="/bout-brain/record" element={<BoutBrainRecordPage />} />
       </Routes>
 
       <Footer />

@@ -1115,3 +1115,63 @@ export async function getFighterBio(name: string): Promise<FighterBio> {
   if (!res.ok) throw new Error("Could not load bio");
   return res.json() as Promise<FighterBio>;
 }
+
+// Bout Brain's record on past fights it never trained on (the temporal
+// hold-out). Decided fights only; picks are the latest ones, newest first,
+// wins and misses alike.
+export type BoutBrainPick = {
+  event: string;
+  date: string;          // YYYY-MM-DD
+  fighter_a: string;
+  fighter_b: string;
+  pick: string;
+  winner: string;
+  confidence: number;    // 50-100, how sure it was of its pick
+  correct: boolean;
+};
+
+export type BoutBrainRecord = {
+  accuracy: number;      // % right
+  fights: number;
+  events: number;
+  trained_on: number;    // fights it learned from (all older than these)
+  from: string;
+  to: string;
+  confident: { fights: number; accuracy: number | null };   // picks at 70%+
+  // the score's record by band (50-59, 60-69, 70-79, 80+); every decided
+  // fight falls in exactly one, so they add up to the whole record
+  bands: ScoreBand[];
+  picks: BoutBrainPick[];
+};
+
+export type ScoreBand = {
+  label: string;
+  picks: number;
+  correct: number;
+  accuracy: number | null;   // null for an empty band
+};
+
+export async function getBoutBrainRecord(): Promise<BoutBrainRecord> {
+  const res = await fetch(`${BASE_URL}/api/bout-brain/record`);
+  if (!res.ok) throw new Error("Could not load the model's record");
+  return res.json() as Promise<BoutBrainRecord>;
+}
+
+// Every past pick in Bout Brain's record, grouped by event, newest first.
+export type BoutBrainEvent = {
+  event: string;
+  date: string;          // YYYY-MM-DD
+  correct: number;
+  fights: number;
+  picks: BoutBrainPick[];
+};
+
+export type BoutBrainPicks = Pick<
+  BoutBrainRecord, "accuracy" | "fights" | "events" | "trained_on" | "from" | "to" | "confident" | "bands"
+> & { by_event: BoutBrainEvent[] };
+
+export async function getBoutBrainPicks(): Promise<BoutBrainPicks> {
+  const res = await fetch(`${BASE_URL}/api/bout-brain/picks`);
+  if (!res.ok) throw new Error("Could not load Bout Brain's picks");
+  return res.json() as Promise<BoutBrainPicks>;
+}

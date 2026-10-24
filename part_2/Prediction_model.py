@@ -47,9 +47,9 @@ ROLLING_SNAPSHOT_SPECS = [
     ("rolling_td_def_5",            "td_defense",                5),
     ("rolling_win_rate_3",          "win_flag_indicator",        3),
     ("rolling_win_rate_5",          "win_flag_indicator",        5),
-    ("rolling_td_avg_5",            "td_avg",                    5),
-    ("rolling_sub_avg_5",           "sub_avg",                   5),
-    ("rolling_str_def_5",           "str_def",                   5),
+    ("rolling_td_avg_5",            "td15_fight",                5),
+    ("rolling_sub_avg_5",           "sub15_fight",               5),
+    ("rolling_str_def_5",           "str_def_fight",             5),
     ("rolling_opp_elo_3",           "opponent_elo_before_fight", 3),
     ("rolling_opp_elo_5",           "opponent_elo_before_fight", 5),
     ("rolling_opponent_strength_3", "opponent_strength",         3),
@@ -388,94 +388,58 @@ def train():
     fighters_df = pd.concat([fighters_df, stance_dummies], axis=1)
     fighters_df.drop(columns=['stance'], inplace=True)
 
-    # Striking derivation
+    # --- "Last 3 / last 5 fights" form features --------------------------
+    # ALL of them are rebuilt here, the same way, rather than trusted from the
+    # CSV. Two bugs made the old ones wrong:
+    #
+    #  1. Window bleed. `groupby("name")[c].shift(1).rolling(k)` only groups
+    #     the SHIFT; the rolling then runs over the whole table, so a window
+    #     mixed in whichever rows sat next to it. Sorted by date (here) that was
+    #     other fighters' fights on the same nights: Jon Jones's "last 3 striking
+    #     accuracy" before Aspinall averaged Hafez, Tybura and his own previous
+    #     fight (0.32 vs his real 0.59) — wrong on 78% of rows. The CSV prep
+    #     sorts by name, so there it hit each fighter's first few fights.
+    #  2. Leakage. Takedowns, subs and striking defence were rolled over
+    #     UFCStats CAREER totals as of the scrape — one constant per fighter,
+    #     so every past fight "knew" the fighter's future. Now rolled over what
+    #     happened in each fight itself.
+    #
+    # `transform` keeps each window inside one fighter's own fights; `shift(1)`
+    # keeps the fight being predicted out of its own window. Live predictions
+    # use the same bases (ROLLING_SNAPSHOT_SPECS), so they match what the model
+    # learned from. (Frontend career stats still read the CSV's totals — those
+    # are meant to be "as of today" and are unaffected.)
+
+    # per-fight bases — what happened in THIS fight only
+    fighters_df["str_acc_fight"] = (
+        fighters_df["sig_str_landed"] / fighters_df["sig_str_atmpted"]
+    ).fillna(0)
+    _mins = fighters_df["fight_time_min"].where(fighters_df["fight_time_min"] > 0)
+    fighters_df["td15_fight"] = fighters_df["td_landed"] / _mins * 15        # takedowns / 15 min
+    fighters_df["sub15_fight"] = fighters_df["sub_att"] / _mins * 15         # sub attempts / 15 min
+    _opp_att = (fighters_df.groupby("fight_id")["sig_str_atmpted"].transform("sum")
+                - fighters_df["sig_str_atmpted"])                             # opponent's attempts
+    fighters_df["str_def_fight"] = (                                         # % of them avoided
+        (1 - fighters_df["sig_str_absorbed"] / _opp_att.where(_opp_att > 0)) * 100
+    )
+
+    # what a debut (no past fights) gets instead of an average
+    no_history = {
+        "rolling_win_rate_3": 0.5, "rolling_win_rate_5": 0.5,
+        "rolling_opp_elo_3": INITIAL_ELO, "rolling_opp_elo_5": INITIAL_ELO,
+    }
+    for feat, base, k in ROLLING_SNAPSHOT_SPECS:
+        if base not in fighters_df.columns:      # built later (won_by_finish)
+            continue
+        fighters_df[feat] = (
+            fighters_df.groupby("name")[base]
+            .transform(lambda s, k=k: s.shift(1).rolling(k, min_periods=1).mean())
+            .round(2)
+            .fillna(no_history.get(feat, 0))
+        )
+
     fighters_df["striking_differential_3"] = fighters_df["rolling_slpm_3"] - fighters_df["rolling_sapm_3"]
     fighters_df["striking_differential_5"] = fighters_df["rolling_slpm_5"] - fighters_df["rolling_sapm_5"]
-
-    fighters_df["str_acc_fight"] = (
-            fighters_df["sig_str_landed"] / fighters_df["sig_str_atmpted"]
-    ).fillna(0)
-
-    fighters_df["rolling_str_acc_3"] = (
-        fighters_df.groupby("name")["str_acc_fight"]
-        .shift(1)
-        .rolling(3, min_periods=1)
-        .mean()
-        .round(2)
-    )
-    fighters_df["rolling_str_acc_5"] = (
-        fighters_df.groupby("name")["str_acc_fight"]
-        .shift(1)
-        .rolling(5, min_periods=1)
-        .mean()
-        .round(2)
-    )
-    fighters_df["rolling_str_acc_3"] = fighters_df["rolling_str_acc_3"].fillna(0)
-    fighters_df["rolling_str_acc_5"] = fighters_df["rolling_str_acc_5"].fillna(0)
-
-    # Rolling opponent features
-    fighters_df['rolling_opp_elo_3'] = (
-        fighters_df.groupby('name')['opponent_elo_before_fight']
-        .shift(1)
-        .rolling(3, min_periods=1)
-        .mean()
-        .round(2)
-    )
-    fighters_df['rolling_opp_elo_5'] = (
-        fighters_df.groupby('name')['opponent_elo_before_fight']
-        .shift(1)
-        .rolling(5, min_periods=1)
-        .mean()
-        .round(2)
-    )
-    fighters_df['rolling_opp_elo_3'] = fighters_df['rolling_opp_elo_3'].fillna(INITIAL_ELO)
-    fighters_df['rolling_opp_elo_5'] = fighters_df['rolling_opp_elo_5'].fillna(INITIAL_ELO)
-
-    fighters_df['rolling_opponent_strength_3'] = (
-        fighters_df.groupby('name')['opponent_strength']
-        .shift(1)
-        .rolling(3, min_periods=1)
-        .mean()
-        .round(2)
-    )
-    fighters_df['rolling_opponent_strength_5'] = (
-        fighters_df.groupby('name')['opponent_strength']
-        .shift(1)
-        .rolling(5, min_periods=1)
-        .mean()
-        .round(2)
-    )
-    # Rolling TD volume
-    fighters_df['rolling_td_avg_5'] = (
-        fighters_df.groupby('name')['td_avg']
-        .shift(1)
-        .rolling(5, min_periods=1)
-        .mean()
-        .round(2)
-    )
-    fighters_df['rolling_td_avg_5'] = fighters_df['rolling_td_avg_5'].fillna(0)
-
-    # Rolling submission attempts
-    fighters_df['rolling_sub_avg_5'] = (
-        fighters_df.groupby('name')['sub_avg']
-        .shift(1)
-        .rolling(5, min_periods=1)
-        .mean()
-        .round(2)
-    )
-    fighters_df['rolling_sub_avg_5'] = fighters_df['rolling_sub_avg_5'].fillna(0)
-
-    # Rolling striking defense
-    fighters_df['rolling_str_def_5'] = (
-        fighters_df.groupby('name')['str_def']
-        .shift(1)
-        .rolling(5, min_periods=1)
-        .mean()
-        .round(2)
-    )
-    fighters_df['rolling_str_def_5'] = fighters_df['rolling_str_def_5'].fillna(0)
-    fighters_df['rolling_opponent_strength_3'] = fighters_df['rolling_opponent_strength_3'].fillna(0)
-    fighters_df['rolling_opponent_strength_5'] = fighters_df['rolling_opponent_strength_5'].fillna(0)
 
     #clustering of fight styles
     print("\nCalculating fighter styles...")
@@ -564,11 +528,14 @@ def train():
                 f"Subs={profile['rolling_sub_avg_5']:.2f}, "
                 f"StrDiff={profile['striking_differential_5']:.2f}"
             )
-    fighters_df = fighters_df.merge(
-        fighter_style_stats[['name', 'style_cluster', 'style_name']],
-        on='name',
-        how='left'
+    # Each fight gets the style the fighter showed GOING INTO it (its own
+    # pre-fight rolling form), not the style of their last 5 fights in today's
+    # data — stamping the end of a career onto its start leaked the future.
+    # The clusters themselves are still fitted on recent form, as before.
+    fighters_df['style_cluster'] = kmeans.predict(
+        scaler.transform(fighters_df[style_features].fillna(0))
     )
+    fighters_df['style_name'] = fighters_df['style_cluster'].map(style_names)
 
     most_common_style = fighters_df['style_cluster'].mode()[0]
     fighters_df['style_cluster'] = fighters_df['style_cluster'].fillna(most_common_style)
@@ -731,6 +698,92 @@ def train():
             continue
         label = f"{lo*100:.0f}-{min(hi,1.0)*100:.0f}%"
         print(f"{label:>12} {n:>5} {conf[mask].mean()*100:>9.1f}% {correct[mask].mean()*100:>11.1f}%")
+
+    global backtest
+    backtest = _build_backtest(merged.iloc[split_idx:], test_probs[:, 1], n_train=split_idx)
+
+
+backtest = None   # filled by train(); served by /api/bout-brain/record
+
+RECENT_PICKS_SHOWN = 60
+
+
+def _build_backtest(test_rows, prob_a, n_train):
+    """Bout Brain's record on the held-out fights: the most recent 20%, which
+    the served model never trained on — every one of them is a past event it
+    called blind. This is the Bout Brain page's advert, so it must be honest:
+
+    * Only DECIDED fights count. The training target scores a draw or no
+      contest as a B win; here those are dropped, so every pick shown can be
+      marked plainly right or wrong. (That makes this figure differ slightly
+      from the "Test Accuracy" printed above.)
+    * Nothing is cherry-picked: the stream is simply the latest fights in
+      the set, wins and misses alike."""
+    rows = test_rows.assign(prob_a=prob_a)
+    decided = rows[(rows["winner_A"] == rows["name_A"]) | (rows["winner_A"] == rows["name_B"])].copy()
+    if decided.empty:
+        return None
+    decided["pick"] = np.where(decided["prob_a"] > 0.5, decided["name_A"], decided["name_B"])
+    # the model score shown to users: how sure it was of its pick, 50-100,
+    # ROUNDED — and every count below uses this same figure, so a pick shown
+    # as "70%" is always counted in the 70+ numbers (no 69.6 vs 70 drift)
+    decided["confidence"] = (np.maximum(decided["prob_a"], 1 - decided["prob_a"]) * 100).round().astype(int)
+    decided["correct"] = decided["pick"] == decided["winner_A"]
+
+    # "when it's really sure": the share right at 70+
+    sure = decided[decided["confidence"] >= 70]
+
+    # The score's track record by band. The selling point is the SHAPE: the
+    # surer it is, the more often it's right — the score means what it says.
+    # Every decided fight is in here, so the bands add up to the whole record.
+    bands = []
+    for lo, hi, label in ((50, 59, "50-59"), (60, 69, "60-69"), (70, 79, "70-79"), (80, 100, "80+")):
+        b = decided[(decided["confidence"] >= lo) & (decided["confidence"] <= hi)]
+        bands.append({"label": label, "picks": int(len(b)), "correct": int(b["correct"].sum()),
+                      "accuracy": round(float(b["correct"].mean()) * 100, 1) if len(b) else None})
+
+    events = (decided.groupby(["event_name_A", "date_A"], sort=False)["correct"]
+              .agg(["sum", "count"]).reset_index().sort_values("date_A"))
+    recent = decided.sort_values("date_A").tail(RECENT_PICKS_SHOWN).iloc[::-1]
+
+    def _date(d):
+        return str(pd.to_datetime(d).date())
+
+    def _pick(r):
+        return {
+            "event": r["event_name_A"], "date": _date(r["date_A"]),
+            "fighter_a": r["name_A"], "fighter_b": r["name_B"],
+            "pick": r["pick"], "winner": r["winner_A"],
+            "confidence": int(r["confidence"]),
+            "correct": bool(r["correct"]),
+        }
+
+    # every pick, grouped by event, newest event first (the full record page)
+    by_event = [
+        {"event": name, "date": _date(date),
+         "correct": int(g["correct"].sum()), "fights": int(len(g)),
+         "picks": [_pick(r) for _, r in g.iterrows()]}
+        for (name, date), g in decided.groupby(["event_name_A", "date_A"], sort=False)
+    ]
+    by_event.sort(key=lambda e: e["date"], reverse=True)
+
+    return {
+        "accuracy": round(float(decided["correct"].mean()) * 100, 1),
+        "fights": int(len(decided)),
+        "events": int(len(events)),
+        "trained_on": int(n_train),
+        "from": _date(decided["date_A"].min()),
+        "to": _date(decided["date_A"].max()),
+        "confident": {
+            "fights": int(len(sure)),
+            "accuracy": round(float(sure["correct"].mean()) * 100, 1) if len(sure) else None,
+        },
+        "bands": bands,
+        # the latest picks, newest first (the Bout Brain page's feed)
+        "picks": [_pick(r) for _, r in recent.iterrows()],
+        # everything, for the full record page; the summary endpoint drops it
+        "by_event": by_event,
+    }
 
 
 def main():

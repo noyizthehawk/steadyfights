@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { getUpcomingEvents, me } from "../api";
 import { EventTile } from "../components/EventTile";
+import { DotLink } from "../components/DotLink";
 import { UFCEvent } from "../api";
 
 export default function PredictionGamePage() {
@@ -24,24 +24,8 @@ export default function PredictionGamePage() {
             <div className="mb-6 flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-white">Available Market</h1>
                 {userId !== null && (
-                    // The app's dot, with its label underneath instead of a red
-                    // text link: quiet at rest, fills red with the soft ring on
-                    // hover/focus. The padding is the hit area.
-                    <Link
-                        to={`/users/${userId}/events`}
-                        className="group/dot -m-2 flex flex-col items-center gap-1.5 p-2 outline-none"
-                    >
-                        <span
-                            aria-hidden
-                            className="block h-2.5 w-2.5 rounded-full bg-white/25 transition-all duration-200 group-hover/dot:scale-110 group-hover/dot:bg-[#d33a2c] group-hover/dot:shadow-[0_0_0_4px_#d33a2c33] group-focus-visible/dot:bg-[#d33a2c] group-focus-visible/dot:shadow-[0_0_0_4px_#d33a2c33]"
-                        />
-                        <span
-                            className="text-[11px] italic leading-none text-zinc-500 transition-colors group-hover/dot:text-zinc-200 group-focus-visible/dot:text-zinc-200"
-                            style={{ fontFamily: "var(--font-rundown)" }}
-                        >
-                            My events
-                        </span>
-                    </Link>
+                    // the app's dot, label underneath (not a red text link)
+                    <DotLink to={`/users/${userId}/events`} label="My events" />
                 )}
             </div>
             {error && <p className="error">{error}</p>}
