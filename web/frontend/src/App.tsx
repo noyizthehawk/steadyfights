@@ -26,11 +26,11 @@ import CoinsSuccessPage from "./pages/CoinsSuccessPage";
 import CoinsCancelPage from "./pages/CoinsCancelPage";
 import { me, logout } from "./api";
 import Footer from "./components/Footer";
+import { LogoMark } from "./components/Logo";
 
 // The main page links, defined once and rendered in TWO places: the horizontal
 // desktop row and the mobile hamburger dropdown. Editing this array updates both.
 const navLinks = [
-  { to: "/", label: "Home" },
   { to: "/predictor", label: "Bout Brain" },
   { to: "/fighters", label: "Fighter Cards" },
   { to: "/prediction-game", label: "Casual Checker" },
@@ -98,6 +98,9 @@ export default function App() {
   return (
     <>
       <nav className="nav">
+        {/* logo + links as ONE item, so the nav's space-between still splits
+            just three ways (left group, search, account) */}
+        <div className="flex min-w-0 items-center gap-5">
         {/* Mobile only (CSS hides it above 768px): hamburger + dropdown */}
         <div className="nav-mobile" ref={navRef}>
           <button
@@ -123,6 +126,9 @@ export default function App() {
           )}
         </div>
 
+        {/* the SF. logo is the home link — it replaced "Home" */}
+        <LogoMark />
+
         {/* Desktop only (CSS hides it below 768px): the horizontal link row */}
         <div className="nav-left">
           {navLinks.map((l) => (
@@ -130,6 +136,7 @@ export default function App() {
               {l.label}
             </Link>
           ))}
+        </div>
         </div>
 
         {/* Global fighter search — available from every page */}

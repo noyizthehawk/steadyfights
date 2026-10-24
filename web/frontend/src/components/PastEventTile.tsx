@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { type UserEvents } from "../api";
+import { EventCaption } from "./EventCaption";
 
 // A poster tile for one of a user's past events. Unlike EventTile (which links to
 // the generic event page via event_link), this carries userId + event_id so the
@@ -12,31 +13,22 @@ export function PastEventTile({
     event: UserEvents;
 }) {
     return (
-        <Link
-            to={`/users/${userId}/events/${event.event_id}`}
-            className="group relative block aspect-[3/4] w-full overflow-hidden rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
-        >
-            {/* poster fills the tile */}
-            {event.poster ? (
-                <img
-                    src={event.poster}
-                    alt={event.title}
-                    className="h-full w-full object-cover"
-                />
-            ) : (
-                <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-400">
-                    No image
-                </div>
-            )}
-
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-3 text-left">
-                <h2 className="break-words text-[11px] font-semibold leading-tight text-white sm:text-xs">
-                    {event.title}
-                </h2>
-                <p className="mt-0.5 text-xs font-bold text-zinc-300">
-                    {new Date(event.date * 1000).toLocaleDateString()}
-                </p>
+        <Link to={`/users/${userId}/events/${event.event_id}`} className="group block text-left">
+            {/* the poster alone — the caption sits underneath */}
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl shadow-lg transition-transform duration-200 group-hover:scale-105">
+                {event.poster ? (
+                    <img
+                        src={event.poster}
+                        alt={event.title}
+                        className="h-full w-full object-cover"
+                    />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-400">
+                        No image
+                    </div>
+                )}
             </div>
+            <EventCaption title={event.title} date={event.date} />
         </Link>
     );
 }

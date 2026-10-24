@@ -5,7 +5,7 @@ import { PastEventTile } from "../components/PastEventTile";
 import { eventPhase } from "../lib/lock";
 
 const GRID =
-    "grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+    "grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
 export default function UserPastEvents() {
     const { userId } = useParams<{ userId: string }>();

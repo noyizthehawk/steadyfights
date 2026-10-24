@@ -96,6 +96,21 @@
   flex-shrink: 0;
 }
 
+/* The SF. logo (components/Logo.tsx) */
+.nav-logo-mark:focus-visible {
+  border-radius: 0.5rem;   /* match the box (rounded-lg) */
+}
+/* first load: the logo pops in. `backwards`, not `both`: once done, the
+   animation lets go of transform, so the logo's hover scale still works. */
+@keyframes logoMarkIn {
+  0%   { transform: scale(0); }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.nav-logo-mark {
+  animation: logoMarkIn 0.35s ease-out 0.1s backwards;
+}
+
 .page {
   /* #root is a column flex container, and `margin: … auto` on the cross axis
      suppresses stretch — which left .page shrink-to-fit, i.e. sized to its own
@@ -491,6 +506,9 @@ h1 {
 
 /* Respect reduced-motion: keep a static red glow, drop the blink. */
 @media (prefers-reduced-motion: reduce) {
+  .nav-logo-mark {
+    animation: none;
+  }
   .live-glow {
     animation: none;
     box-shadow: 0 0 0 1.5px rgba(59, 130, 246, 0.9), 0 0 8px 1px rgba(59, 130, 246, 0.5);
