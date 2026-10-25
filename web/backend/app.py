@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from part_2 import Prediction_model as model
 from .database import Base, engine
+from .redis_client import check_redis
 from .routers import auth, predict, picks, events, friends, leaderboard, news, admin, profile, coins, groups, videos, notable, comments
 
 
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
     # empty Postgres) it builds the whole schema. Runs before model.train() so a
     # bad DB connection fails fast instead of after minutes of training.
     Base.metadata.create_all(bind=engine)
+    check_redis()      # one line in the deploy logs: is Redis actually in use?
     print("Training model (one time, please wait)...")
     model.train()
     print("Model ready. API is live.")
