@@ -25,6 +25,17 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 # extraction (Haiku).
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
+# Writing fighter bios costs Sonnet tokens on every first profile view. On by
+# default only where the app runs on Railway (which sets RAILWAY_ENVIRONMENT on
+# every service): locally it was the main spend — a separate bio cache from
+# production's, no Redis cap, and React StrictMode firing each request twice in
+# dev. BIO_GENERATION=on / off overrides either way.
+_bio_flag = os.getenv("BIO_GENERATION", "").strip().lower()
+BIO_GENERATION_ENABLED = (
+    _bio_flag in ("1", "on", "true", "yes") if _bio_flag
+    else bool(os.getenv("RAILWAY_ENVIRONMENT"))
+)
+
 # News API
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY else None

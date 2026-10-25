@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from redis import RedisError
 
-from .config import ANTHROPIC_API_KEY
+from .config import ANTHROPIC_API_KEY, BIO_GENERATION_ENABLED
 from .redis_client import redis_client
 from .models import FighterBio
 from part_2.career import career_summary_api, normalize_name
@@ -203,6 +203,12 @@ def get_or_create(db, fighter: str, *, force: bool = False) -> dict:
     # The fight count IS the cache key: same count, same facts, same text.
     if row is not None and row.fights_at_generation == fights and not force:
         return {"body": row.body, "cached": True, "fights": fights}
+
+    if not BIO_GENERATION_ENABLED:
+        # Local dev (see config): serve whatever is cached, never write one.
+        if row is not None:
+            return {"body": row.body, "cached": True, "stale": True, "fights": fights}
+        return {"body": None, "reason": "bio generation is off here (BIO_GENERATION)"}
 
     if not is_configured():
         # Stale text beats no text — a bio written one fight ago is still
