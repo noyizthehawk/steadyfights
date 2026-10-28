@@ -29,3 +29,5 @@ cookies.txt
 
 # cron job logs
 logs/
+.DS_Store
+*.tsbuildinfo
