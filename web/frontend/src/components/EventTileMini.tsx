@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { UFCEvent } from "../api";
 import { eventPhase } from "../lib/lock";
+import { EventPoster } from "./EventPoster";
 
 
 // `highlight` = this is the immediate next event → pulsing red glow.
@@ -24,17 +25,7 @@ export function EventTileMini({ event, highlight = false }: { event: UFCEvent; h
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400 shadow-[0_0_6px_2px_rgba(59,130,246,0.9)]" />
                     </span>
                 )}
-                {event.poster ? (
-                    <img
-                        src={event.poster}
-                        alt={event.title}
-                        className="h-full w-full object-cover"
-                    />
-                ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-400">
-                        No image
-                    </div>
-                )}
+                <EventPoster src={event.poster} alt={event.title} className="h-full w-full object-cover" />
             </div>
             <p
                 className="mt-2 break-words text-center text-[9px] leading-tight text-zinc-400"

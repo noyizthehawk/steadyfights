@@ -59,6 +59,14 @@ def _load():
     return career
 
 
+# Recent windows. Form (performance + W-L) reacts fast, so it reads the last 3;
+# strength of recent opposition needs more opponents to mean anything, so it
+# keeps 5. Trajectory (last 5 vs everything before) is a separate test and
+# doesn't use either.
+RECENT_FORM_FIGHTS = 3
+RECENT_OPP_FIGHTS = 5
+
+
 _QUANTILES = {
     "adj": (0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90),
     "vol": (0.25, 0.50, 0.75, 0.90),
@@ -81,7 +89,7 @@ def _get_thresholds():
         "adj": g["Adj Perf"].mean(),
         "vol": g["Raw Perf"].std().dropna(), 
         "opp": g["Opp Str"].mean(),
-        "opp_recent": g["Opp Str"].apply(lambda x: x.tail(5).mean()).dropna(),
+        "opp_recent": g["Opp Str"].apply(lambda x: x.tail(RECENT_OPP_FIGHTS).mean()).dropna(),
     }
     _thresholds = {
         key: [s.quantile(q) for q in _QUANTILES[key]]
@@ -525,16 +533,21 @@ def leaderboards():
 
     out = {}
 
-    # -- from the tag: recent form and the last-5 schedule (both 0-100) -------
+    # -- from the tag: recent form and the recent schedule (both 0-100) -------
     tags = []
     for norm in eligible:
         t = _fighter_tag_cached(norm)
         name = career_df.loc[career_df["Fighter_norm"] == norm, "Fighter"].iloc[-1]
         tags.append((name, t))
+    # the record is the form window's, so it only belongs under In form
+    notes = {
+        "in_form": lambda t: f"Last {RECENT_FORM_FIGHTS}: {t['recent_record']}",
+        "gauntlet": lambda t: f"Last {RECENT_OPP_FIGHTS} opponents",
+    }
     for key, field in (("in_form", "recent_form"), ("gauntlet", "strength_iq")):
         ranked = sorted(tags, key=lambda nt: nt[1][field], reverse=True)[:LEADERBOARD_SIZE]
         out[key] = [{"fighter": name, "value": t[field], "display": f"{t[field]:.0f}",
-                     "fill": t[field], "note": f"Last 5: {t['recent_record']}"}
+                     "fill": t[field], "note": notes[key](t)}
                     for name, t in ranked]
 
     # -- from the per-fight table: clinch, leg kicks, height --------------------
@@ -761,16 +774,17 @@ def career_summary_api(fighter):
     losses = fights[fights["win(1)/loss(0)"] == 0]
     record = f"{len(wins)} - {len(losses)}"
 
-    # Recent form: the last (up to) 5 fights, scored on the SAME 0-100 scale as
-    # avg_adj_perf so it's directly comparable to the career number. This captures
-    # "how good are they RIGHT NOW" — a fighter who improved late (e.g. Oliveira)
-    # scores high here even if their career average is dragged down by early years.
-    recent = fights.tail(5)
+    # Recent form: the last (up to) RECENT_FORM_FIGHTS fights, scored on the SAME
+    # 0-100 scale as avg_adj_perf so it's directly comparable to the career number.
+    # This captures "how good are they RIGHT NOW" — a fighter who improved late
+    # (e.g. Oliveira) scores high here even if their career average is dragged
+    # down by early years.
+    recent = fights.tail(RECENT_FORM_FIGHTS)
     recent_perf = _scale_to_100(float(recent["Adj Perf"].mean()), "adj_perf")
     recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
     recent_record = f"{recent_wins} - {len(recent) - recent_wins}"
 
-    recent_opp = float(recent["Opp Str"].mean())
+    recent_opp = float(fights.tail(RECENT_OPP_FIGHTS)["Opp Str"].mean())
 
     fighter_stats = get_fighter_stats(fighter)
     division = _division(fights)
@@ -787,8 +801,8 @@ def career_summary_api(fighter):
         "avg_raw_perf": _scale_to_100(float(fights["Raw Perf"].mean()), "raw_perf"),
         "avg_adj_perf": _scale_to_100(avg_adj, "adj_perf"),
         "perf_label": _perf_label(_scale_to_100(avg_adj, "adj_perf")),
-        "recent_perf": recent_perf,                  # last-5 form, same 0-100 scale
-        "recent_record": recent_record,              # e.g. "4 - 1"
+        "recent_perf": recent_perf,                  # last-3 form, same 0-100 scale
+        "recent_record": recent_record,              # e.g. "2 - 1"
         "avg_opp_strength": _scale_to_100(avg_opp, "opp_str"),
         "opp_label": _opp_label(_scale_to_100(avg_opp, "opp_str")),
         "recent_opp_strength": _scale_to_100(recent_opp, "opp_str_recent"),
@@ -881,7 +895,7 @@ def _fighter_tag_cached(name_norm):
     # Only the numbers a tag or a fighter card needs. career_summary_api computes
     # the full timeline, the aged-well index and per-phase breakdowns as well,
     # which is ~6x the work for data a dot on an event page never shows.
-    recent = fights.tail(5)
+    recent = fights.tail(RECENT_FORM_FIGHTS)
     recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
     wins = int((fights["win(1)/loss(0)"] == 1).sum())
 
@@ -898,7 +912,7 @@ def _fighter_tag_cached(name_norm):
         # picked for the realistic career-average band — not the raw column
         # ranges. So these are directly comparable to each other and to score.
         "recent_form": _scale_to_100(float(recent["Adj Perf"].mean()), "adj_perf"),
-        "strength_iq": _scale_to_100(float(recent["Opp Str"].mean()), "opp_str_recent"),
+        "strength_iq": _scale_to_100(float(fights.tail(RECENT_OPP_FIGHTS)["Opp Str"].mean()), "opp_str_recent"),
         "total_fights": int(len(fights)),
         "recent_record": f"{recent_wins} - {len(recent) - recent_wins}",
     }

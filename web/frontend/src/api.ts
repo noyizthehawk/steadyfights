@@ -554,7 +554,7 @@ export type FighterCardData = {
   division: string | null;
   overall_perf: number | null;  // 0-100, same as the profile's career rings
   overall_opp: number | null;
-  recent_perf: number | null;   // last 5 fights
+  recent_perf: number | null;   // last 3 fights
   // the stat they're best at relative to the roster (chosen by percentile).
   // The bar is drawn from `value` with lib/statScale (same as the profile);
   // display is the real figure; top_pct is "Top X%" of fighters with 5+ UFC fights.
@@ -567,7 +567,7 @@ export type FighterCardData = {
     top_pct: number;
   } | null;
   // leaderboard cards only: the list's own stat, shown instead of best_metric.
-  // fill is the bar (0-100); note is the line under it ("Last 5: 4 - 1").
+  // fill is the bar (0-100); note is the line under it ("Last 3: 2 - 1").
   highlight?: {
     label: string;
     value: number;
@@ -1078,8 +1078,8 @@ export async function voteComment(
 
 export type FighterTag = {
   career_score: number;   // 0-100, the headline number
-  recent_form: number;    // 0-100, last 5 fights on the same scale
-  strength_iq: number;    // 0-100, quality of opposition faced
+  recent_form: number;    // 0-100, last 3 fights on the same scale
+  strength_iq: number;    // 0-100, quality of opposition faced (last 5)
   total_fights: number;   // a count, not a score — never coloured
   recent_record: string;  // e.g. "4 - 1"
 };

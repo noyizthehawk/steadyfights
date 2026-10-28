@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { UFCEvent } from "../api";
 import { eventPhase } from "../lib/lock";
 import { EventCaption } from "./EventCaption";
+import { EventPoster } from "./EventPoster";
 
 
 export function EventTile({ event }: { event: UFCEvent }) {
@@ -31,17 +32,7 @@ export function EventTile({ event }: { event: UFCEvent }) {
                         <span className="sr-only">In progress</span>
                     </span>
                 )}
-                {event.poster ? (
-                    <img
-                        src={event.poster}
-                        alt={event.title}
-                        className="h-full w-full object-cover"
-                    />
-                ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-400">
-                        No image
-                    </div>
-                )}
+                <EventPoster src={event.poster} alt={event.title} className="h-full w-full object-cover" />
             </div>
             <EventCaption title={event.title} date={event.date} />
         </Link>

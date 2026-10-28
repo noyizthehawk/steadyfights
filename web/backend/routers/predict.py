@@ -64,7 +64,7 @@ TOP_CAREERS_SHOWN = 30   # the page shows one row and expands to all of these
 # career.leaderboards(); the words live here. `label` heads each card's bar.
 LEADERBOARDS = [
     {"key": "in_form", "title": "In form", "label": "Recent form",
-     "meta": "best performances over the last 5 fights"},
+     "meta": "best performances over the last 3 fights"},
     {"key": "gauntlet", "title": "The gauntlet", "label": "Opponent strength",
      "meta": "toughest last 5 opponents"},
     {"key": "leg_kicks", "title": "Leg kickers", "label": "Leg strikes thrown / min",
@@ -131,7 +131,7 @@ def _fighter_card(name: str, pictures: dict) -> dict:
         "division": tag["division"],
         "overall_perf": tag["overall_perf"],
         "overall_opp": tag["overall_opp"],
-        "recent_perf": tag["recent_form"],       # same last-5 figure as the profile's recent ring
+        "recent_perf": tag["recent_form"],       # same last-3 figure as the profile's recent ring
         "best_metric": _best_metric(name, tag["total_fights"]),
     }
 

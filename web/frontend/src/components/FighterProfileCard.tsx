@@ -80,7 +80,7 @@ export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
                         second line a few pixels from the first. */}
                     <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                         <Ring value={summary.avg_adj_perf} label="Overall Performance" hint={summary.perf_label} />
-                        <Ring value={summary.recent_perf} label="Recent Performance" hint={`${summary.recent_record} last 5`} delta={summary.recent_perf - summary.avg_adj_perf} />
+                        <Ring value={summary.recent_perf} label="Recent Performance" hint={`${summary.recent_record} last 3`} delta={summary.recent_perf - summary.avg_adj_perf} />
                         <Ring value={summary.avg_opp_strength} label="Overall Opponent Strength" hint={summary.opp_label} />
                         <Ring value={summary.recent_opp_strength} label="Recent Opponent Strength" hint={summary.recent_opp_label} delta={summary.recent_opp_strength - summary.avg_opp_strength} />
                     </div>

@@ -152,10 +152,13 @@ export default function EventDetailPage() {
                                         // width and object-cover crops a full-body sliver.
                                         <img src={fight.img_a} alt={fight.fighter_a} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
                                     )}
-                                    <div className="min-w-0 text-center sm:text-left">
+                                    {/* max-w-full: on a phone the column is items-center, which sizes
+                                        this block to its text and lets a long name run past the card.
+                                        The name wraps there instead; from sm up it truncates. */}
+                                    <div className="min-w-0 max-w-full text-center sm:text-left">
                                         <FighterTags tag={tags[fight.fighter_a]} />
                                         <span className="flex items-center justify-center gap-1.5 sm:justify-start">
-                                            <Link to={`/fighters/${encodeURIComponent(fight.fighter_a)}/career`} className="min-w-0 truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_a}</Link>
+                                            <Link to={`/fighters/${encodeURIComponent(fight.fighter_a)}/career`} className="min-w-0 break-words text-sm font-semibold hover:text-red-400 sm:truncate sm:text-base">{fight.fighter_a}</Link>
                                             <ScoreChip tag={tags[fight.fighter_a]} />
                                         </span>
                                         <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 sm:justify-start">
@@ -176,11 +179,11 @@ export default function EventDetailPage() {
                                     {fight.img_b && (
                                         <img src={fight.img_b} alt={fight.fighter_b} className="h-14 w-14 shrink-0 rounded-full object-cover object-top sm:h-16 sm:w-16" />
                                     )}
-                                    <div className="min-w-0 text-center sm:text-right">
+                                    <div className="min-w-0 max-w-full text-center sm:text-right">
                                         <FighterTags tag={tags[fight.fighter_b]} mirrored />
                                         <span className="flex items-center justify-center gap-1.5 sm:justify-end">
                                             <ScoreChip tag={tags[fight.fighter_b]} />
-                                            <Link to={`/fighters/${encodeURIComponent(fight.fighter_b)}/career`} className="min-w-0 truncate text-sm font-semibold hover:text-red-400 sm:text-base">{fight.fighter_b}</Link>
+                                            <Link to={`/fighters/${encodeURIComponent(fight.fighter_b)}/career`} className="min-w-0 break-words text-sm font-semibold hover:text-red-400 sm:truncate sm:text-base">{fight.fighter_b}</Link>
                                         </span>
                                         <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 sm:justify-end">
                                             <Flag src={fight.flag_b} country={fight.country_b} />
