@@ -64,7 +64,7 @@ TOP_CAREERS_SHOWN = 30   # the page shows one row and expands to all of these
 # career.leaderboards(); the words live here. `label` heads each card's bar.
 LEADERBOARDS = [
     {"key": "in_form", "title": "In form", "label": "Recent form",
-     "meta": "best performances over the last 3 fights"},
+     "meta": "best form over the last 3 fights, latest counts most"},
     {"key": "gauntlet", "title": "The gauntlet", "label": "Opponent strength",
      "meta": "toughest last 5 opponents"},
     {"key": "leg_kicks", "title": "Leg kickers", "label": "Leg strikes thrown / min",

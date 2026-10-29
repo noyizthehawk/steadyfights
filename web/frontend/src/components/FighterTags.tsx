@@ -74,7 +74,7 @@ export function FighterTags({
       <ScoreDot
         label="RF"
         value={tag.recent_form}
-        title={`Recent form ${tag.recent_form}/100 — last 3 fights (${tag.recent_record})`}
+        title={`Recent form ${tag.recent_form}/100 — last 3 fights, latest counts most (${tag.recent_record})`}
       />
       <ScoreDot
         label="SOO"

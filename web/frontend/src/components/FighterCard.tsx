@@ -122,7 +122,7 @@ export function FighterCard({ fighter, rank }: { fighter: FighterCardData; rank?
             <ScoreDot
               label="RF"
               value={fighter.recent_perf!}
-              title={`Recent performance ${fighter.recent_perf}/100 — last 3 fights`}
+              title={`Recent performance ${fighter.recent_perf}/100 — last 3 fights, latest counts most`}
             />
             {/* flag right beside RF. Same 24px height as the dots and
                 bottom-aligned with them (items-end), so it reads as one more

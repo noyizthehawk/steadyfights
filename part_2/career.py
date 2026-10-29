@@ -67,6 +67,18 @@ RECENT_FORM_FIGHTS = 3
 RECENT_OPP_FIGHTS = 5
 
 
+def _recent_form(fights):
+    """Recency-weighted Adj Perf over the last RECENT_FORM_FIGHTS fights (rows
+    sorted oldest first): the latest counts 3x, the one before 2x, the oldest 1x.
+    A plain mean let one outlier night outweigh a fresh loss — Chimaev read
+    99.8 straight after losing to Strickland, carried by the Du Plessis
+    performance two fights back. Weighted, he's still elite but visibly dented.
+    Returns the raw value; callers scale it like any other Adj Perf average."""
+    recent = fights["Adj Perf"].tail(RECENT_FORM_FIGHTS).to_numpy(dtype=float)
+    weights = np.arange(1, len(recent) + 1)
+    return float((recent * weights).sum() / weights.sum())
+
+
 _QUANTILES = {
     "adj": (0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90),
     "vol": (0.25, 0.50, 0.75, 0.90),
@@ -331,6 +343,7 @@ def _phase(sub):
     if sub.empty:
         return None
     # Per-fight log for this phase — drives the drill-down when a user clicks the tile.
+    # Chronological here; the profile card orders it for display (newest first).
     bouts = [
         {
             "fight_number": int(r["fight_number"]),
@@ -774,13 +787,14 @@ def career_summary_api(fighter):
     losses = fights[fights["win(1)/loss(0)"] == 0]
     record = f"{len(wins)} - {len(losses)}"
 
-    # Recent form: the last (up to) RECENT_FORM_FIGHTS fights, scored on the SAME
-    # 0-100 scale as avg_adj_perf so it's directly comparable to the career number.
+    # Recent form: the last (up to) RECENT_FORM_FIGHTS fights, latest weighted
+    # most (_recent_form), scored on the SAME 0-100 scale as avg_adj_perf so it's
+    # directly comparable to the career number.
     # This captures "how good are they RIGHT NOW" — a fighter who improved late
     # (e.g. Oliveira) scores high here even if their career average is dragged
     # down by early years.
     recent = fights.tail(RECENT_FORM_FIGHTS)
-    recent_perf = _scale_to_100(float(recent["Adj Perf"].mean()), "adj_perf")
+    recent_perf = _scale_to_100(_recent_form(fights), "adj_perf")
     recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
     recent_record = f"{recent_wins} - {len(recent) - recent_wins}"
 
@@ -913,7 +927,7 @@ def _fighter_tag_cached(name_norm):
         # Both already min-max scaled to 0-100 by _scale_to_100, using bounds
         # picked for the realistic career-average band — not the raw column
         # ranges. So these are directly comparable to each other and to score.
-        "recent_form": _scale_to_100(float(recent["Adj Perf"].mean()), "adj_perf"),
+        "recent_form": _scale_to_100(_recent_form(fights), "adj_perf"),
         "strength_iq": _scale_to_100(float(opp_window["Opp Str"].mean()), "opp_str_recent"),
         "total_fights": int(len(fights)),
         "recent_record": f"{recent_wins} - {len(recent) - recent_wins}",
