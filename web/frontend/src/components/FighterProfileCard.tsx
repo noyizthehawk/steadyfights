@@ -11,13 +11,23 @@ export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
     // stack full-width below the row, so any number can be open at once.
     const [openPhases, setOpenPhases] = useState<Set<string>>(new Set());
 
-    // filter out phases the fighter never reached (a 4-fight career has no mid)
+    // Latest phase first, like the newest-first fight lists inside each one.
+    // Filter out phases the fighter never reached (a 4-fight career has no mid).
     const phaseList = ([
-        ["Early", "early", "1–5", summary.phases.early],
-        ["Mid", "mid", "6–10", summary.phases.mid],
         ["Late", "late", "11+", summary.phases.late],
+        ["Mid", "mid", "6–10", summary.phases.mid],
+        ["Early", "early", "1–5", summary.phases.early],
     ] as [string, "early" | "mid" | "late", string, Phase | undefined][])
-        .filter((e): e is [string, "early" | "mid" | "late", string, Phase] => Boolean(e[3]));
+        .filter((e): e is [string, "early" | "mid" | "late", string, Phase] => Boolean(e[3]))
+        // Fights newest first, so career fight numbers count down as you scroll
+        // (24 at the top of Late … 1 at the bottom of Early), and the tile shows
+        // the fighter's real span ("11–24", not "11+") to match.
+        .map(([title, kind, range, phase]): [string, "early" | "mid" | "late", string, Phase] => {
+            const bouts = [...phase.bouts].sort((a, b) => b.fight_number - a.fight_number);
+            if (bouts.length === 0) return [title, kind, range, phase];
+            const hi = bouts[0].fight_number, lo = bouts[bouts.length - 1].fight_number;
+            return [title, kind, lo === hi ? `${lo}` : `${lo}–${hi}`, { ...phase, bouts }];
+        });
     const allOpen = phaseList.length > 0 && phaseList.every(([t]) => openPhases.has(t));
     const toggle = (title: string) =>
         setOpenPhases((prev) => {
@@ -123,6 +133,8 @@ export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
                         and the card's button just toggles them. Each panel
                         borrows its phase's accent so it reads as belonging to
                         the card above it. */}
+                    {/* Same latest-first order as the tiles: with several open,
+                        the stacked lists read as one newest-first fight record. */}
                     {phaseList.filter(([t]) => openPhases.has(t)).map(([title, kind, range, phase]) => (
                         <div
                             key={title}
