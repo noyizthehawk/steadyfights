@@ -539,10 +539,10 @@ def leaderboards():
         t = _fighter_tag_cached(norm)
         name = career_df.loc[career_df["Fighter_norm"] == norm, "Fighter"].iloc[-1]
         tags.append((name, t))
-    # the record is the form window's, so it only belongs under In form
+    # each list shows the W-L over its own window
     notes = {
         "in_form": lambda t: f"Last {RECENT_FORM_FIGHTS}: {t['recent_record']}",
-        "gauntlet": lambda t: f"Last {RECENT_OPP_FIGHTS} opponents",
+        "gauntlet": lambda t: f"Last {RECENT_OPP_FIGHTS}: {t['opp_record']}",
     }
     for key, field in (("in_form", "recent_form"), ("gauntlet", "strength_iq")):
         ranked = sorted(tags, key=lambda nt: nt[1][field], reverse=True)[:LEADERBOARD_SIZE]
@@ -897,6 +897,8 @@ def _fighter_tag_cached(name_norm):
     # which is ~6x the work for data a dot on an event page never shows.
     recent = fights.tail(RECENT_FORM_FIGHTS)
     recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
+    opp_window = fights.tail(RECENT_OPP_FIGHTS)
+    opp_wins = int((opp_window["win(1)/loss(0)"] == 1).sum())
     wins = int((fights["win(1)/loss(0)"] == 1).sum())
 
     return {
@@ -912,9 +914,10 @@ def _fighter_tag_cached(name_norm):
         # picked for the realistic career-average band — not the raw column
         # ranges. So these are directly comparable to each other and to score.
         "recent_form": _scale_to_100(float(recent["Adj Perf"].mean()), "adj_perf"),
-        "strength_iq": _scale_to_100(float(fights.tail(RECENT_OPP_FIGHTS)["Opp Str"].mean()), "opp_str_recent"),
+        "strength_iq": _scale_to_100(float(opp_window["Opp Str"].mean()), "opp_str_recent"),
         "total_fights": int(len(fights)),
         "recent_record": f"{recent_wins} - {len(recent) - recent_wins}",
+        "opp_record": f"{opp_wins} - {len(opp_window) - opp_wins}",   # W-L over the strength_iq window
     }
 
 

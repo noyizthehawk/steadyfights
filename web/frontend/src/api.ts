@@ -1080,6 +1080,7 @@ export type FighterTag = {
   career_score: number;   // 0-100, the headline number
   recent_form: number;    // 0-100, last 3 fights on the same scale
   strength_iq: number;    // 0-100, quality of opposition faced (last 5)
+  opp_record: string;     // W-L over those same last 5, e.g. "3 - 2"
   total_fights: number;   // a count, not a score — never coloured
   recent_record: string;  // e.g. "4 - 1"
 };
