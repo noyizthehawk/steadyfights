@@ -235,7 +235,7 @@ export function CareerScore({ value }: { value: number | null }) {
   const color = value === null ? "#3f3f46" : rampColor(position(value, CAREER_RANGE));
   return (
     <span
-      title="Career quality (0-100)"
+      title={value === null ? "Career score" : `Career score ${Math.round(value)}`}
       className="inline-flex min-w-[3rem] shrink-0 items-center justify-center rounded-lg px-2.5 py-1.5 text-base font-bold"
       style={{ background: color, color: value === null ? "#a1a1aa" : "#0a0a0a" }}
     >

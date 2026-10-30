@@ -96,9 +96,8 @@ export type PhaseBout = {
 export type Phase = {
   fights: number;
   win_rate: number;
-  raw_perf: number;
-  adj_perf: number;
-  opp_strength: number;
+  perf: number;   // PERF rating for the phase, 0-99 like the rings
+  opp: number;    // OPP rating for the phase, 0-99 like the rings
   bouts: PhaseBout[];
 };
 export type UserEvents = {
@@ -124,15 +123,14 @@ export type TaleOfTheTape = {
 };
 
 // One fight in the career chart: how the fighter performed, and how strong the
-// opponent was. Both raw — the chart draws its own scales.
+// opponent was — both on the same 0-99 ratings as PERF and OPP.
 export type TimelineFight = {
   fight_number: number;
   opponent: string;
   won: boolean;
   event: string;
-  perf: number;       // Raw Perf, roughly 0-85
-  adj_perf: number;   // opponent-adjusted
-  opp: number;        // opponent strength, 0-1
+  perf: number;       // PERF rating for this fight
+  opp: number;        // OPP rating for this opponent
 };
 
 
@@ -141,8 +139,8 @@ export type AgedWell = {
   opponent: string;
   won: boolean;
   event: string;
-  then: number;              // opponent strength on the night, 0-0.75
-  peak_after: number | null; // best they reached later, null if never fought again
+  then: number;              // opponent rating on the night, 0-99 (= the chart's dot)
+  peak_after: number | null; // best rating they reached later, null if never fought again
   became_champion: boolean;
   champion_years_later: number | null;  // null only when became_champion is false —
                                         // a belt won IN this fight is the result, not foresight
@@ -169,15 +167,15 @@ export type CareerSummary = {
   avg_raw_perf: number;
   avg_adj_perf: number;
   perf_label: string;
-  recent_perf: number;       // last-5 form on the same 0–100 scale as avg_adj_perf
-  recent_record: string;     // e.g. "4 - 1"
+  recent_perf: number;       // FORM: last 3 fights, same scale as avg_adj_perf
+  recent_record: string;     // e.g. "2 - 1"
   avg_opp_strength: number;
   opp_label: string;
   recent_opp_strength: number;  // last-5 opposition on the same 0–100 scale
   recent_opp_label: string;
   volatility: number;
   volatility_label: string;
-  career_score: number;   // 0–100
+  career_score: number;   // CAREER, 0–99
   career_label: string;
   trajectory: string | null;
   phases: {
@@ -1077,9 +1075,10 @@ export async function voteComment(
 // ── Fighter tags (form / quality badges on the event card) ────────────────────
 
 export type FighterTag = {
-  career_score: number;   // 0-100, the headline number
-  recent_form: number;    // 0-100, last 3 fights on the same scale
-  strength_iq: number;    // 0-100, quality of opposition faced (last 5)
+  career_score: number;   // CAREER, 0-99, the headline number
+  recent_form: number;    // FORM, 0-99: last 3 fights, latest counts most
+  overall_opp: number;    // OPP, 0-99: opposition across the career
+  strength_iq: number;    // 0-99, opposition over the last 5 (the gauntlet's stat)
   opp_record: string;     // W-L over those same last 5, e.g. "3 - 2"
   total_fights: number;   // a count, not a score — never coloured
   recent_record: string;  // e.g. "4 - 1"

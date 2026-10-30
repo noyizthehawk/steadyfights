@@ -89,10 +89,10 @@ export function FighterProfileCard({ summary }: { summary: CareerSummary }) {
                         cell border, so an outer box around them only drew a
                         second line a few pixels from the first. */}
                     <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        <Ring value={summary.avg_adj_perf} label="Overall Performance" hint={summary.perf_label} />
-                        <Ring value={summary.recent_perf} label="Recent Performance" hint={`${summary.recent_record} last 3`} delta={summary.recent_perf - summary.avg_adj_perf} />
-                        <Ring value={summary.avg_opp_strength} label="Overall Opponent Strength" hint={summary.opp_label} />
-                        <Ring value={summary.recent_opp_strength} label="Recent Opponent Strength" hint={summary.recent_opp_label} delta={summary.recent_opp_strength - summary.avg_opp_strength} />
+                        <Ring value={summary.avg_adj_perf} label="Performance" hint={summary.perf_label} />
+                        <Ring value={summary.recent_perf} label="Form" hint={`${summary.recent_record} last 3`} delta={summary.recent_perf - summary.avg_adj_perf} />
+                        <Ring value={summary.avg_opp_strength} label="Opposition" hint={summary.opp_label} />
+                        <Ring value={summary.recent_opp_strength} label="Opposition, last 5" hint={summary.recent_opp_label} delta={summary.recent_opp_strength - summary.avg_opp_strength} />
                     </div>
 
                     <div className="mt-2 grid grid-cols-3 gap-2">
@@ -309,8 +309,8 @@ function PhaseColumn({
                 </div>
 
                 <div className="relative mt-auto grid gap-3 pt-[18px]">
-                    <Bar value={phase.adj_perf} label="Performance" max={75} />
-                    <Bar value={Math.round(phase.opp_strength * 100)} label="Opposition" max={75} />
+                    <Bar value={phase.perf} label="Performance" />
+                    <Bar value={phase.opp} label="Opposition" />
                 </div>
 
                 {/* A dot. It fills with the phase accent when open, so state

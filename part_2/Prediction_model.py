@@ -16,11 +16,10 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 fighter_csv = os.path.join(script_dir, "../csv/fighter_level_data.csv")
 opp_strength_csv = os.path.join(script_dir, "../csv/fighter_opponent_strength_extra.csv")
 
-#  elo rating system constants
-K_FACTOR = 32
-INITIAL_ELO = 1500
+# Elo lives in part_2/elo.py, shared with the career profile so the two can
+# never compute it differently.
+from part_2.elo import ELO_INACTIVITY_DECAY, INITIAL_ELO, add_elo  # noqa: E402
 
-ELO_INACTIVITY_DECAY = 0.85
 VERBOSE = False
 
 # Tale-of-the-tape features: base column name 
@@ -67,19 +66,6 @@ def _fmt_stat(value, kind):
     if kind == "int":
         return f"{value:.0f}"
     return f"{value:.1f}"
-
-
-def expected_score(elo_a, elo_b):
-    return 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
-
-
-def update_elo(elo_a, elo_b, actual_score_a, k=K_FACTOR):
-    """Update Elo ratings after a fight."""
-    expected_a = expected_score(elo_a, elo_b)
-    new_elo_a = elo_a + k * (actual_score_a - expected_a)
-    new_elo_b = elo_b + k * ((1 - actual_score_a) - (1 - expected_a))
-    return new_elo_a, new_elo_b
-
 
 
 def _fighter_snapshot(name):
@@ -337,48 +323,7 @@ def train():
     fighters_df['dob'] = pd.to_datetime(fighters_df['dob'])
     fighters_df = fighters_df.sort_values('date').reset_index(drop=True)
 
-    # Initialize Elo tracking
-    elo_ratings = {}
-
-    fighters_df['elo_before_fight'] = 0.0
-    fighters_df['opponent_elo_before_fight'] = 0.0
-
-    processed_fights = set()
-    for idx, row in fighters_df.iterrows():
-        fight_id = row['fight_id']
-        fighter_name = row['name']
-        if fight_id in processed_fights:
-            continue
-        fight_rows = fighters_df[fighters_df['fight_id'] == fight_id]
-
-        if len(fight_rows) != 2:
-            continue
-
-        fighter_a = fight_rows.iloc[0]
-        fighter_b = fight_rows.iloc[1]
-
-        name_a = fighter_a['name']
-        name_b = fighter_b['name']
-        elo_a = elo_ratings.get(name_a, INITIAL_ELO)
-        elo_b = elo_ratings.get(name_b, INITIAL_ELO)
-
-        fighters_df.loc[fight_rows.index[0], 'elo_before_fight'] = elo_a
-        fighters_df.loc[fight_rows.index[1], 'elo_before_fight'] = elo_b
-        fighters_df.loc[fight_rows.index[0], 'opponent_elo_before_fight'] = elo_b
-        fighters_df.loc[fight_rows.index[1], 'opponent_elo_before_fight'] = elo_a
-
-        winner = fighter_a['winner']
-        if winner == name_a:
-            actual_score_a = 1.0
-        elif winner == name_b:
-            actual_score_a = 0.0
-        else:
-            actual_score_a = 0.5
-
-        new_elo_a, new_elo_b = update_elo(elo_a, elo_b, actual_score_a)
-        elo_ratings[name_a] = new_elo_a
-        elo_ratings[name_b] = new_elo_b
-        processed_fights.add(fight_id)
+    elo_ratings = add_elo(fighters_df)   # fills elo_before_fight / opponent_elo_before_fight
 
     fighters_df['elo_diff'] = fighters_df['elo_before_fight'] - fighters_df['opponent_elo_before_fight']
 

@@ -5,7 +5,9 @@ const B = { name: "text-blue-400", bar: "bg-blue-400", pick: "border-blue-400/50
 
 const LABEL = "text-[9px] uppercase tracking-widest text-zinc-500";
 
-export function ResultCard({ result }: { result: PredictResult }) {
+// `showStyles` hides the style-cluster labels ("Striker" etc). Dream Fights turns
+// it off while the clustering is reworked — it called Kamaru Usman a striker.
+export function ResultCard({ result, showStyles = true }: { result: PredictResult; showStyles?: boolean }) {
   const pickedA = result.pick === result.fighter_a;
   const picked = pickedA ? A : B;
 
@@ -17,14 +19,14 @@ export function ResultCard({ result }: { result: PredictResult }) {
           <h3 className={`truncate font-display uppercase text-sm max-sm:text-[11px] ${A.name}`}>
             {result.fighter_a}
           </h3>
-          <div className="mt-1 truncate text-xs text-zinc-400">{result.style_a}</div>
+          {showStyles && <div className="mt-1 truncate text-xs text-zinc-400">{result.style_a}</div>}
         </div>
         <span className="shrink-0 pt-1 font-display text-[10px] text-white max-sm:text-[8px]">VS</span>
         <div className="min-w-0 flex-1 text-right">
           <h3 className={`truncate font-display uppercase text-sm max-sm:text-[11px] ${B.name}`}>
             {result.fighter_b}
           </h3>
-          <div className="mt-1 truncate text-xs text-zinc-400">{result.style_b}</div>
+          {showStyles && <div className="mt-1 truncate text-xs text-zinc-400">{result.style_b}</div>}
         </div>
       </div>
 

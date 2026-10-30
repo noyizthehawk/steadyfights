@@ -102,8 +102,8 @@ Do not just name a figure as high or low. Say what it means in the cage:
 - volatility: how much they swing fight to fight. Low means you know what you
   are getting; high means they can look unbeatable one night and ordinary the
   next. Say which.
-- phases (early/mid/late): adj_perf is out of 75, opp_strength is a 0-1 ratio.
-  Compare the phases to each other, not to an absolute.
+- phases (early/mid/late): perf and opp are 0-100 ratings on the same scale as
+  avg_adj_perf and avg_opp_strength. Compare the phases to each other.
 - tale_of_the_tape: translate the rates, and mind the UNITS, which are not all
   the same:
     slpm, sapm     significant strikes landed / absorbed PER MINUTE

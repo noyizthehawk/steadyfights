@@ -35,7 +35,7 @@ export function AgedWell({ rows, fighter }: { rows: AgedWellRow[]; fighter: stri
         </thead>
         <tbody className="divide-y divide-zinc-800">
           {rows.map((r) => {
-            const gain = r.peak_after !== null ? Math.round((r.peak_after - r.then) * 100) : 0;
+            const gain = r.peak_after !== null ? Math.round(r.peak_after) - Math.round(r.then) : 0;
             return (
               <tr key={`${r.fight_number}-${r.opponent}`} className="align-top">
                 <td className="py-2 pr-2">
@@ -87,14 +87,14 @@ export function AgedWell({ rows, fighter }: { rows: AgedWellRow[]; fighter: stri
                   )}
                 </td>
                 <td className="py-2 text-right tabular-nums text-zinc-400">
-                  {Math.round(r.then * 100)}
+                  {Math.round(r.then)}
                 </td>
                 <td className="py-2 text-right tabular-nums">
                   {r.peak_after === null ? (
                     <span className="text-zinc-600">—</span>
                   ) : (
                     <>
-                      <span className="text-white">{Math.round(r.peak_after * 100)}</span>
+                      <span className="text-white">{Math.round(r.peak_after)}</span>
                       {gain > 0 && <span className="text-[10px] text-green-500"> +{gain}</span>}
                     </>
                   )}
@@ -106,7 +106,7 @@ export function AgedWell({ rows, fighter }: { rows: AgedWellRow[]; fighter: stri
       </table>
 
       <p className="mt-3 text-[10px] leading-snug text-zinc-500">
-        Opponent strength on the night vs the best they reached afterwards, out of 75.
+        Opponent rating (OPP) on the night vs the best they reached afterwards.
       </p>
     </section>
   );

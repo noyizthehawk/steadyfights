@@ -72,14 +72,16 @@ export function FighterTags({
       }`}
     >
       <ScoreDot
-        label="RF"
+        label="FORM"
         value={tag.recent_form}
-        title={`Recent form ${tag.recent_form}/100 — last 3 fights, latest counts most (${tag.recent_record})`}
+        title={`Form ${Math.round(tag.recent_form)} — last 3 fights, latest counts most (${tag.recent_record})`}
       />
+      {/* Career opposition, the same OPP the fighter cards and profile show —
+          this badge used to be the last-5 figure under another name (SOO). */}
       <ScoreDot
-        label="SOO"
-        value={tag.strength_iq}
-        title={`Strength of opposition ${tag.strength_iq}/100 — quality of opponents faced`}
+        label="OPP"
+        value={tag.overall_opp}
+        title={`Opposition ${Math.round(tag.overall_opp)} — quality of opponents faced across the career`}
       />
       {/* Same label-above-value stack as the dots, with the logo standing in
           for the text label — so the three badges keep one rhythm and the

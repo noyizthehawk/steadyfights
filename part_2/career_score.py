@@ -7,6 +7,24 @@ import numpy as np
 W_WIN = 0.45     # weight on raw win-rate within "career quality"
 W_PERF = 0.55    # weight on opponent-adjusted performance
 
+SOFT_CAP_KNEE = 90.0
+SOFT_CAP_CEILING = 99.0   # FIFA's top rating; the curve approaches it, never reaches
+
+
+def soft_cap(x):
+    """Every rating's top end: a straight line up to the knee, then an
+    exponential ease toward 99 that never reaches it. A hard min(x, 100)
+    pinned Jones, Makhachev and Medic all at FORM 100, and GSP and Jones at
+    career 100; past the knee the curve keeps separating them the way a FIFA
+    card keeps 99 for the rare few. The ceiling is 99, not 100, because the
+    page rounds: an asymptote at 100 still displayed "100" for values like
+    99.6. The slope is 1 at the knee, so the scale doesn't kink there, and
+    anything below 90 is untouched."""
+    if x <= SOFT_CAP_KNEE:
+        return x
+    room = SOFT_CAP_CEILING - SOFT_CAP_KNEE
+    return SOFT_CAP_KNEE + room * (1 - np.exp(-(x - SOFT_CAP_KNEE) / room))
+
 
 
 def is_real_title(division):
@@ -70,4 +88,4 @@ def compute_career_score(fights, max_adj_perf, *, win_col, perf_col,
         0.7 * (career_quality_score + title_bonus + double_champ_bonus)
         + 0.3 * longevity_factor
     ) * 100
-    return min(score, 100.0)
+    return soft_cap(score)

@@ -63,9 +63,9 @@ TOP_CAREERS_SHOWN = 30   # the page shows one row and expands to all of these
 # The fun lists under the GOATs, in page order. The numbers come from
 # career.leaderboards(); the words live here. `label` heads each card's bar.
 LEADERBOARDS = [
-    {"key": "in_form", "title": "In form", "label": "Recent form",
+    {"key": "in_form", "title": "In form", "label": "Form",
      "meta": "best form over the last 3 fights, latest counts most"},
-    {"key": "gauntlet", "title": "The gauntlet", "label": "Opponent strength",
+    {"key": "gauntlet", "title": "The gauntlet", "label": "Opposition, last 5",
      "meta": "toughest last 5 opponents"},
     {"key": "leg_kicks", "title": "Leg kickers", "label": "Leg strikes thrown / min",
      "meta": "most leg strikes thrown per minute"},

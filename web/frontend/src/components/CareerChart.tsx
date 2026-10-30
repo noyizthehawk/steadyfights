@@ -40,16 +40,15 @@ export function CareerChart({ timeline }: { timeline: TimelineFight[] }) {
   const perf = timeline.map((f) => f.perf);
   const opp = timeline.map((f) => f.opp);
 
-  // Fixed domains, not per-fighter min/max: auto-scaling would make every
+  // One fixed 0-100 domain for both lines — the same ratings as the PERF and
+  // OPP badges — not per-fighter min/max: auto-scaling would make every
   // fighter's chart look equally dramatic and stop them being comparable.
   const px = (i: number) => PAD.left + (i / Math.max(1, n - 1)) * (W - PAD.left - PAD.right);
-  const yPerf = (v: number) =>
-    PAD.top + (1 - Math.min(1, Math.max(0, (v - 20) / 60))) * (H - PAD.top - PAD.bottom);
-  const yOpp = (v: number) =>
-    PAD.top + (1 - Math.min(1, Math.max(0, (v - 0.4) / 0.4))) * (H - PAD.top - PAD.bottom);
+  const y = (v: number) =>
+    PAD.top + (1 - Math.min(1, Math.max(0, v / 100))) * (H - PAD.top - PAD.bottom);
 
-  const line = (vals: number[], y: (v: number) => number) =>
-    smooth(vals).map((v, i) => `${i ? "L" : "M"}${px(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const line = (vals: number[], yOf: (v: number) => number) =>
+    smooth(vals).map((v, i) => `${i ? "L" : "M"}${px(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(" ");
 
   const active = sel !== null ? timeline[sel] : null;
 
@@ -65,12 +64,12 @@ export function CareerChart({ timeline }: { timeline: TimelineFight[] }) {
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 rounded" style={{ background: OPP }} />
-          <span className="text-zinc-400">Opponent strength</span>
+          <span className="text-zinc-400">Opposition</span>
         </span>
       </div>
 
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img"
-           aria-label={`Performance and opponent strength across ${n} fights`}>
+           aria-label={`Performance and opposition across ${n} fights`}>
         {[0.25, 0.5, 0.75].map((f) => (
           <line key={f} x1={PAD.left} x2={W - PAD.right}
                 y1={PAD.top + f * (H - PAD.top - PAD.bottom)}
@@ -78,18 +77,18 @@ export function CareerChart({ timeline }: { timeline: TimelineFight[] }) {
                 stroke="#27272a" strokeWidth="0.5" />
         ))}
 
-        <path d={line(opp, yOpp)} fill="none" stroke={OPP} strokeWidth="1.5"
+        <path d={line(opp, y)} fill="none" stroke={OPP} strokeWidth="1.5"
               strokeLinejoin="round" opacity="0.9" />
-        <path d={line(perf, yPerf)} fill="none" stroke={PERF} strokeWidth="1.5"
+        <path d={line(perf, y)} fill="none" stroke={PERF} strokeWidth="1.5"
               strokeLinejoin="round" />
 
         {/* One dot per fight — the individual opponents. A loss is hollow, so the
             shape carries the result and colour stays free for the series. */}
         {timeline.map((f, i) => (
           <g key={f.fight_number}>
-            <circle cx={px(i)} cy={yOpp(f.opp)} r={sel === i ? 3 : 2}
+            <circle cx={px(i)} cy={y(f.opp)} r={sel === i ? 3 : 2}
                     fill={f.won ? OPP : "#0a0a0a"} stroke={OPP} strokeWidth="1" />
-            <circle cx={px(i)} cy={yPerf(f.perf)} r={sel === i ? 3 : 2}
+            <circle cx={px(i)} cy={y(f.perf)} r={sel === i ? 3 : 2}
                     fill={f.won ? PERF : "#0a0a0a"} stroke={PERF} strokeWidth="1" />
             {/* generous invisible hit area — the dots are far too small to tap */}
             <rect x={px(i) - (W / n) / 2} y="0" width={W / n} height={H}
@@ -120,7 +119,7 @@ export function CareerChart({ timeline }: { timeline: TimelineFight[] }) {
             </span>
             <span className="text-white"> vs {active.opponent}</span>
             <span className="text-zinc-500">
-              {" · "}perf {active.perf} / 75 · opp {Math.round(active.opp * 100)} / 75
+              {" · "}PERF {Math.round(active.perf)} · OPP {Math.round(active.opp)}
             </span>
           </div>
         ) : (

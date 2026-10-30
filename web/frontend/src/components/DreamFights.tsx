@@ -169,7 +169,7 @@ export function DreamFights({ paywalled, onFreeLeft, onPaywall }: Props) {
             <div className="h-px bg-zinc-800" />
             <StageLine name={result.fighter_b} meta={result.stage_b} accent="text-blue-400" />
           </div>
-          <ResultCard result={result} />
+          <ResultCard result={result} showStyles={false} />
         </>
       )}
     </section>

@@ -88,7 +88,7 @@ export function FighterCard({ fighter, rank }: { fighter: FighterCardData; rank?
           className="mt-1 flex items-center gap-1.5 text-xs italic text-zinc-500"
           style={{ fontFamily: "var(--font-rundown)" }}
         >
-          {/* the flag normally sits beside RF in the cells row below; a debut
+          {/* the flag normally sits beside FORM in the cells row below; a debut
               card has no cells row, so it rides the caption instead */}
           {debut && fighter.flag_url && (
             <img
@@ -112,19 +112,19 @@ export function FighterCard({ fighter, rank }: { fighter: FighterCardData; rank?
             <ScoreDot
               label="PERF"
               value={fighter.overall_perf!}
-              title={`Overall performance ${fighter.overall_perf}/100 — how well they perform once opponent quality is accounted for`}
+              title={`Performance ${Math.round(fighter.overall_perf!)} — how well they perform once opponent quality is accounted for`}
             />
             <ScoreDot
               label="OPP"
               value={fighter.overall_opp!}
-              title={`Overall opponent strength ${fighter.overall_opp}/100 — the calibre faced across the career`}
+              title={`Opposition ${Math.round(fighter.overall_opp!)} — quality of opponents faced across the career`}
             />
             <ScoreDot
-              label="RF"
+              label="FORM"
               value={fighter.recent_perf!}
-              title={`Recent performance ${fighter.recent_perf}/100 — last 3 fights, latest counts most`}
+              title={`Form ${Math.round(fighter.recent_perf!)} — last 3 fights, latest counts most`}
             />
-            {/* flag right beside RF. Same 24px height as the dots and
+            {/* flag right beside FORM. Same 24px height as the dots and
                 bottom-aligned with them (items-end), so it reads as one more
                 badge in the row. Only fighters from a scraped event card have
                 one; legends don't. */}

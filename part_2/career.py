@@ -11,7 +11,8 @@ import numpy as np
 import pandas as pd
 from unidecode import unidecode
 
-from part_2.career_score import compute_career_score
+from part_2.career_score import compute_career_score, soft_cap
+from part_2.elo import add_elo
 
 
 def normalize_name(s):
@@ -73,8 +74,13 @@ def _recent_form(fights):
     A plain mean let one outlier night outweigh a fresh loss — Chimaev read
     99.8 straight after losing to Strickland, carried by the Du Plessis
     performance two fights back. Weighted, he's still elite but visibly dented.
-    Returns the raw value; callers scale it like any other Adj Perf average."""
-    recent = fights["Adj Perf"].tail(RECENT_FORM_FIGHTS).to_numpy(dtype=float)
+    Returns the raw value; callers scale it like any other Adj Perf average.
+
+    A fight with no Adj Perf is skipped rather than blanking the whole figure:
+    38 fighters had one in their last 3, which left their form empty."""
+    recent = fights["Adj Perf"].dropna().tail(RECENT_FORM_FIGHTS).to_numpy(dtype=float)
+    if len(recent) == 0:
+        return float("nan")
     weights = np.arange(1, len(recent) + 1)
     return float((recent * weights).sum() / weights.sum())
 
@@ -286,14 +292,63 @@ _SCALE_BOUNDS = {
     # bound or it clamps: observed last-5 range is 0.422-0.688 against a career
     # range of 0.422-0.626.
     "opp_str_recent": (0.42, 0.69),
+    # ONE opponent (the career chart's dots) ranges 0.39-0.75, far past a career
+    # average, so it gets its own bounds; see _fight_opp for how it's blended
+    # with Elo.
+    "opp_str_fight": (0.41, 0.67),
+    # opponent Elo on fight night: ~1460 is a debutant who has lost, ~1700 an
+    # established champion (the 99th percentile is 1652, the max 1761)
+    "opp_elo": (1460.0, 1700.0),
 }
 
 
+# Aged well: how far an opponent's rating must climb after the fight to count
+# as a story. 15 rating points ≈ the 0.05 of raw strength it used to be.
+AGED_WELL_MIN_GAIN = 15.0
+
+_opp_elo = None
+
+
+def _opp_elo_lookup():
+    """(fighter_norm, date) -> the opponent's Elo going into that fight, from
+    part_2.elo: the same ratings Bout Brain trains on. Built once."""
+    global _opp_elo
+    if _opp_elo is None:
+        fl = pd.read_csv(fighter_csv, usecols=["fight_id", "name", "winner", "date"], low_memory=False)
+        fl["date"] = pd.to_datetime(fl["date"], errors="coerce")
+        fl = fl.sort_values("date").reset_index(drop=True)   # Elo replays in date order
+        add_elo(fl)
+        _opp_elo = dict(zip(zip(fl["name"].map(normalize_name), fl["date"]),
+                            fl["opponent_elo_before_fight"]))
+    return _opp_elo
+
+
+def _fight_opp(opp_str, fighter_norm, date):
+    """How strong one opponent was on fight night, 0-99: the average of two
+    measures whose mistakes run in opposite directions.
+
+    * Opp Str (their record and performance so far) can't see WHO they beat,
+      so an unbeaten record against modest opposition rates elite: Bryce
+      Mitchell, 15-0, read 98 against Topuria, above Holloway at 80.
+    * Elo knows who they beat but starts every UFC newcomer at 1500, so a
+      champion from another promotion reads as a nobody: Cormier 69, Gane 65.
+
+    Blended, Mitchell reads 77 and Holloway 88, while Cormier and Gane stay
+    in the 80s. 90+ falls from 5.2% of fights to 0.5%: Usman, Volkanovski,
+    Du Plessis. Without an Elo for the fight it falls back to Opp Str alone."""
+    by_record = _scale_to_100(opp_str, "opp_str_fight")
+    elo = _opp_elo_lookup().get((fighter_norm, date))
+    if elo is None or pd.isna(elo):
+        return by_record
+    return round((by_record + _scale_to_100(elo, "opp_elo")) / 2, 1)
+
+
 def _scale_to_100(value, kind):
-    """Min-max normalize a career-average stat onto 0-100, clamped to the ends."""
+    """Min-max normalize a stat onto 0-100: floored at 0, eased toward 100 at
+    the top by soft_cap (shared with the career score) instead of clamped."""
     lo, hi = _SCALE_BOUNDS[kind]
     scaled = (value - lo) / (hi - lo) * 100
-    return round(min(100.0, max(0.0, scaled)), 1)
+    return round(float(soft_cap(max(0.0, scaled))), 1)
 
 
 def _compute_career_score(fights, max_adj_perf):
@@ -359,11 +414,12 @@ def _phase(sub):
     return {
         "fights": int(len(sub)),
         "win_rate": round(float(sub["win(1)/loss(0)"].mean()) * 100, 1),
-        
-        "raw_perf": round(float(sub["Raw Perf"].mean()), 1),
-        "adj_perf": round(float(sub["Adj Perf"].mean()), 1),
-    
-        "opp_strength": round(float(sub["Opp Str"].mean()), 3),
+        # the same 0-100 ratings as the PERF and OPP rings, on the SAME bounds
+        # so a phase and the career figure add up (the bars used to be raw
+        # averages drawn out of 75). Wider bounds were tried and dropped: every
+        # phase then read below the career ring.
+        "perf": _scale_to_100(float(sub["Adj Perf"].mean()), "adj_perf"),
+        "opp": _scale_to_100(float(sub["Opp Str"].mean()), "opp_str"),
         "bouts": bouts,
     }
 _aged_well_index = None
@@ -372,9 +428,10 @@ _aged_well_index = None
 def _aged_index():
     """Two lookups behind the 'aged well' view, built once and cached.
 
-    opp_history — every strength reading each fighter ever recorded AS an
-    opponent, date-sorted. The max of the readings AFTER a given fight is what
-    they went on to become.
+    opp_history — every rating each fighter ever recorded AS an opponent,
+    date-sorted. The max of the ratings AFTER a given fight is what they went
+    on to become. Each is _fight_opp, the same 0-99 Opp Str + Elo blend as the
+    career chart's dots, so "then" here and the chart's dot always agree.
 
     title_wins — every date each fighter won a title fight, sorted. A peak alone
     can't tell you someone became champion; Opp Str blends win rate and
@@ -385,10 +442,13 @@ def _aged_index():
         return _aged_well_index
 
     df = _load()
+    rows = df[["opponent_name", "date", "Opp Str", "Fighter_norm"]].dropna().copy()
+    rows["rating"] = [_fight_opp(s, f, d) for s, f, d in
+                      zip(rows["Opp Str"], rows["Fighter_norm"], rows["date"])]
     history = {}
-    for name, g in df[["opponent_name", "date", "Opp Str"]].dropna().groupby("opponent_name"):
+    for name, g in rows.groupby("opponent_name"):
         g = g.sort_values("date")
-        history[name] = (g["date"].tolist(), g["Opp Str"].tolist())
+        history[name] = (g["date"].tolist(), g["rating"].tolist())
 
     fl = pd.read_csv(fighter_csv, low_memory=False)
     tf = fl[(fl["title_fight"] == 1) & (fl["winner"] == fl["name"])].copy()
@@ -642,12 +702,13 @@ def career_summary_api(fighter):
             "opponent": r["opponent_name"],
             "won": bool(int(r["win(1)/loss(0)"])),
             "event": r["Event"],
-            "perf": round(float(r["Raw Perf"]), 1),
-            "adj_perf": round(float(r["Adj Perf"]), 1),
-            "opp": round(float(r["Opp Str"]), 3),
+            # each fight on the same 0-100 rating as PERF and OPP (a standout
+            # night can top out at 100); was raw perf "out of 75"
+            "perf": _scale_to_100(float(r["Adj Perf"]), "adj_perf"),
+            "opp": _fight_opp(float(r["Opp Str"]), r["Fighter_norm"], r["date"]),
         }
         for _, r in fights.iterrows()
-        if pd.notna(r["Raw Perf"]) and pd.notna(r["Opp Str"])
+        if pd.notna(r["Adj Perf"]) and pd.notna(r["Opp Str"])
     ]
 
     # "Aged well": what the opponent went on to become AFTER this fight.
@@ -676,19 +737,19 @@ def career_summary_api(fighter):
         became_champ = bool(later_titles)
         title_date = later_titles[0] if later_titles else None
 
-        then = float(r["Opp Str"])
+        then = _fight_opp(float(r["Opp Str"]), r["Fighter_norm"], when)   # = the chart's dot
         gain = (peak_after - then) if peak_after is not None else 0.0
         # a flat reading is usually the <3-fight placeholder (39% of rows), not a
         # verdict, so it must not qualify as a story
-        if (gain > 0.05 or became_champ) and opp_name not in seen_opponents:
+        if (gain > AGED_WELL_MIN_GAIN or became_champ) and opp_name not in seen_opponents:
             seen_opponents.add(opp_name)
             aged.append({
                 "fight_number": int(r["fight_number"]),
                 "opponent": opp_name,
                 "won": bool(int(r["win(1)/loss(0)"])),
                 "event": r["Event"],
-                "then": round(then, 3),
-                "peak_after": round(float(peak_after), 3) if peak_after is not None else None,
+                "then": round(then, 1),
+                "peak_after": round(float(peak_after), 1) if peak_after is not None else None,
                 "became_champion": became_champ,
                 # None when it happened in this very fight, else years later
                 "champion_years_later": (
