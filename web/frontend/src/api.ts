@@ -245,7 +245,14 @@ export type TopCareer = {           // shape → export type
 
 export type LoginResponse = { message: string };
 export type SignupResponse = { message: string };
-export type MeResponse = { id: number; email: string; username: string; avatar_url: string | null };
+export type MeResponse = {
+  id: number;
+  email: string;
+  username: string;
+  avatar_url: string | null;
+  subscription_status: string | null; // Stripe status: active | past_due | canceled | ...
+  has_billing: boolean;               // has a Stripe Customer, so the portal can open
+};
 
 // Upload the current user's avatar (multipart). Returns the new public URL.
 export async function uploadAvatar(file: File): Promise<{ avatar_url: string }> {
@@ -303,6 +310,21 @@ export async function buyCoins(pack: CoinPack): Promise<string> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Could not buy coins");
+  }
+  const data: { url: string } = await res.json();
+  return data.url;
+}
+
+export async function openBillingPortal(): Promise<string> {
+  // Stripe-hosted page to cancel / update card / view invoices; returns its URL
+  const res = await fetch(`${BASE_URL}/api/billing/portal`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not open billing portal");
   }
   const data: { url: string } = await res.json();
   return data.url;

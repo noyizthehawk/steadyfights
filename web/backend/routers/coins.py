@@ -1,9 +1,14 @@
+import logging
+
 from fastapi import APIRouter, Request, Header, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 import stripe
 from ..config import FRONTEND_URL, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID
 from ..dependencies import get_curr_user, DBDep
 from ..models import User, CoinReason, CoinLedger
 from ..ledgers import record_movement
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 COIN_PACKS = {
@@ -12,86 +17,156 @@ COIN_PACKS = {
     "large": {"coins": 10000, "price_cents": 1999, "label": "10000 coins"},
 }
 
+# Stripe subscription statuses that still count as "has a live subscription"
+# for blocking a second checkout. Access itself is gated on == "active" in predict.py.
+LIVE_SUB_STATUSES = {"active", "trialing", "past_due"}
+
+
+def _require_stripe():
+    # README promises the app runs without Stripe configured — fail clean, not 500
+    if not stripe.api_key:
+        raise HTTPException(status_code=503, detail="Payments are not configured")
+
 
 @router.post("/api/coin/checkout")
 def checkout(pack_id: str, user: User = Depends(get_curr_user)):
-    #user picks a pack
+    _require_stripe()
     pack = COIN_PACKS.get(pack_id)
     if not pack:
         raise HTTPException(status_code=404, detail="Pack not found")
-    session = stripe.checkout.Session.create(
-        mode="payment",
-        line_items=[{
-            "price_data": {
-                "currency": "cad",
-                "product_data": {"name": pack["label"]},
-                "unit_amount": pack["price_cents"],   # the real price
-            },
-            "quantity": 1,
-        }],
-        success_url=f"{FRONTEND_URL}/success",
-        cancel_url=f"{FRONTEND_URL}/cancel",
-        metadata={"user_id": str(user.id), "pack_id": pack_id},
-    )
-    return {"url": session.url}  # redirect to checkout
+    try:
+        session = stripe.checkout.Session.create(
+            mode="payment",
+            line_items=[{
+                "price_data": {
+                    "currency": "cad",
+                    "product_data": {"name": pack["label"]},
+                    "unit_amount": pack["price_cents"],   # price comes from the server, never the client
+                },
+                "quantity": 1,
+            }],
+            success_url=f"{FRONTEND_URL}/success",
+            cancel_url=f"{FRONTEND_URL}/cancel",
+            client_reference_id=str(user.id),
+            metadata={"user_id": str(user.id), "pack_id": pack_id},
+        )
+    except stripe.StripeError:
+        log.exception("stripe coin checkout failed")
+        raise HTTPException(status_code=502, detail="Could not reach payment provider")
+    return {"url": session.url}
 
 
 @router.post("/api/billing/checkout")
 def billing_checkout(db: DBDep, user: User = Depends(get_curr_user)):
-    # reuse this user's Stripe Customer, or create one and remember it — the
-    # Customer is how the cancellation webhook later finds them back
-    if not user.stripe_customer_id:
-        customer = stripe.Customer.create(email=user.email, metadata={"user_id": str(user.id)})
-        user.stripe_customer_id = customer.id
-        db.commit()
-    session = stripe.checkout.Session.create(
-        mode="subscription",
-        customer=user.stripe_customer_id,
-        line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
-        success_url=f"{FRONTEND_URL}/predictor?subscribed=1",
-        cancel_url=f"{FRONTEND_URL}/predictor",
-        metadata={"user_id": str(user.id)},
-    )
+    _require_stripe()
+    # don't let someone stack a second $10/mo subscription on top of a live one
+    if user.subscription_status in LIVE_SUB_STATUSES:
+        raise HTTPException(status_code=409, detail="You're already subscribed — manage it from your account page")
+    try:
+        # reuse this user's Stripe Customer, or create one and remember it — the
+        # Customer is how subscription webhooks find the user again
+        if not user.stripe_customer_id:
+            customer = stripe.Customer.create(email=user.email, metadata={"user_id": str(user.id)})
+            user.stripe_customer_id = customer.id
+            db.commit()
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            customer=user.stripe_customer_id,
+            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            success_url=f"{FRONTEND_URL}/predictor?subscribed=1",
+            cancel_url=f"{FRONTEND_URL}/predictor",
+            client_reference_id=str(user.id),
+            metadata={"user_id": str(user.id)},
+        )
+    except stripe.StripeError:
+        log.exception("stripe subscription checkout failed")
+        raise HTTPException(status_code=502, detail="Could not reach payment provider")
     return {"url": session.url}
+
+
+@router.post("/api/billing/portal")
+def billing_portal(user: User = Depends(get_curr_user)):
+    """Stripe-hosted page where the user cancels, swaps card, sees invoices.
+    Cancellations made there come back to us as customer.subscription.* webhooks."""
+    _require_stripe()
+    if not user.stripe_customer_id:
+        raise HTTPException(status_code=404, detail="No billing account yet")
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=user.stripe_customer_id,
+            return_url=f"{FRONTEND_URL}/account",
+        )
+    except stripe.StripeError:
+        log.exception("stripe billing portal failed")
+        raise HTTPException(status_code=502, detail="Could not open billing portal")
+    return {"url": session.url}
+
+
+def _credit_coins(db, session_obj) -> dict:
+    """Credit a paid coin checkout exactly once, keyed on the Checkout Session id."""
+    # checkout.session.completed can fire with payment still pending for async
+    # methods (bank debits); those get credited on async_payment_succeeded instead
+    if session_obj.get("payment_status") != "paid":
+        return {"status": "awaiting payment"}
+
+    session_id = session_obj["id"]
+    if db.query(CoinLedger).filter(CoinLedger.external_id == session_id).first():
+        return {"status": "already processed"}
+
+    meta = session_obj.get("metadata") or {}
+    pack = COIN_PACKS.get(meta.get("pack_id"))
+    if not pack:
+        # a 4xx would make Stripe retry for days with the same bad data — log and ack
+        log.error("coin webhook: unknown pack %r on session %s", meta.get("pack_id"), session_id)
+        return {"status": "unknown pack"}
+
+    try:
+        record_movement(db, int(meta["user_id"]), pack["coins"],
+                        CoinReason.purchase, external_id=session_id)
+    except IntegrityError:
+        # two deliveries of the same event raced past the check above; the unique
+        # external_id let exactly one insert win
+        db.rollback()
+        return {"status": "already processed"}
+    return {"status": "coins credited"}
+
+
+def _sync_subscription(db, subscription_id: str) -> dict:
+    """Copy the subscription's CURRENT status from Stripe onto the user.
+
+    Webhooks can arrive out of order (an old 'updated' after a 'deleted'), so we
+    don't trust the status inside the event — we re-fetch the latest state."""
+    sub = stripe.Subscription.retrieve(subscription_id)
+    user = db.query(User).filter(User.stripe_customer_id == sub["customer"]).first()
+    if not user:
+        log.error("subscription webhook: no user for customer %s", sub["customer"])
+        return {"status": "unknown customer"}
+    user.subscription_status = sub["status"]   # active | past_due | canceled | unpaid | ...
+    db.commit()
+    return {"status": f"subscription {sub['status']}"}
 
 
 @router.post("/api/coin/webhook")   # unified Stripe webhook: coin purchases + subscription
 async def stripe_webhook(req: Request, db: DBDep, stripe_signature: str = Header(None)):
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Webhook not configured")
     payload = await req.body()
     try:
         event = stripe.Webhook.construct_event(payload, stripe_signature, STRIPE_WEBHOOK_SECRET)
-    except Exception:
+    except (ValueError, stripe.SignatureVerificationError):
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     etype = event["type"]
     obj = event["data"]["object"]
 
-    if etype == "checkout.session.completed":
+    if etype in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
         if obj.get("mode") == "subscription":
-            user = db.get(User, int(obj["metadata"]["user_id"]))
-            if user:
-                user.subscription_status = "active"
-                db.commit()
-            return {"status": "subscription active"}
+            return _sync_subscription(db, obj["subscription"])
+        return _credit_coins(db, obj)
 
-        # otherwise it's a coin purchase
-        session_id = obj["id"]
-        if db.query(CoinLedger).filter(CoinLedger.external_id == session_id).first():
-            return {"status": "already processed"}
-        pack = COIN_PACKS.get(obj["metadata"].get("pack_id"))
-        if not pack:
-            raise HTTPException(status_code=400, detail="Pack not found")
-        record_movement(db, int(obj["metadata"]["user_id"]), pack["coins"],
-                        CoinReason.purchase, external_id=session_id)
-        return {"status": "coins credited"}
-
-    # subscription ended/canceled -> revoke access. The subscription object has
-    # no user_id metadata, so we find the user by their stored Stripe Customer id.
-    if etype == "customer.subscription.deleted":
-        user = db.query(User).filter(User.stripe_customer_id == obj.get("customer")).first()
-        if user:
-            user.subscription_status = "canceled"
-            db.commit()
-        return {"status": "subscription canceled"}
+    if etype in ("customer.subscription.created",
+                 "customer.subscription.updated",
+                 "customer.subscription.deleted"):
+        return _sync_subscription(db, obj["id"])
 
     return {"status": "ignored"}

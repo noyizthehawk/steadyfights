@@ -40,7 +40,16 @@ def add_user(db, email="s@x.com", customer_id=None):
 
 def feed(event):
     # bypass signature verification: make construct_event return our fake event
+    coins_module.STRIPE_WEBHOOK_SECRET = "whsec_test"
     coins_module.stripe.Webhook.construct_event = lambda payload, sig, secret: event
+
+
+def stripe_has_sub(sub_id, customer, status):
+    # the webhook re-fetches the subscription instead of trusting the event body
+    def retrieve(i):
+        assert i == sub_id
+        return {"id": sub_id, "customer": customer, "status": status}
+    coins_module.stripe.Subscription.retrieve = retrieve
 
 
 def call_webhook(db):
@@ -49,10 +58,11 @@ def call_webhook(db):
 
 def test_subscription_checkout_activates_user():
     db = make_db()
-    user = add_user(db)
+    user = add_user(db, customer_id="cus_1")
+    stripe_has_sub("sub_1", "cus_1", "active")
     feed({
         "type": "checkout.session.completed",
-        "data": {"object": {"mode": "subscription", "id": "cs_sub_1",
+        "data": {"object": {"mode": "subscription", "id": "cs_sub_1", "subscription": "sub_1",
                              "metadata": {"user_id": str(user.id)}}},
     })
     call_webhook(db)
@@ -64,9 +74,10 @@ def test_subscription_deleted_cancels_user():
     db = make_db()
     user = add_user(db, customer_id="cus_123")
     user.subscription_status = "active"; db.commit()
+    stripe_has_sub("sub_9", "cus_123", "canceled")
     feed({
         "type": "customer.subscription.deleted",
-        "data": {"object": {"customer": "cus_123"}},   # found by Customer id, not metadata
+        "data": {"object": {"id": "sub_9", "customer": "cus_123"}},   # found by Customer id
     })
     call_webhook(db)
     db.refresh(user)
@@ -79,7 +90,7 @@ def test_coin_purchase_still_credits():
     user = add_user(db)
     feed({
         "type": "checkout.session.completed",
-        "data": {"object": {"mode": "payment", "id": "cs_coin_1",
+        "data": {"object": {"mode": "payment", "id": "cs_coin_1", "payment_status": "paid",
                              "metadata": {"user_id": str(user.id), "pack_id": "small"}}},
     })
     call_webhook(db)
@@ -91,12 +102,45 @@ def test_coin_purchase_is_idempotent():
     user = add_user(db)
     feed({
         "type": "checkout.session.completed",
-        "data": {"object": {"mode": "payment", "id": "cs_dupe",
+        "data": {"object": {"mode": "payment", "id": "cs_dupe", "payment_status": "paid",
                              "metadata": {"user_id": str(user.id), "pack_id": "small"}}},
     })
     call_webhook(db)
     call_webhook(db)                          # same session id delivered twice
     assert get_balance(db, user.id) == 1000   # credited once, not twice
+
+
+def test_stale_event_uses_live_status():
+    """An out-of-order 'updated' event saying active must not resurrect a canceled sub."""
+    db = make_db()
+    user = add_user(db, customer_id="cus_7")
+    stripe_has_sub("sub_7", "cus_7", "canceled")      # Stripe's truth right now
+    feed({
+        "type": "customer.subscription.updated",
+        "data": {"object": {"id": "sub_7", "customer": "cus_7", "status": "active"}},  # stale
+    })
+    call_webhook(db)
+    db.refresh(user)
+    assert user.subscription_status == "canceled"
+
+
+def test_unpaid_coin_session_not_credited():
+    db = make_db()
+    user = add_user(db)
+    feed({
+        "type": "checkout.session.completed",
+        "data": {"object": {"mode": "payment", "id": "cs_async", "payment_status": "unpaid",
+                             "metadata": {"user_id": str(user.id), "pack_id": "small"}}},
+    })
+    call_webhook(db)
+    assert get_balance(db, user.id) == 0
+    feed({
+        "type": "checkout.session.async_payment_succeeded",
+        "data": {"object": {"mode": "payment", "id": "cs_async", "payment_status": "paid",
+                             "metadata": {"user_id": str(user.id), "pack_id": "small"}}},
+    })
+    call_webhook(db)
+    assert get_balance(db, user.id) == 1000
 
 
 if __name__ == "__main__":
@@ -105,6 +149,8 @@ if __name__ == "__main__":
         test_subscription_deleted_cancels_user,
         test_coin_purchase_still_credits,
         test_coin_purchase_is_idempotent,
+        test_stale_event_uses_live_status,
+        test_unpaid_coin_session_not_credited,
     ]
     passed = 0
     for t in tests:

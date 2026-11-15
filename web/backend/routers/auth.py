@@ -98,4 +98,6 @@ def logout(db: DBDep, response: Response, refresh_token: str = Cookie(None)):
 @router.get("/api/me")
 def get_me(user: User = Depends(get_curr_user)):
     return {"id": user.id, "email": user.email, "username": user.username,
-            "avatar_url": user.avatar_url}
+            "avatar_url": user.avatar_url,
+            "subscription_status": user.subscription_status,
+            "has_billing": bool(user.stripe_customer_id)}
