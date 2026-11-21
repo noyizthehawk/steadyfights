@@ -155,6 +155,8 @@ async def stripe_webhook(req: Request, db: DBDep, stripe_signature: str = Header
         event = stripe.Webhook.construct_event(payload, stripe_signature, STRIPE_WEBHOOK_SECRET)
     except (ValueError, stripe.SignatureVerificationError):
         raise HTTPException(status_code=400, detail="Invalid signature")
+    # stripe>=8 objects aren't dicts (no .get) — flatten to plain nested dicts
+    event = event.to_dict()
 
     etype = event["type"]
     obj = event["data"]["object"]

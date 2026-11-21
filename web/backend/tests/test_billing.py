@@ -41,7 +41,10 @@ def add_user(db, email="s@x.com", customer_id=None):
 def feed(event):
     # bypass signature verification: make construct_event return our fake event
     coins_module.STRIPE_WEBHOOK_SECRET = "whsec_test"
-    coins_module.stripe.Webhook.construct_event = lambda payload, sig, secret: event
+    # wrap in a REAL stripe.Event: real ones aren't dicts (no .get), and plain
+    # dicts here once hid exactly that bug
+    real = coins_module.stripe.Event.construct_from({"object": "event", **event}, "sk_test")
+    coins_module.stripe.Webhook.construct_event = lambda payload, sig, secret: real
 
 
 def stripe_has_sub(sub_id, customer, status):
