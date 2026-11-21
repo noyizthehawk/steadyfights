@@ -3,13 +3,18 @@ per-event stats and their list of past events."""
 import re
 import time
 
-from fastapi import APIRouter, HTTPException
+import json
+
+from fastapi import APIRouter, Depends, HTTPException
+from redis import RedisError
 from sqlalchemy import and_, func
 
-from ..dependencies import DBDep
+from ..config import LEADERBOARD_TTL
+from ..dependencies import DBDep, get_curr_user
 from ..event_timing import EVENT_DURATION, event_phase, UPCOMING
 from ..models import User, UFCEvent, UFCFight, Pick, NotableExtraction
-from ..stats import compute_user_stats
+from ..redis_client import redis_client
+from ..stats import compute_user_stats, compute_leaderboard
 from part_2.career import normalize_name, fighter_tag
 
 router = APIRouter()
@@ -80,6 +85,66 @@ def get_upcoming_events(db: DBDep):
             }
             for event in events
         ]
+    }
+
+
+def _ranked_ids(db) -> list[int]:
+    """User ids in world-leaderboard order (same ranking as /api/leaderboard).
+    The landing page asks on every visit, so the order is cached like the board."""
+    key = "leaderboard:ranked_ids"
+    if redis_client is not None:
+        try:
+            cached = redis_client.get(key)
+            if cached is not None:
+                return json.loads(cached)
+        except RedisError:
+            pass
+    ids = [row["id"] for row in compute_leaderboard(db)]
+    if redis_client is not None:
+        try:
+            redis_client.set(key, json.dumps(ids), ex=LEADERBOARD_TTL)
+        except RedisError:
+            pass
+    return ids
+
+
+@router.get("/api/me/intro")
+def my_intro(db: DBDep, user: User = Depends(get_curr_user)):
+    """Everything the landing page's ring-announcer intro needs, in one call:
+    world rank + pick record (the announcer line) and the next card with how
+    much of it this user has picked (the fight-week line)."""
+    record = compute_user_stats(db, user.id)
+    ranked = _ranked_ids(db)
+    rank = ranked.index(user.id) + 1 if user.id in ranked else None
+
+    now = int(time.time())
+    nxt = None
+    events = upcoming_events(db, now)
+    if events:
+        ev = events[0]
+        live = [f for f in ev.fights if f.status != "cancelled"]
+        fight_ids = {f.id for f in live}
+        mine = {fid: picked for fid, picked in
+                db.query(Pick.fight_id, Pick.picked)
+                  .filter(Pick.user_id == user.id, Pick.fight_id.in_(fight_ids)).all()}
+        winners = {f.id: f.winner for f in live if f.winner is not None}
+        mine_settled = [fid for fid in mine if fid in winners]
+        nxt = {
+            "id": ev.id,
+            "title": ev.title,
+            "date": ev.date,
+            "phase": event_phase(ev.date, now),
+            "fights": len(live),
+            "picked": len(mine),
+            "settled": len(mine_settled),
+            "correct": sum(1 for fid in mine_settled if mine[fid] == winners[fid]),
+        }
+
+    return {
+        "rank": rank,
+        "settled": record["fights_settled"],
+        "correct": record["correct"],
+        "next": nxt,
     }
 
 

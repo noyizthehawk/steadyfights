@@ -22,6 +22,7 @@ import { NewsTile } from "../components/NewsTile";
 import { VideoTile } from "../components/VideoTile";
 import { NotableUsers } from "../components/NotableUsers";
 import { PunditConsensus } from "../components/PunditConsensus";
+import { RingIntro } from "../components/RingIntro";
 
 
 const FEATURES: { title: string; blurb: string; to: string }[] = [
@@ -70,15 +71,11 @@ export default function LandingPage() {
 
   return (
     <div className="w-full px-4 py-8 text-[#e7e7ea]">
-      <section className="mx-auto max-w-3xl py-12 text-center">
+      {/* logged in: the greeting sits top-left, flush with the body grid below
+          (same max-w-6xl); logged out: the centred hero */}
+      <section className={user ? "mx-auto max-w-6xl pb-10 pt-2" : "mx-auto max-w-3xl py-12 text-center"}>
         {user ? (
-          <>
-            <h1 className="mb-4 text-4xl font-bold text-white sm:text-5xl">
-              Welcome back, <span className="text-[#d33a2c]">{user!.username}</span>.
-            </h1>
-            <p className="mx-auto max-w-xl text-lg text-zinc-400">
-            </p>
-          </>
+          <RingIntro username={user.username} />
         ) : user === null ? (
           <>
             <h1 className="mb-4 text-4xl font-bold text-white sm:text-5xl">

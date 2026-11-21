@@ -77,12 +77,82 @@ def _recent_form(fights):
     Returns the raw value; callers scale it like any other Adj Perf average.
 
     A fight with no Adj Perf is skipped rather than blanking the whole figure:
-    38 fighters had one in their last 3, which left their form empty."""
-    recent = fights["Adj Perf"].dropna().tail(RECENT_FORM_FIGHTS).to_numpy(dtype=float)
-    if len(recent) == 0:
-        return float("nan")
+    38 fighters had one in their last 3, which left their form empty.
+
+    With RECENT_FORM_FIGHTS or fewer fights the window IS the whole career, so
+    form falls back to the plain mean — identical to the career average. Weighting
+    there gave two different numbers from the exact same fights, which read as
+    a bug; "form" only means something once there's a career before it."""
+    perf = fights["Adj Perf"].dropna()
+    if len(perf) <= RECENT_FORM_FIGHTS:
+        return float(perf.mean()) if len(perf) else float("nan")
+    recent = perf.tail(RECENT_FORM_FIGHTS).to_numpy(dtype=float)
     weights = np.arange(1, len(recent) + 1)
     return float((recent * weights).sum() / weights.sum())
+
+
+# Small-sample shrinkage for career performance. A fighter's average is shown as
+# if they'd also had SHRINK_K league-average fights:
+#     (sum of their Adj Perf + K * league mean) / (fights + K)
+# Why: across fighters with 6+ fights, the average of the first two explains only
+# ~18% of what follows (slope 0.18), so a 2-fight average is mostly noise — and
+# 17 of the top 25 by raw average had 3 or fewer UFC fights (Amosov: 94.3 off two
+# wins). K=3 is deliberately gentler than the data's implied ~9, so real prospects
+# still stand out. Long careers barely move (19 fights: 14% pull). Opposition
+# strength is NOT shrunk — who you fought is a fact, not a noisy measurement.
+SHRINK_K = 3
+_perf_prior = None
+
+
+def _league_perf_mean():
+    """Mean Adj Perf of a single UFC fight — the 'average fight' we shrink toward."""
+    global _perf_prior
+    if _perf_prior is None:
+        _perf_prior = float(_load()["Adj Perf"].dropna().mean())
+    return _perf_prior
+
+
+def _career_perf(fights):
+    """Shrunk career Adj Perf (raw units; scale with 'adj_perf_career').
+    No measured fights → NaN, never the prior alone: shrinking an empty career
+    would invent a league-average 59.5 for someone we know nothing about."""
+    perf = fights["Adj Perf"].dropna()
+    if perf.empty:
+        return float("nan")
+    return float((perf.sum() + SHRINK_K * _league_perf_mean()) / (len(perf) + SHRINK_K))
+
+
+def _form_perf(fights):
+    """Form on the career scale: the shrunk career figure plus how far the last
+    few fights sit from the fighter's OWN raw average.
+
+    Form is descriptive ("how have they looked lately"), so the recent swing is
+    not shrunk — a next-fight backtest (n=9189) found recent form adds little
+    over the career average, but that's a reason not to over-read it, not to
+    flatten the ring. The swing is converted at the OLD bounds' width so form
+    moves exactly as much as it did before shrinkage. When the last few fights
+    match their average — including every career of RECENT_FORM_FIGHTS or fewer,
+    where _recent_form is the plain mean — form equals the career number."""
+    perf = fights["Adj Perf"].dropna()
+    if perf.empty:
+        return float("nan")
+    swing = _recent_form(fights) - float(perf.mean())
+    lo, hi = _SCALE_BOUNDS["adj_perf_career"]
+    old_lo, old_hi = _SCALE_BOUNDS["adj_perf"]
+    return _career_perf(fights) + swing * (hi - lo) / (old_hi - old_lo)
+
+
+def _recent_opp_scaled(fights):
+    """Recent strength of opposition (last RECENT_OPP_FIGHTS) on 0-100.
+
+    It normally uses the wider opp_str_recent bounds (a 5-fight mean swings more
+    than a career mean). But with RECENT_OPP_FIGHTS or fewer fights the window
+    IS the career, so the raw mean is identical to the career one — and scaling
+    it on different bounds showed two numbers for the same fights (Amosov,
+    2 fights: 89.9 career vs 70.0 recent). There, use the career figure."""
+    window = fights.tail(RECENT_OPP_FIGHTS)
+    kind = "opp_str" if len(fights) <= RECENT_OPP_FIGHTS else "opp_str_recent"
+    return _scale_to_100(float(window["Opp Str"].mean()), kind)
 
 
 _QUANTILES = {
@@ -287,6 +357,13 @@ def _opp_label(scaled):
 _SCALE_BOUNDS = {
     "raw_perf": (30.0, 70.0),
     "adj_perf": (3.0, 65.0),
+    # Career performance is SHRUNK toward the league mean (_career_perf), which
+    # pulls the whole distribution inward — on the old bounds every fighter lost
+    # points. These were fitted so two anchors keep today's numbers: the median
+    # 3+-fight career still scores 59.5 and the best career still tops out where
+    # it did. Re-fit (scratch script: solve for lo/hi from the shrunk median and
+    # max) if SHRINK_K or the data changes materially.
+    "adj_perf_career": (11.8, 59.0),
     "opp_str":  (0.42, 0.63),
     # A 5-fight mean swings wider than a career mean, so it needs its own upper
     # bound or it clamps: observed last-5 range is 0.422-0.688 against a career
@@ -841,7 +918,8 @@ def career_summary_api(fighter):
     vol = fights["Raw Perf"].std()
     volatility = round(float(vol), 1) if pd.notna(vol) else 0.0
 
-    avg_adj = float(fights["Adj Perf"].mean())
+    # shrunk toward the league mean for short careers (see SHRINK_K)
+    perf_score = _scale_to_100(_career_perf(fights), "adj_perf_career")
     avg_opp = float(fights["Opp Str"].mean())
 
     wins = fights[fights["win(1)/loss(0)"] == 1]
@@ -855,11 +933,9 @@ def career_summary_api(fighter):
     # (e.g. Oliveira) scores high here even if their career average is dragged
     # down by early years.
     recent = fights.tail(RECENT_FORM_FIGHTS)
-    recent_perf = _scale_to_100(_recent_form(fights), "adj_perf")
+    recent_perf = _scale_to_100(_form_perf(fights), "adj_perf_career")
     recent_wins = int((recent["win(1)/loss(0)"] == 1).sum())
     recent_record = f"{recent_wins} - {len(recent) - recent_wins}"
-
-    recent_opp = float(fights.tail(RECENT_OPP_FIGHTS)["Opp Str"].mean())
 
     fighter_stats = get_fighter_stats(fighter)
     division = _division(fights)
@@ -874,14 +950,14 @@ def career_summary_api(fighter):
         "timeline": timeline,
         "aged_well": aged,
         "avg_raw_perf": _scale_to_100(float(fights["Raw Perf"].mean()), "raw_perf"),
-        "avg_adj_perf": _scale_to_100(avg_adj, "adj_perf"),
-        "perf_label": _perf_label(_scale_to_100(avg_adj, "adj_perf")),
+        "avg_adj_perf": perf_score,
+        "perf_label": _perf_label(perf_score),
         "recent_perf": recent_perf,                  # last-3 form, same 0-100 scale
         "recent_record": recent_record,              # e.g. "2 - 1"
         "avg_opp_strength": _scale_to_100(avg_opp, "opp_str"),
         "opp_label": _opp_label(_scale_to_100(avg_opp, "opp_str")),
-        "recent_opp_strength": _scale_to_100(recent_opp, "opp_str_recent"),
-        "recent_opp_label": _opp_label(_scale_to_100(recent_opp, "opp_str_recent")),
+        "recent_opp_strength": _recent_opp_scaled(fights),
+        "recent_opp_label": _opp_label(_recent_opp_scaled(fights)),
         "volatility": volatility,
         "volatility_label": _volatility_label(vol),
         "career_score": round(float(score), 1),
@@ -980,7 +1056,7 @@ def _fighter_tag_cached(name_norm):
         # Overall figures for the fighter cards, scaled exactly as the profile's
         # rings (avg_adj_perf / avg_opp_strength) so a card and the profile
         # always show the same number.
-        "overall_perf": _scale_to_100(float(fights["Adj Perf"].mean()), "adj_perf"),
+        "overall_perf": _scale_to_100(_career_perf(fights), "adj_perf_career"),
         "overall_opp": _scale_to_100(float(fights["Opp Str"].mean()), "opp_str"),
         "record": f"{wins} - {len(fights) - wins}",
         "division": _division(fights),
@@ -988,8 +1064,8 @@ def _fighter_tag_cached(name_norm):
         # Both already min-max scaled to 0-100 by _scale_to_100, using bounds
         # picked for the realistic career-average band — not the raw column
         # ranges. So these are directly comparable to each other and to score.
-        "recent_form": _scale_to_100(_recent_form(fights), "adj_perf"),
-        "strength_iq": _scale_to_100(float(opp_window["Opp Str"].mean()), "opp_str_recent"),
+        "recent_form": _scale_to_100(_form_perf(fights), "adj_perf_career"),
+        "strength_iq": _recent_opp_scaled(fights),
         "total_fights": int(len(fights)),
         "recent_record": f"{recent_wins} - {len(recent) - recent_wins}",
         "opp_record": f"{opp_wins} - {len(opp_window) - opp_wins}",   # W-L over the strength_iq window

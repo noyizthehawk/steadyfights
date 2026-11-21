@@ -146,6 +146,19 @@ code {
   animation: card-in 0.25s ease-out;
 }
 
+/* ring-announcer intro on the landing page: each line rises in, staggered by
+   an inline animation-delay. `both` keeps a line hidden until its turn. */
+@keyframes ring-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ring-in {
+  animation: ring-in 0.5s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-in { animation: none; }
+}
+
 /* ---- PP Neue Montreal (rundown) ----
    Commercial licence, so the .woff2 files are not committed — see
    public/fonts/README.md. font-display:swap means a missing or slow font shows

@@ -315,6 +315,29 @@ export async function buyCoins(pack: CoinPack): Promise<string> {
   return data.url;
 }
 
+export type Intro = {
+  rank: number | null;   // world-leaderboard position; null = unranked (< 3 settled picks)
+  settled: number;
+  correct: number;
+  next: {
+    id: number;
+    title: string;
+    date: number;        // unix seconds
+    phase: "upcoming" | "in_progress" | "past";
+    fights: number;
+    picked: number;      // how many of this card's fights the user has picked
+    settled: number;     // ...of those, how many have results
+    correct: number;
+  } | null;
+};
+
+export async function getIntro(): Promise<Intro> {
+  const res = await fetch(`${BASE_URL}/api/me/intro`, { credentials: "include" });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load intro");
+  return res.json();
+}
+
 export type BillingSummary = {
   status: string | null;            // Stripe status we store: active | past_due | canceled | ...
   free_left: number;
