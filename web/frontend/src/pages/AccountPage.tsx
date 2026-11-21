@@ -1,23 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { me, openBillingPortal, uploadAvatar, type MeResponse } from "../api";
+import { me, uploadAvatar, type MeResponse } from "../api";
 import { Avatar } from "../components/Avatar";
+import { BoutBrainPlan } from "../components/BoutBrainPlan";
 import { errorMessage } from "../lib/errorMessage";
-
-const SUB_LABEL: Record<string, string> = {
-  active: "Active",
-  trialing: "Trial",
-  past_due: "Payment failed — update your card",
-  unpaid: "Unpaid",
-  canceled: "Canceled",
-  incomplete: "Incomplete",
-  incomplete_expired: "Expired",
-};
 
 export default function AccountPage() {
   const [user, setUser] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string>("");
   const [uploading, setUploading] = useState(false);
-  const [opening, setOpening] = useState(false); // billing portal redirect in flight
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -37,17 +27,6 @@ export default function AccountPage() {
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = ""; // allow re-selecting the same file
-    }
-  }
-
-  async function onManageBilling() {
-    setError("");
-    setOpening(true);
-    try {
-      window.location.href = await openBillingPortal(); // full-page redirect to Stripe
-    } catch (err) {
-      setError(errorMessage(err));
-      setOpening(false); // only reset on failure — success navigates away
     }
   }
 
@@ -83,24 +62,7 @@ export default function AccountPage() {
       <p className="mt-3 text-xs text-zinc-500">JPEG, PNG, or WebP · up to 5 MB.</p>
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
 
-      {user.has_billing && (
-        <div className="mt-6 rounded-2xl bg-zinc-900 p-6">
-          <div className="text-[10px] tracking-[0.3em] text-zinc-400">SUBSCRIPTION</div>
-          <p className="mt-2 text-sm text-white">
-            Bout Brain ·{" "}
-            <span className={user.subscription_status === "active" ? "text-emerald-400" : "text-zinc-400"}>
-              {SUB_LABEL[user.subscription_status ?? ""] ?? "Not subscribed"}
-            </span>
-          </p>
-          <button
-            onClick={onManageBilling}
-            disabled={opening}
-            className="mt-3 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 transition hover:border-red-500/60 hover:text-white disabled:opacity-60"
-          >
-            {opening ? "Opening…" : "Manage billing"}
-          </button>
-        </div>
-      )}
+      <BoutBrainPlan />
     </div>
   );
 }

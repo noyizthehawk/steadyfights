@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { getFighters, predict, startSubscription, PaywallError, AuthError } from "../api";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { getFighters, me, predict, startSubscription, PaywallError, AuthError } from "../api";
 import type { PredictResult } from "../api";
 import { FighterSelect } from "../components/FighterSelect";
 import { ResultCard } from "../components/ResultCard";
@@ -34,6 +34,69 @@ function FreeDots({ left, total = 10 }: { left: number; total?: number }) {
   );
 }
 
+type SubState = "confirming" | "active" | "slow";
+
+// Shown after returning from Stripe Checkout. Waits for the webhook before
+// saying "unlocked", so it never promises access the backend hasn't granted.
+function SubscribedPanel({ state, onClose }: { state: SubState; onClose: () => void }) {
+  const done = state === "active";
+  const accent = done ? "#34d399" : "#fbbf24";
+  return (
+    <div
+      role="status"
+      className="relative mx-auto mt-5 max-w-md rounded-xl border bg-black p-5 text-left sm:mt-6"
+      style={{ borderColor: `${accent}4d` }}
+    >
+      {done && (
+        <button
+          onClick={onClose}
+          aria-label="Dismiss"
+          className="absolute right-3 top-3 p-1 text-zinc-500 transition-colors hover:text-white"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+            <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-hidden
+          className={`block h-2 w-2 rounded-full ${done ? "" : "animate-pulse"}`}
+          style={{ background: accent, boxShadow: `0 0 0 4px ${accent}22` }}
+        />
+        <span className="text-[11px] leading-none" style={{ fontFamily: "var(--font-display)", color: accent }}>
+          {done ? "YOU MADE WEIGHT" : "WEIGHING IN"}
+        </span>
+      </div>
+      <div
+        className="mt-4 space-y-1.5 border-l-2 pl-3 text-sm italic text-zinc-300"
+        style={{ fontFamily: "var(--font-rundown)", borderColor: accent }}
+      >
+        {state === "confirming" && <p>Payment received — unlocking Bout Brain…</p>}
+        {state === "active" && (
+          <>
+            <p>Bout Brain is unlocked.</p>
+            <p>Unlimited predictions, every card.</p>
+            <p className="text-zinc-500">
+              Manage your plan any time from{" "}
+              <Link to="/account" className="underline decoration-zinc-600 underline-offset-4 hover:text-zinc-200">
+                Account
+              </Link>
+              .
+            </p>
+          </>
+        )}
+        {state === "slow" && (
+          <>
+            <p>Payment received — it's taking longer than usual to unlock.</p>
+            <p className="text-zinc-500">Refresh in a minute. You won't be charged twice.</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PredictorPage() {
   // state
   const [fighters, setFighters] = useState<string[]>([]); // names for the dropdowns
@@ -45,7 +108,8 @@ export default function PredictorPage() {
   const [paywalled, setPaywalled] = useState<boolean>(false); // out of free predictions?
   const [freeLeft, setFreeLeft] = useState<number | null>(null); // free predictions remaining
   const [subscribing, setSubscribing] = useState<boolean>(false); // subscribe redirect in flight
-  const [justSubscribed, setJustSubscribed] = useState<boolean>(false); // returned from checkout
+  // returned from checkout: confirming (webhook not landed yet) → active, or slow if it never shows
+  const [subState, setSubState] = useState<SubState | null>(null);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -58,12 +122,36 @@ export default function PredictorPage() {
 
   
   useEffect(() => {
-    if (searchParams.get("subscribed") === "1") {
-      setPaywalled(false); //set paywall to false, open the gate
-      setJustSubscribed(true); //flag
-      setSearchParams({}, { replace: true }); // clean the URL so a refresh doesn't re-trigger
-    }
+    if (searchParams.get("subscribed") !== "1") return;
+    setPaywalled(false); //set paywall to false, open the gate
+    setSearchParams({}, { replace: true }); // clean the URL so a refresh doesn't re-trigger
+    setSubState("confirming");
   }, [searchParams, setSearchParams]);
+
+  // Stripe redirects here before its webhook reaches us, so poll until the
+  // backend has actually marked the subscription active (same idea as /success).
+  // Its own effect: clearing the URL above re-runs that one, and its cleanup
+  // would otherwise cancel this poll immediately.
+  useEffect(() => {
+    if (subState !== "confirming") return;
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        try {
+          const u = await me();
+          if (cancelled) return;
+          if (u.subscription_status === "active") return setSubState("active");
+        } catch {
+          /* transient — retry */
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (!cancelled) setSubState("slow");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [subState]);
 
   // prediction handler
   async function handlePredict() {
@@ -115,11 +203,7 @@ export default function PredictorPage() {
         <h1>
           <span className="text-[#d33a2c]">FIGHTS,</span> FIGURED OUT.
         </h1>
-        {justSubscribed && (
-          <p className="subtitle" style={{ color: "#4ade80" }}>
-            You're subscribed! You just made weight.
-          </p>
-        )}
+        {subState && <SubscribedPanel state={subState} onClose={() => setSubState(null)} />}
       </section>
 
       {/* One row, gap-6, no per-child margins — the whole layout's rhythm comes

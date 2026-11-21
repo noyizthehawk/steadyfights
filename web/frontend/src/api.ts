@@ -315,6 +315,23 @@ export async function buyCoins(pack: CoinPack): Promise<string> {
   return data.url;
 }
 
+export type BillingSummary = {
+  status: string | null;            // Stripe status we store: active | past_due | canceled | ...
+  free_left: number;
+  free_limit: number;
+  price_label: string;              // "$10 / month"
+  period_end: number | null;        // unix seconds — next renewal, or when access ends
+  cancel_at_period_end: boolean;    // cancelled, but still active until period_end
+  card: { brand: string; last4: string } | null;
+};
+
+export async function getBillingSummary(): Promise<BillingSummary> {
+  const res = await fetch(`${BASE_URL}/api/billing/summary`, { credentials: "include" });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load your plan");
+  return res.json();
+}
+
 export async function openBillingPortal(): Promise<string> {
   // Stripe-hosted page to cancel / update card / view invoices; returns its URL
   const res = await fetch(`${BASE_URL}/api/billing/portal`, {

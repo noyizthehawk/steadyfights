@@ -102,6 +102,44 @@ def billing_portal(user: User = Depends(get_curr_user)):
     return {"url": session.url}
 
 
+@router.get("/api/billing/summary")
+def billing_summary(user: User = Depends(get_curr_user)):
+    """What the Account page shows: plan state, renewal/cancel date, card on file.
+    Read live from Stripe so a pending cancellation shows up immediately (our
+    stored status stays 'active' until the period actually ends)."""
+    from .predict import FREE_PREDICTION_LIMIT   # local import: avoid a router import cycle
+    summary = {
+        "status": user.subscription_status,
+        "free_left": max(0, FREE_PREDICTION_LIMIT - (user.free_predictions_used or 0)),
+        "free_limit": FREE_PREDICTION_LIMIT,
+        "price_label": "$10 / month",
+        "period_end": None,          # unix seconds: next renewal, or when access ends
+        "cancel_at_period_end": False,
+        "card": None,                # {"brand": "visa", "last4": "4242"}
+    }
+    if not (stripe.api_key and user.stripe_customer_id):
+        return summary
+    try:
+        subs = stripe.Subscription.list(customer=user.stripe_customer_id, status="all",
+                                        limit=1, expand=["data.default_payment_method"])
+    except stripe.StripeError:
+        log.exception("billing summary lookup failed")
+        return summary                # page still renders from our stored status
+    if not subs["data"]:
+        return summary
+    sub = subs["data"][0].to_dict()
+    # since API 2025-03 the period lives on the subscription item, not the subscription
+    items = (sub.get("items") or {}).get("data") or []
+    summary["period_end"] = sub.get("current_period_end") or (items[0].get("current_period_end") if items else None)
+    summary["cancel_at_period_end"] = bool(sub.get("cancel_at_period_end") or sub.get("cancel_at"))
+    if sub.get("cancel_at"):
+        summary["period_end"] = sub["cancel_at"]
+    card = (sub.get("default_payment_method") or {}).get("card") if isinstance(sub.get("default_payment_method"), dict) else None
+    if card:
+        summary["card"] = {"brand": card.get("brand"), "last4": card.get("last4")}
+    return summary
+
+
 def _credit_coins(db, session_obj) -> dict:
     """Credit a paid coin checkout exactly once, keyed on the Checkout Session id."""
     # checkout.session.completed can fire with payment still pending for async

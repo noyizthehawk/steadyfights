@@ -23,7 +23,8 @@ export default function Footer() {
 
       {/* legal — kept, but subtle so the footer stays seamless */}
       <p className="mx-auto mt-4 max-w-6xl text-center text-[10px] leading-relaxed text-zinc-600">
-        Coins are for entertainment only and cannot be redeemed for cash or prizes. Not affiliated with UFC®.
+        Coins are for entertainment only and cannot be redeemed for cash or prizes. Not affiliated with UFC®.{" "}
+        <Link to="/privacy" className="underline transition-colors hover:text-white">Privacy</Link>
       </p>
     </footer>
   );

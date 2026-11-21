@@ -25,6 +25,7 @@ import RoomDetailPage from "./pages/RoomDetailPage";
 import CoinsPage from "./pages/CoinsPage";
 import CoinsSuccessPage from "./pages/CoinsSuccessPage";
 import CoinsCancelPage from "./pages/CoinsCancelPage";
+import PrivacyPage from "./pages/PrivacyPage";
 import { me, logout } from "./api";
 import Footer from "./components/Footer";
 import { LogoMark } from "./components/Logo";
@@ -219,6 +220,7 @@ export default function App() {
         <Route path="/top-career" element={<TopCareerPage />} />
         <Route path="/predictor" element={<PredictorPage />} />
         <Route path="/bout-brain/record" element={<BoutBrainRecordPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
       </Routes>
 
       <Footer />
