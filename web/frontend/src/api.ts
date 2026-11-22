@@ -315,6 +315,34 @@ export async function buyCoins(pack: CoinPack): Promise<string> {
   return data.url;
 }
 
+export type TotwPlayer = {
+  fighter: string;
+  won: boolean;
+  opponent: string;
+  method: string | null;        // "UD", "SUB R4", "TKO R1"
+  event: string;
+  date: string;                 // YYYY-MM-DD
+  division: string | null;
+  night: number;                // that fight's performance, 0-100
+  career_score: number;         // integer, rounded like CareerScoreChip
+  career_delta: number | null;  // change from before this fight; null = debut
+  form: number;                 // FORM after this fight, integer like the card's FORM dot
+  form_delta: number | null;    // change from before this fight; null = debut
+  record: string;
+  image_url: string | null;
+  flag_url: string | null;
+  country: string | null;
+};
+
+export type Totw = { week_start: string; week_end: string; events: string[]; team: TotwPlayer[] };
+
+export async function getTotw(): Promise<Totw | null> {
+  const res = await fetch(`${BASE_URL}/api/totw`);
+  if (!res.ok) throw new Error("Could not load Team of the Week");
+  const data: { totw: Totw | null } = await res.json();
+  return data.totw;
+}
+
 export type Intro = {
   rank: number | null;   // world-leaderboard position; null = unranked (< 3 settled picks)
   settled: number;

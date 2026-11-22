@@ -23,6 +23,7 @@ import { VideoTile } from "../components/VideoTile";
 import { NotableUsers } from "../components/NotableUsers";
 import { PunditConsensus } from "../components/PunditConsensus";
 import { RingIntro } from "../components/RingIntro";
+import { TeamOfTheWeek } from "../components/TeamOfTheWeek";
 
 
 const FEATURES: { title: string; blurb: string; to: string }[] = [
@@ -100,6 +101,9 @@ export default function LandingPage() {
           </>
         ) : null}
       </section>
+
+      {/* the week's five best performances, FIFA TOTW-style — public */}
+      <TeamOfTheWeek />
 
       {/* Body: events (left) · feature tiles (center) · leaderboard (right) */}
       <section className="mx-auto flex max-w-6xl flex-col gap-6 pb-16 lg:flex-row">

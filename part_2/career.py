@@ -1010,6 +1010,69 @@ def _ranked_careers(min_fights):
     return results
 
 
+TOTW_SIZE = 5
+TOTW_WINDOW_DAYS = 7
+
+
+@lru_cache(maxsize=None)
+def team_of_the_week():
+    """The week's best performances — the newest week of fights in the data
+    (everything within TOTW_WINDOW_DAYS of the newest fight date), top TOTW_SIZE
+    by that night's Adj Perf, win OR lose.
+
+    Each player carries their career score now and before this fight, so the
+    card can show the FIFA-style upgrade arrow. "Before" is the same formula on
+    the fights up to but not including this one; a debut has no before.
+    Cached for the process like the rest: data only changes on refresh+restart."""
+    df = _load()
+    dated = df.dropna(subset=["date", "Adj Perf"])
+    if dated.empty:
+        return None
+    newest = dated["date"].max()
+    week = dated[dated["date"] > newest - pd.Timedelta(days=TOTW_WINDOW_DAYS)]
+    max_adj = df["Adj Perf"].max()
+
+    team = []
+    for _, r in week.nlargest(TOTW_SIZE, "Adj Perf").iterrows():
+        fights = df[df["Fighter_norm"] == r["Fighter_norm"]].sort_values("fight_number")
+        upto = fights[fights["fight_number"] <= r["fight_number"]]
+        before = fights[fights["fight_number"] < r["fight_number"]]
+        # Integers on both sides, so the arrow always equals the visible
+        # difference. Rounded like the UI's CareerScoreChip (Math.round on the
+        # 1-dp tag value, halves UP) — Python's round() is banker's, and 68.5
+        # came out 68 here but 69 on the fighter's normal card.
+        def shown(x):
+            return math.floor(round(float(x), 1) + 0.5)
+        now = shown(_compute_career_score(upto, max_adj))
+        prev = shown(_compute_career_score(before, max_adj)) if not before.empty else None
+        # FORM the same way — the card's FORM dot (ScoreDot) also Math.rounds
+        form_now = shown(_scale_to_100(_form_perf(upto), "adj_perf_career"))
+        form_prev = shown(_scale_to_100(_form_perf(before), "adj_perf_career")) if not before.empty else None
+        wins = int((upto["win(1)/loss(0)"] == 1).sum())
+        team.append({
+            "fighter": r["Fighter"],
+            "won": bool(int(r["win(1)/loss(0)"])),
+            "opponent": r["opponent_name"],
+            "method": _short_method(r.get("method"), r.get("finish_round")),
+            "event": r["Event"],
+            "date": str(r["date"])[:10],
+            "division": _division(fights),
+            # that night alone, on the per-fight scale the career chart uses
+            "night": _scale_to_100(float(r["Adj Perf"]), "adj_perf"),
+            "career_score": now,
+            "career_delta": None if prev is None else now - prev,   # None = debut
+            "form": form_now,
+            "form_delta": None if form_prev is None else form_now - form_prev,
+            "record": f"{wins} - {len(upto) - wins}",
+        })
+    return {
+        "week_start": str((newest - pd.Timedelta(days=TOTW_WINDOW_DAYS - 1)).date()),
+        "week_end": str(newest.date()),
+        "events": sorted(week["Event"].dropna().unique().tolist()),
+        "team": team,
+    }
+
+
 def top_careers(n = 10, min_fights = 8):
     # slice a copy — callers must not be able to mutate the cached list
     return list(_ranked_careers(min_fights)[:n])

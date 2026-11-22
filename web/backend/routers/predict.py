@@ -161,6 +161,22 @@ def _card_fighters(event) -> list[str]:
     return names
 
 
+@router.get("/api/totw")
+def team_of_the_week(db: DBDep):
+    """Team of the Week for the homepage: the newest week's top performances
+    (career.team_of_the_week) plus each fighter's headshot and flag."""
+    totw = career.team_of_the_week()
+    if not totw:
+        return {"totw": None}
+    pictures = headshots.lookup(db, [p["fighter"] for p in totw["team"]])
+    team = []
+    for p in totw["team"]:
+        pic = pictures.get(normalize_name(p["fighter"]), {})
+        team.append({**p, "image_url": pic.get("image_url"), "flag_url": pic.get("flag_url"),
+                     "country": pic.get("country")})
+    return {"totw": {**totw, "team": team}}
+
+
 @router.get("/api/fighters/browse")
 def browse_fighters(db: DBDep):
     """The Fighters page's sections: everyone on the next card (in bout order)
