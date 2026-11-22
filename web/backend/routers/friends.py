@@ -49,7 +49,7 @@ async def send_invite(req: InviteRequest, db: DBDep, user: User = Depends(get_cu
     # must not break the request. Log it (don't swallow silently) so failures
     # are visible instead of vanishing.
     try:
-        await send_friend_request_email(target.email, user.email)
+        await send_friend_request_email(target.email, user.username)
     except Exception as e:
         print(f"[friend-invite email failed] to={target.email}: {e}")
     db.refresh(invite)
