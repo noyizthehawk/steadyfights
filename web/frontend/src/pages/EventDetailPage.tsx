@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { getUpcomingEvents, getMyPicks, makePick, clearPick, getEventPunditPicks,
+import { getUpcomingEvents, getMyPicks, me, makePick, clearPick, getEventPunditPicks,
          getFighterTags, AuthError, type UFCEvent, type EventPunditPicks,
          type FighterTags as FighterTagMap } from "../api";
 import { picksLocked, punditPicksVisible } from "../lib/lock";
@@ -8,6 +8,8 @@ import { PunditCluster } from "../components/PunditCluster";
 import { Flag } from "../components/Flag";
 import EventComments from "../components/EventComments";
 import { FighterTags, ScoreChip } from "../components/FighterTags";
+import { AskBoutBrain } from "../components/AskBoutBrain";
+import { SharePicks } from "../components/SharePicks";
 
 export default function EventDetailPage() {
    //slug from route
@@ -23,6 +25,13 @@ export default function EventDetailPage() {
     // badges fill in — same split as pundit picks. Empty object until then, so
     // the lookups below just return undefined and render nothing.
     const [tags, setTags] = useState<FighterTagMap>({});
+    // which fight's Ask Bout Brain panel is open, if any
+    const [askOpen, setAskOpen] = useState<number | null>(null);
+    // for the share-picks image; null when logged out (no picks to share anyway)
+    const [username, setUsername] = useState<string | null>(null);
+    useEffect(() => {
+        me().then((u) => setUsername(u.username)).catch(() => {});
+    }, []);
 
     //when slug changes
     useEffect(() => {
@@ -101,6 +110,7 @@ export default function EventDetailPage() {
                 <p className="text-sm text-zinc-400">
                     {new Date(event.date * 1000).toLocaleDateString()} · {event.venue ?? "TBA"}
                 </p>
+                {username && <SharePicks event={event} picks={picks} username={username} tags={tags} />}
                 {locked && (
                     // mb-10, not mb-6: this banner and the disabled PICK buttons
                     // below say the same thing, and sitting them close together
@@ -224,6 +234,32 @@ export default function EventDetailPage() {
                                 >
                                     {pickedB ? "PICKED" : "PICK"}
                                 </button>
+
+                                {/* Ask Bout Brain, right where the pick happens. One
+                                    open at a time so the card doesn't turn into a wall
+                                    of answers. */}
+                                {/* Hidden for a debutant: their tag comes back null (no UFC
+                                    fights), so there'd be nothing to answer from. Undefined
+                                    just means the tags haven't loaded yet. */}
+                                {tags[fight.fighter_a] !== null && tags[fight.fighter_b] !== null && (
+                                <div className="col-span-3 -mb-1 flex justify-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAskOpen(askOpen === fight.id ? null : fight.id)}
+                                        aria-expanded={askOpen === fight.id}
+                                        className="bg-transparent px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:text-white"
+                                        style={{ fontFamily: "var(--mono)" }}
+                                    >
+                                        {askOpen === fight.id ? "Close" : "Ask Bout Brain about this fight"}{" "}
+                                        <span aria-hidden>{askOpen === fight.id ? "▴" : "▾"}</span>
+                                    </button>
+                                </div>
+                                )}
+                                {askOpen === fight.id && (
+                                    <div className="col-span-3 overflow-hidden rounded-md bg-black">
+                                        <AskBoutBrain fighterA={fight.fighter_a} fighterB={fight.fighter_b} framed={false} />
+                                    </div>
+                                )}
                             </li>
                             );
                         })}

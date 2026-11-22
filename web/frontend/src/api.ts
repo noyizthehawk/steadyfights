@@ -1265,3 +1265,51 @@ export async function getBoutBrainPicks(): Promise<BoutBrainPicks> {
   if (!res.ok) throw new Error("Could not load Bout Brain's picks");
   return res.json() as Promise<BoutBrainPicks>;
 }
+
+// Ask Bout Brain: one question about one matchup, answered from our stats.
+export type BoutAskMeta = {
+  suggested: string[];
+  remaining: number;
+  limit: number;
+  subscribed: boolean;
+};
+
+export type BoutAnswer = {
+  question: string;
+  answer: string;
+  edge: "a" | "b" | "even" | "unknown";
+  remaining: number;
+  cached: boolean;
+};
+
+export async function getBoutAskMeta(): Promise<BoutAskMeta> {
+  const res = await fetch(`${BASE_URL}/api/bout/ask`, { credentials: "include" });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (!res.ok) throw new Error("Could not load questions");
+  return res.json();
+}
+
+export async function askBout(fighterA: string, fighterB: string, question: string): Promise<BoutAnswer> {
+  const res = await fetch(`${BASE_URL}/api/bout/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fighter_a: fighterA, fighter_b: fighterB, question }),
+    credentials: "include",
+  });
+  if (res.status === 401) throw new AuthError("Not authenticated");
+  if (res.status === 402) {
+    const err = await res.json().catch(() => ({}));
+    throw new PaywallError(err.detail || "You're out of free questions today.");
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(typeof err.detail === "string" ? err.detail : "Bout Brain couldn't answer that.");
+  }
+  return res.json();
+}
+
+// An event's poster, re-served from our own domain so a canvas can draw it
+// and still export (the share-picks image).
+export function eventPosterUrl(eventId: number): string {
+  return `${BASE_URL}/api/events/${eventId}/poster`;
+}

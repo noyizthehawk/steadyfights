@@ -479,3 +479,45 @@ def get_fighter_tags(event_id: int, db: DBDep):
                 tags[name] = fighter_tag(name)
 
     return {"event_id": event.id, "tags": tags}
+
+
+# Event posters, served from our own domain. The share-picks image draws the
+# poster on a canvas, and a browser refuses to export a canvas that holds
+# another site's image, so ufc.com's URL can't be used directly.
+#
+# Only ever fetches the poster URL we scraped for that event, from ufc.com,
+# so this can't be turned into an open proxy for arbitrary URLs.
+_POSTER_CACHE: dict[str, tuple[bytes, str]] = {}
+_POSTER_CACHE_MAX = 40
+_POSTER_MAX_BYTES = 3_000_000
+
+
+@router.get("/api/events/{event_id}/poster")
+def event_poster(event_id: int, db: DBDep):
+    import requests
+    from urllib.parse import urlparse
+    from fastapi.responses import Response
+
+    event = db.get(UFCEvent, event_id)
+    url = event.poster if event else None
+    if not url:
+        raise HTTPException(status_code=404, detail="No poster")
+    host = (urlparse(url).hostname or "").lower()
+    if urlparse(url).scheme != "https" or not (host == "ufc.com" or host.endswith(".ufc.com")):
+        raise HTTPException(status_code=404, detail="No poster")
+
+    hit = _POSTER_CACHE.get(url)
+    if hit is None:
+        try:
+            r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        except requests.RequestException:
+            raise HTTPException(status_code=502, detail="Poster unavailable")
+        ctype = r.headers.get("Content-Type", "").split(";")[0]
+        if r.status_code != 200 or not ctype.startswith("image/") or len(r.content) > _POSTER_MAX_BYTES:
+            raise HTTPException(status_code=502, detail="Poster unavailable")
+        if len(_POSTER_CACHE) >= _POSTER_CACHE_MAX:
+            _POSTER_CACHE.pop(next(iter(_POSTER_CACHE)))
+        hit = _POSTER_CACHE[url] = (r.content, ctype)
+
+    body, ctype = hit
+    return Response(content=body, media_type=ctype, headers={"Cache-Control": "public, max-age=86400"})

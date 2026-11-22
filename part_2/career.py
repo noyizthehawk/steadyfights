@@ -122,6 +122,33 @@ def _career_perf(fights):
     return float((perf.sum() + SHRINK_K * _league_perf_mean()) / (len(perf) + SHRINK_K))
 
 
+_opp_prior = None
+
+
+def _league_opp_mean():
+    """Mean Opp Str of a single UFC fight, the 'average opponent' we shrink toward."""
+    global _opp_prior
+    if _opp_prior is None:
+        _opp_prior = float(_load()["Opp Str"].dropna().mean())
+    return _opp_prior
+
+
+def _career_opp(fights):
+    """Shrunk career strength of opposition (raw units; scale with
+    'opp_str_career'). Same idea as _career_perf: two fights against decent
+    names isn't an elite schedule yet. Unshrunk, Amosov (Magny, Alvarez) read
+    89.9 "Elite Opposition", top 1% of the UFC, and 17 one- or two-fight
+    careers sat at 85+. NaN with no measured fights."""
+    opp = fights["Opp Str"].dropna()
+    if opp.empty:
+        return float("nan")
+    return float((opp.sum() + SHRINK_K * _league_opp_mean()) / (len(opp) + SHRINK_K))
+
+
+def _career_opp_scaled(fights):
+    return _scale_to_100(_career_opp(fights), "opp_str_career")
+
+
 def _form_perf(fights):
     """Form on the career scale: the shrunk career figure plus how far the last
     few fights sit from the fighter's OWN raw average.
@@ -147,12 +174,12 @@ def _recent_opp_scaled(fights):
 
     It normally uses the wider opp_str_recent bounds (a 5-fight mean swings more
     than a career mean). But with RECENT_OPP_FIGHTS or fewer fights the window
-    IS the career, so the raw mean is identical to the career one — and scaling
-    it on different bounds showed two numbers for the same fights (Amosov,
-    2 fights: 89.9 career vs 70.0 recent). There, use the career figure."""
+    IS the career, so it returns the career figure (shrunk, like the ring),
+    never a second number for the same fights."""
+    if len(fights) <= RECENT_OPP_FIGHTS:
+        return _career_opp_scaled(fights)
     window = fights.tail(RECENT_OPP_FIGHTS)
-    kind = "opp_str" if len(fights) <= RECENT_OPP_FIGHTS else "opp_str_recent"
-    return _scale_to_100(float(window["Opp Str"].mean()), kind)
+    return _scale_to_100(float(window["Opp Str"].mean()), "opp_str_recent")
 
 
 _QUANTILES = {
@@ -365,6 +392,10 @@ _SCALE_BOUNDS = {
     # max) if SHRINK_K or the data changes materially.
     "adj_perf_career": (11.8, 59.0),
     "opp_str":  (0.42, 0.63),
+    # Career opposition is shrunk toward the league mean (_career_opp), same as
+    # performance. Two-anchor re-fit: the median 3+-fight career keeps its 44.7
+    # and the toughest schedule keeps its top score.
+    "opp_str_career": (0.439, 0.617),
     # A 5-fight mean swings wider than a career mean, so it needs its own upper
     # bound or it clamps: observed last-5 range is 0.422-0.688 against a career
     # range of 0.422-0.626.
@@ -470,7 +501,25 @@ def _short_method(method, finish_round):
     return short
 
 
-def _phase(sub):
+def _phase_value(sub, fights, col, prior):
+    """A phase's mean, pulled toward the league mean by the SAME factor as the
+    whole career (K / career fights), not by K for the phase alone.
+
+    That makes the phases add up: the fight-weighted average of the phase
+    values equals the shrunk career figure exactly, since
+        sum_i (n_i/n) * (m_i + (K/n)P) / (1 + K/n)  =  (S + KP) / (n + K).
+    Shrinking each phase by the full K would pull a 5-fight phase much harder
+    than the 15-fight career it belongs to, and every phase would read below
+    the ring."""
+    vals = sub[col].dropna()
+    n_career = int(fights[col].notna().sum())
+    if vals.empty or n_career == 0:
+        return float("nan")
+    f = SHRINK_K / n_career
+    return (float(vals.mean()) + f * prior) / (1 + f)
+
+
+def _phase(sub, fights):
     """Aggregate one career phase (early/mid/late), or None if it has no fights."""
     if sub.empty:
         return None
@@ -491,12 +540,11 @@ def _phase(sub):
     return {
         "fights": int(len(sub)),
         "win_rate": round(float(sub["win(1)/loss(0)"].mean()) * 100, 1),
-        # the same 0-100 ratings as the PERF and OPP rings, on the SAME bounds
-        # so a phase and the career figure add up (the bars used to be raw
-        # averages drawn out of 75). Wider bounds were tried and dropped: every
-        # phase then read below the career ring.
-        "perf": _scale_to_100(float(sub["Adj Perf"].mean()), "adj_perf"),
-        "opp": _scale_to_100(float(sub["Opp Str"].mean()), "opp_str"),
+        # The same 0-100 ratings as the PERF and OPP rings: same shrinkage
+        # (scaled to the career, see _phase_value) and the same bounds, so the
+        # phases average out to the career figure.
+        "perf": _scale_to_100(_phase_value(sub, fights, "Adj Perf", _league_perf_mean()), "adj_perf_career"),
+        "opp": _scale_to_100(_phase_value(sub, fights, "Opp Str", _league_opp_mean()), "opp_str_career"),
         "bouts": bouts,
     }
 _aged_well_index = None
@@ -920,7 +968,6 @@ def career_summary_api(fighter):
 
     # shrunk toward the league mean for short careers (see SHRINK_K)
     perf_score = _scale_to_100(_career_perf(fights), "adj_perf_career")
-    avg_opp = float(fights["Opp Str"].mean())
 
     wins = fights[fights["win(1)/loss(0)"] == 1]
     losses = fights[fights["win(1)/loss(0)"] == 0]
@@ -954,8 +1001,8 @@ def career_summary_api(fighter):
         "perf_label": _perf_label(perf_score),
         "recent_perf": recent_perf,                  # last-3 form, same 0-100 scale
         "recent_record": recent_record,              # e.g. "2 - 1"
-        "avg_opp_strength": _scale_to_100(avg_opp, "opp_str"),
-        "opp_label": _opp_label(_scale_to_100(avg_opp, "opp_str")),
+        "avg_opp_strength": _career_opp_scaled(fights),
+        "opp_label": _opp_label(_career_opp_scaled(fights)),
         "recent_opp_strength": _recent_opp_scaled(fights),
         "recent_opp_label": _opp_label(_recent_opp_scaled(fights)),
         "volatility": volatility,
@@ -968,9 +1015,9 @@ def career_summary_api(fighter):
         # volatility check broke once already (see the comment above).
         "trajectory_bucket": bucket,
         "phases": {
-            "early": _phase(early),
-            "mid": _phase(mid),
-            "late": _phase(late),
+            "early": _phase(early, fights),
+            "mid": _phase(mid, fights),
+            "late": _phase(late, fights),
         },
         "record": record
     }
@@ -1120,7 +1167,7 @@ def _fighter_tag_cached(name_norm):
         # rings (avg_adj_perf / avg_opp_strength) so a card and the profile
         # always show the same number.
         "overall_perf": _scale_to_100(_career_perf(fights), "adj_perf_career"),
-        "overall_opp": _scale_to_100(float(fights["Opp Str"].mean()), "opp_str"),
+        "overall_opp": _career_opp_scaled(fights),
         "record": f"{wins} - {len(fights) - wins}",
         "division": _division(fights),
         "career_score": round(float(_compute_career_score(fights, df["Adj Perf"].max())), 1),

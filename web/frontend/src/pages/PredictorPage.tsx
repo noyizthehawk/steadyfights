@@ -239,7 +239,7 @@ export default function PredictorPage() {
             {error && <p className="error">{error}</p>}
           </div>
 
-          {result && <ResultCard result={result} />}
+          {result && <ResultCard key={`${result.fighter_a}|${result.fighter_b}`} result={result} ask />}
 
           <div>
             {heading("Quick predict")}

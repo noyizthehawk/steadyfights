@@ -6,13 +6,13 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
 
-from ..dependencies import get_curr_user, DBDep
+from ..dependencies import get_curr_user, DBDep, rate_limit_user
 from ..models import User, UFCFight, UFCEvent
-from ..schemas import PredictRequest, DreamRequest
+from ..schemas import PredictRequest, DreamRequest, BoutAskRequest
 from .events import upcoming_events
 from part_2 import Prediction_model as model
 from part_2 import career
-from .. import fighter_bio, headshots
+from .. import bout_qa, fighter_bio, headshots
 from part_2.career import normalize_name
 
 router = APIRouter()
@@ -302,6 +302,38 @@ def _charge(db, user, subscribed, result):
         user.free_predictions_used += 1
         db.commit()
         result["free_remaining"] = FREE_PREDICTION_LIMIT - user.free_predictions_used
+
+
+@router.get("/api/bout/ask")
+def bout_ask_meta(user: User = Depends(get_curr_user)):
+    """The suggested question chips and how many questions are left today."""
+    subscribed = user.subscription_status == "active"
+    return {
+        "suggested": bout_qa.SUGGESTED,
+        "remaining": bout_qa.remaining(user.id, subscribed),
+        "limit": bout_qa.SUB_DAILY if subscribed else bout_qa.FREE_DAILY,
+        "subscribed": subscribed,
+    }
+
+
+@router.post("/api/bout/ask", dependencies=[Depends(rate_limit_user("boutqa", limit=10, window=60))])
+def bout_ask(req: BoutAskRequest, user: User = Depends(get_curr_user)):
+    """Ask Bout Brain one question about a matchup, answered from our stats.
+    Names may come from an event card, which spells them its own way, so they
+    are matched on the normalised name rather than exactly."""
+    a, b = bout_qa.resolve(req.fighter_a), bout_qa.resolve(req.fighter_b)
+    missing = [n for n, r in ((req.fighter_a, a), (req.fighter_b, b)) if r is None]
+    if missing:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No UFC fights on record for {' or '.join(missing)} yet, so there's nothing to go on.",
+        )
+    if a == b:
+        raise HTTPException(status_code=400, detail="Pick two different fighters.")
+    try:
+        return bout_qa.ask(a, b, req.question, user.id, user.subscription_status == "active")
+    except bout_qa.AskError as e:
+        raise HTTPException(status_code=e.status, detail=e.detail)
 
 
 @router.get("/api/dream/fighters")

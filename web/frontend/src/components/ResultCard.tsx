@@ -1,13 +1,15 @@
 import type { PredictResult } from "../api";
+import { AskBoutBrain } from "./AskBoutBrain";
 
 const A = { name: "text-[#d33a2c]", bar: "bg-[#d33a2c]", pick: "border-[#d33a2c]/50 bg-[#d33a2c]/10" };
 const B = { name: "text-blue-400", bar: "bg-blue-400", pick: "border-blue-400/50 bg-blue-400/10" };
 
 const LABEL = "text-[9px] uppercase tracking-widest text-zinc-500";
 
+// `ask` adds the Ask Bout Brain box under the tale of the tape.
 // `showStyles` hides the style-cluster labels ("Striker" etc). Dream Fights turns
 // it off while the clustering is reworked — it called Kamaru Usman a striker.
-export function ResultCard({ result, showStyles = true }: { result: PredictResult; showStyles?: boolean }) {
+export function ResultCard({ result, showStyles = true, ask = false }: { result: PredictResult; showStyles?: boolean; ask?: boolean }) {
   const pickedA = result.pick === result.fighter_a;
   const picked = pickedA ? A : B;
 
@@ -92,6 +94,8 @@ export function ResultCard({ result, showStyles = true }: { result: PredictResul
           ))}
         </div>
       </div>
+
+      {ask && <AskBoutBrain fighterA={result.fighter_a} fighterB={result.fighter_b} />}
     </div>
   );
 }

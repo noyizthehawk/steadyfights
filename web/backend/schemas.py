@@ -8,6 +8,11 @@ class PredictRequest(BaseModel):
     fighter_a: str
     fighter_b: str
 
+class BoutAskRequest(BaseModel):
+    fighter_a: str
+    fighter_b: str
+    question: str = Field(max_length=200)
+
 class DreamRequest(BaseModel):
     """A cross-era matchup: two fighters, each frozen at a career stage."""
     fighter_a: str
